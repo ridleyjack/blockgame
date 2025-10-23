@@ -1,0 +1,25 @@
+Language: Cpp
+BasedOnStyle: LLVM
+
+AlignArrayOfStructures: Left
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterEnum: false
+  AfterNamespace: false
+  AfterStruct: false
+  SplitEmptyFunction: false
+
+# Vulkan is verbose.
+ColumnLimit: 120
+
+IncludeBlocks: Preserve
+
+PackConstructorInitializers: CurrentLine
+PointerAlignment: Left
+
+SortIncludes:
+  Enabled: false
