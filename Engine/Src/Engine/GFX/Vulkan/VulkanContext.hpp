@@ -10,7 +10,7 @@ namespace Engine {
 
 class Device;
 class SwapChain;
-class PipelineLibrary;
+class PipelineCache;
 class Command;
 class Sync;
 
@@ -52,7 +52,7 @@ public:
 
   Device& GetDevice() const;
   SwapChain& GetSwapchain() const;
-  PipelineLibrary& GetPipelineLibrary() const;
+  PipelineCache& GetPipelineLibrary() const;
   Command& GetCommand() const;
   Sync& GetSync() const;
 
@@ -71,7 +71,7 @@ private:
 
   std::unique_ptr<Device> device_{nullptr};
   std::unique_ptr<SwapChain> swapchain_{nullptr};
-  std::unique_ptr<PipelineLibrary> pipelineLibrary_{nullptr};
+  std::unique_ptr<PipelineCache> pipelineLibrary_{nullptr};
   std::unique_ptr<Command> command_{nullptr};
   std::unique_ptr<Sync> sync_{nullptr};
 

@@ -2,7 +2,7 @@
 
 #include "Engine/ILayer.hpp"
 #include "Engine/IEvent.hpp"
-#include "Engine/Renderer/VulkanRenderer.hpp"
+#include "Engine/GFX/Vulkan/VulkanRenderer.hpp"
 
 class GameLayer : public Engine::ILayer {
 public:

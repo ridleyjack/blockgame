@@ -12,13 +12,13 @@ struct CreatePipelineRequest {
   std::string FragmentShaderFile;
 };
 
-class PipelineLibrary {
+class PipelineCache {
 public:
-  explicit PipelineLibrary(Context& context);
-  ~PipelineLibrary();
+  explicit PipelineCache(Context& context);
+  ~PipelineCache();
 
-  PipelineLibrary(const PipelineLibrary&) = delete;
-  PipelineLibrary& operator=(const PipelineLibrary&) = delete;
+  PipelineCache(const PipelineCache&) = delete;
+  PipelineCache& operator=(const PipelineCache&) = delete;
 
   size_t CreatePipeline(const CreatePipelineRequest& request);
   Pipeline& GetPipeline(size_t pipelineID);

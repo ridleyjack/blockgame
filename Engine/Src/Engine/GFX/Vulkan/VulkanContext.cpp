@@ -2,7 +2,7 @@
 
 #include "VulkanCommand.hpp"
 #include "VulkanDevice.hpp"
-#include "VulkanPipelineLibrary.hpp"
+#include "VulkanPipelineCache.hpp"
 #include "VulkanSwapChain.hpp"
 #include "VulkanSync.hpp"
 
@@ -96,7 +96,7 @@ std::vector<const char*> GetRequiredExtensions() {
 Context::Context(GLFWwindow* window) {
   device_ = std::make_unique<Device>(*this);
   swapchain_ = std::make_unique<SwapChain>(*this);
-  pipelineLibrary_ = std::make_unique<PipelineLibrary>(*this);
+  pipelineLibrary_ = std::make_unique<PipelineCache>(*this);
   command_ = std::make_unique<Command>(*this);
   sync_ = std::make_unique<Sync>(*this);
   window_ = window;
@@ -151,7 +151,7 @@ SwapChain& Context::GetSwapchain() const {
   return *swapchain_;
 }
 
-PipelineLibrary& Context::GetPipelineLibrary() const {
+PipelineCache& Context::GetPipelineLibrary() const {
   return *pipelineLibrary_;
 }
 

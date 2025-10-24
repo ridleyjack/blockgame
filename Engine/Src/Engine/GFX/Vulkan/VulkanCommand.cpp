@@ -1,11 +1,11 @@
 #include "VulkanCommand.hpp"
 
 #include "VulkanContext.hpp"
-#include "VulkanDevice.hpp"
+#include "Engine/GFX/Vulkan/VulkanDevice.hpp"
 
 #include <stdexcept>
 
-namespace Engine{
+namespace Engine {
 
 // ==============================
 // Public Methods
@@ -96,4 +96,4 @@ void Command::createCommandBuffers_() {
     throw std::runtime_error("failed to allocate command buffers!");
   }
 }
-} // namespace oc::graphics::vulkan
+} // namespace Engine
