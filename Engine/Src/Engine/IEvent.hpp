@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Engine {
+namespace engine {
   class IEvent {
       virtual ~IEvent() = default;
   };

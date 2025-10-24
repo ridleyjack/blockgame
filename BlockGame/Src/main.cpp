@@ -5,9 +5,9 @@
 
 int main() {
 
-  Engine::ApplicationConfig config{};
-  Engine::Application app{config};
-  Engine::Renderer renderer{app.GetWindow().GetHandle()};
+  engine::ApplicationConfig config{};
+  engine::Application app{config};
+  engine::gfx::vulkan::Renderer renderer{app.GetWindow().GetHandle()};
   renderer.Init();
 
   GameLayer layer{renderer};

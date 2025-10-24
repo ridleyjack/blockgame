@@ -1,16 +1,17 @@
 #include "VulkanPipeline.hpp"
 
 #include "VulkanContext.hpp"
+#include "VulkanPipelineCache.hpp"
 #include "VulkanDevice.hpp"
 #include "VulkanSwapChain.hpp"
-#include "VulkanPipelineCache.hpp"
+
 #include "Engine/Assets/File.hpp"
 
 #include <glm/glm.hpp>
 
 #include <array>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 struct Vertex {
   glm::vec2 pos;
@@ -293,4 +294,4 @@ VkShaderModule Pipeline::createShaderModule_(const std::vector<char>& code) cons
   return shaderModule;
 }
 
-} // namespace Engine
+} // namespace Engine::GFX::Vulkan

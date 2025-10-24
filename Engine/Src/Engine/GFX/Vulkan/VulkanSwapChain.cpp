@@ -8,7 +8,7 @@
 #include <limits>
 #include <stdexcept>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 // ==============================
 // Public Methods
@@ -189,4 +189,4 @@ VkExtent2D SwapChain::chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities
 
   return actualExtent;
 }
-} // namespace Engine
+} // namespace Engine::GFX::Vulkan

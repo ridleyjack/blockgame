@@ -4,11 +4,11 @@
 // Public Methods
 // ==============================
 
-GameLayer::GameLayer(Engine::Renderer& renderer) : renderer_(renderer) {}
+GameLayer::GameLayer(engine::gfx::vulkan::Renderer& renderer) : renderer_(renderer) {}
 
 GameLayer::~GameLayer() {}
 
-void GameLayer::OnEvent(Engine::IEvent& event) {};
+void GameLayer::OnEvent(engine::IEvent& event) {};
 
 void GameLayer::OnUpdate(float deltaTime) {};
 

@@ -1,13 +1,13 @@
 #include "VulkanRenderer.hpp"
 
-#include "../TileGroup.hpp"
+#include "Engine/GFX/TileGroup.hpp"
 #include "VulkanCommand.hpp"
 #include "VulkanContext.hpp"
 #include "VulkanDevice.hpp"
 #include "VulkanSwapChain.hpp"
 #include "VulkanSync.hpp"
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 // ==============================
 // Public Methods
@@ -15,7 +15,7 @@ namespace Engine {
 
 Renderer::Renderer(GLFWwindow* window) {
   context_ = std::make_unique<Context>(window);
-  tileGroup_ = std::make_unique<TileGroup>(*context_);
+  tileGroup_ = std::make_unique<gfx::TileGroup>(*context_);
 }
 
 Renderer::~Renderer() {
@@ -106,4 +106,4 @@ void Renderer::WaitUntilIdle() const {
 // Private Methods
 // ==============================
 
-} // namespace Engine
+} // namespace engine::gfx::vulkan

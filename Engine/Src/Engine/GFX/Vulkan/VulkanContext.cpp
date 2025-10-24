@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 namespace debug {
 VkResult CreateUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
                                  const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
@@ -232,4 +232,4 @@ void Context::createSurface_() {
     throw std::runtime_error("failed to create window surface!");
   }
 }
-} // namespace Engine
+} // namespace engine::gfx::vulkan

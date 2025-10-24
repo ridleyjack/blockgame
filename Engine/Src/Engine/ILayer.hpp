@@ -2,7 +2,7 @@
 
 #include "IEvent.hpp"
 
-namespace Engine {
+namespace engine {
 class ILayer {
 public:
   virtual void OnEvent(IEvent& event) {};

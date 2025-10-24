@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-namespace Engine::Assets {
+namespace engine::Assets {
 
 ImageLoader::~ImageLoader() {
   stbi_image_free(pixels_);

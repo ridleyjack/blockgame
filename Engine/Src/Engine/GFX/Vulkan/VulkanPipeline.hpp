@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 class Context;
 struct CreatePipelineRequest;
@@ -39,5 +39,5 @@ private:
   VkShaderModule createShaderModule_(const std::vector<char>& code) const;
 };
 
-} // namespace Engine
+} // namespace Engine::GFX::Vulkan
 // oc

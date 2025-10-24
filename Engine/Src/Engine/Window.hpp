@@ -5,7 +5,7 @@
 
 #include <string>
 
-namespace Engine {
+namespace engine {
 
 struct WindowConfig {
   std::string Title{};

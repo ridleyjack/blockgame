@@ -3,7 +3,7 @@
 #include "VulkanContext.hpp"
 #include "VulkanPipeline.hpp"
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 // ==============================
 // Public Methods
@@ -30,4 +30,4 @@ Pipeline& PipelineCache::GetPipeline(const size_t pipelineID) {
 // Private Methods
 // ==============================
 
-} // namespace Engine
+} // namespace Engine::GFX::Vulkan

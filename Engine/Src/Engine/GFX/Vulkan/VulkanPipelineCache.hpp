@@ -2,7 +2,7 @@
 #include <memory>
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 class Pipeline;
 class Context;
@@ -28,4 +28,4 @@ private:
   std::vector<std::unique_ptr<Pipeline>> pipelines_;
 };
 
-} // namespace Engine
+} // namespace Engine::GFX::Vulkan

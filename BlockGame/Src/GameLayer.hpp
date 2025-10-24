@@ -4,17 +4,17 @@
 #include "Engine/IEvent.hpp"
 #include "Engine/GFX/Vulkan/VulkanRenderer.hpp"
 
-class GameLayer : public Engine::ILayer {
+class GameLayer : public engine::ILayer {
 public:
-  explicit GameLayer(Engine::Renderer& renderer);
+  explicit GameLayer(engine::gfx::vulkan::Renderer& renderer);
   ~GameLayer();
 
-  void OnEvent(Engine::IEvent& event) override;
+  void OnEvent(engine::IEvent& event) override;
 
   void OnUpdate(float deltaTime) override;
 
   void OnRender() override;
 
 private:
-  Engine::Renderer& renderer_;
+  engine::gfx::vulkan::Renderer& renderer_;
 };

@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 
-namespace Engine::Assets {
+namespace engine::Assets {
 
 class ImageLoader {
 public:

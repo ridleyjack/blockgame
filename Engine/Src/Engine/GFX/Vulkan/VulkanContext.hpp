@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 class Device;
 class SwapChain;
@@ -82,4 +82,4 @@ private:
   void createSurface_();
 };
 
-} // namespace Engine
+} // namespace engine::gfx::vulkan

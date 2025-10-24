@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 class Context;
 
@@ -48,4 +48,4 @@ private:
   VkExtent2D chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities) const;
 };
 
-} // namespace Engine
+} // namespace Engine::GFX::Vulkan

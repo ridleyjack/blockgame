@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-namespace Engine {
+namespace engine {
 
 struct ApplicationConfig {
   std::string Name{"Block Game"};

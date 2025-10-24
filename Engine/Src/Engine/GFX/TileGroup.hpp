@@ -3,7 +3,6 @@
 #define GLM_FORCE_RADIANS
 
 #include <vulkan/vulkan.h>
-
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
@@ -12,9 +11,11 @@
 #include <array>
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx {
 
+namespace vulkan {
 class Context;
+}
 
 struct Vertex {
   glm::vec2 Pos;
@@ -68,7 +69,7 @@ struct UniformBufferObject {
 
 class TileGroup {
 public:
-  explicit TileGroup(Context& context);
+  explicit TileGroup(vulkan::Context& context);
   ~TileGroup();
 
   TileGroup(const TileGroup&) = delete;
@@ -81,7 +82,7 @@ public:
   void Record(VkCommandBuffer commandBuffer, uint32_t imageIndex, uint32_t currentFrame);
 
 private:
-  Context& context_;
+  vulkan::Context& context_;
 
   VkBuffer vertexBuffer_{VK_NULL_HANDLE};
   VkDeviceMemory vertexBufferMemory_{VK_NULL_HANDLE};
@@ -122,4 +123,4 @@ private:
   void copyBufferToImage_(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 };
 
-} // namespace oc::graphics::vulkan
+} // namespace Engine::GFX

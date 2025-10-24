@@ -12,13 +12,13 @@
 #include <chrono>
 #include <cstring>
 
-namespace Engine {
+namespace engine::gfx {
 
 // ==============================
 // Public Methods
 // ==============================
 
-TileGroup::TileGroup(Context& context) : context_{context} {}
+TileGroup::TileGroup(vulkan::Context& context) : context_{context} {}
 
 TileGroup::~TileGroup() {
   auto vkDevice = context_.GetDevice().Logical();
@@ -32,7 +32,7 @@ TileGroup::~TileGroup() {
 }
 
 void TileGroup::Init() {
-  CreatePipelineRequest request{"Shaders/vert.spv", "Shaders/frag.spv"};
+  vulkan::CreatePipelineRequest request{"Shaders/vert.spv", "Shaders/frag.spv"};
   context_.GetPipelineLibrary().CreatePipeline(request);
 
   createTextureImage_();
@@ -75,7 +75,7 @@ void TileGroup::Record(VkCommandBuffer commandBuffer, uint32_t imageIndex, uint3
   }
 
   VkExtent2D swapChainExtent = context_.GetSwapchain().Extent();
-  Pipeline& pipeline = context_.GetPipelineLibrary().GetPipeline(0);
+  vulkan::Pipeline& pipeline = context_.GetPipelineLibrary().GetPipeline(0);
 
   VkRenderPassBeginInfo renderPassInfo{};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -250,11 +250,11 @@ void TileGroup::createUniformBuffers_() {
 
   VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
-  uniformBuffers_.resize(Engine::config::MaxFramesInFlight);
-  uniformBuffersMemory_.resize(Engine::config::MaxFramesInFlight);
-  uniformBuffersMapped_.resize(Engine::config::MaxFramesInFlight);
+  uniformBuffers_.resize(vulkan::config::MaxFramesInFlight);
+  uniformBuffersMemory_.resize(vulkan::config::MaxFramesInFlight);
+  uniformBuffersMapped_.resize(vulkan::config::MaxFramesInFlight);
 
-  for (size_t i = 0; i < Engine::config::MaxFramesInFlight; i++) {
+  for (size_t i = 0; i < vulkan::config::MaxFramesInFlight; i++) {
     createBuffer_(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers_[i],
                   uniformBuffersMemory_[i]);
@@ -268,15 +268,15 @@ void TileGroup::createDescriptorPool_() {
 
   std::array<VkDescriptorPoolSize, 2> poolSizes{};
   poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  poolSizes[0].descriptorCount = static_cast<uint32_t>(Engine::config::MaxFramesInFlight);
+  poolSizes[0].descriptorCount = static_cast<uint32_t>(vulkan::config::MaxFramesInFlight);
   poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  poolSizes[1].descriptorCount = static_cast<uint32_t>(Engine::config::MaxFramesInFlight);
+  poolSizes[1].descriptorCount = static_cast<uint32_t>(vulkan::config::MaxFramesInFlight);
 
   VkDescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   poolInfo.poolSizeCount = poolSizes.size();
   poolInfo.pPoolSizes = poolSizes.data();
-  poolInfo.maxSets = static_cast<uint32_t>(Engine::config::MaxFramesInFlight);
+  poolInfo.maxSets = static_cast<uint32_t>(vulkan::config::MaxFramesInFlight);
 
   if (vkCreateDescriptorPool(vkDevice, &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor pool!");
@@ -287,19 +287,19 @@ void TileGroup::createDescriptorSets_() {
   auto vkDevice = context_.GetDevice().Logical();
   auto& pipeline = context_.GetPipelineLibrary().GetPipeline(0);
 
-  std::vector<VkDescriptorSetLayout> layouts(Engine::config::MaxFramesInFlight, pipeline.DescriptorSetLayout());
+  std::vector<VkDescriptorSetLayout> layouts(vulkan::config::MaxFramesInFlight, pipeline.DescriptorSetLayout());
   VkDescriptorSetAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   allocInfo.descriptorPool = descriptorPool_;
-  allocInfo.descriptorSetCount = static_cast<uint32_t>(Engine::config::MaxFramesInFlight);
+  allocInfo.descriptorSetCount = static_cast<uint32_t>(vulkan::config::MaxFramesInFlight);
   allocInfo.pSetLayouts = layouts.data();
 
-  descriptorSets_.resize(Engine::config::MaxFramesInFlight);
+  descriptorSets_.resize(vulkan::config::MaxFramesInFlight);
   if (vkAllocateDescriptorSets(vkDevice, &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate descriptor sets!");
   }
 
-  for (size_t i = 0; i < Engine::config::MaxFramesInFlight; i++) {
+  for (size_t i = 0; i < vulkan::config::MaxFramesInFlight; i++) {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = uniformBuffers_[i];
     bufferInfo.offset = 0;
@@ -481,4 +481,4 @@ void TileGroup::copyBufferToImage_(VkBuffer buffer, VkImage image, uint32_t widt
   cmd.EndSingleTimeCommands_(commandBuffer);
 }
 
-} // namespace Engine
+} // namespace engine::gfx

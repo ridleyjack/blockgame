@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-namespace Engine::Assets {
+namespace engine::Assets {
 
 std::vector<char> ReadBinaryFile(const std::string& path) {
   std::ifstream file(path, std::ios::ate | std::ios::binary);

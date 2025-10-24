@@ -4,7 +4,7 @@
 #include "VulkanDevice.hpp"
 #include "VulkanSwapChain.hpp"
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 // ==============================
 // Public Methods
@@ -85,4 +85,4 @@ VkFence& Sync::InFlightFence(uint32_t frame) {
 // Private Methods
 // ==============================
 
-} // namespace oc::graphics::vulkan
+} // namespace Engine::GFX::Vulkan

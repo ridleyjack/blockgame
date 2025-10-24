@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cassert>
 
-namespace Engine {
+namespace engine {
 
 // ==============================
 // Public Methods

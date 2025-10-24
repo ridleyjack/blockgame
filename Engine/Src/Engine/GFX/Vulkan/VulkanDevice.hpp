@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 class Context;
 
@@ -65,4 +65,4 @@ private:
 
   void pickPhysicalDevice_();
 };
-} // namespace oc::graphics::vulkan
+} // namespace Engine::GFX::Vulkan

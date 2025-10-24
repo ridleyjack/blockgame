@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 // ==============================
 // Public Methods
@@ -250,4 +250,4 @@ void Device::pickPhysicalDevice_() {
   }
 }
 
-} // namespace oc::graphics::vulkan
+} // namespace engine::gfx::vulkan

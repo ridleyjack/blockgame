@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 // ==============================
 // Public Methods
@@ -96,4 +96,4 @@ void Command::createCommandBuffers_() {
     throw std::runtime_error("failed to allocate command buffers!");
   }
 }
-} // namespace Engine
+} // namespace engine::gfx::vulkan

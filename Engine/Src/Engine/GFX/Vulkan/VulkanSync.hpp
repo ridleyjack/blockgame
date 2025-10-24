@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace Engine {
+namespace engine::gfx::vulkan {
 
 class Context;
 
@@ -33,4 +33,4 @@ private:
   std::vector<VkFence> inFlightFences_{};
 };
 
-} // namespace oc::graphics::vulkan
+} // namespace Engine::GFX::Vulkan

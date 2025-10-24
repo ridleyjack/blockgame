@@ -4,10 +4,13 @@
 
 struct GLFWwindow;
 
-namespace Engine {
+namespace engine::gfx {
+class TileGroup;
+}
+
+namespace engine::gfx::vulkan {
 
 class Context;
-class TileGroup;
 
 class Renderer {
 public:
@@ -30,4 +33,4 @@ private:
   std::unique_ptr<TileGroup> tileGroup_{};
 };
 
-} // namespace Engine
+} // namespace engine::gfx::vulkan
