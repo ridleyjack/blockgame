@@ -1,5 +1,7 @@
 #include "Application.hpp"
 
+#include "GFX/Vulkan/VulkanRenderer.hpp"
+
 #include <algorithm>
 #include <cassert>
 
@@ -15,8 +17,12 @@ Application::Application(const ApplicationConfig& config) : config_(config) {
   if (config_.Window.Title.empty()) {
     config_.Window.Title = config.Name;
   }
+
   window_ = std::make_unique<Window>(config.Window);
   window_->Create();
+
+  renderer_ = std::make_unique<gfx::vulkan::Renderer>(window_->GetHandle());
+  renderer_->Init();
 }
 
 Application::~Application() {
@@ -36,7 +42,7 @@ void Application::Run() {
     }
 
     const float currentTime = GetTime();
-    float deltaTime = currentTime - lastTime;
+    const float deltaTime = currentTime - lastTime;
     lastTime = currentTime;
 
     for (ILayer* layer : layerStack_)
@@ -45,6 +51,7 @@ void Application::Run() {
     for (ILayer* layer : layerStack_)
       layer->OnRender();
   }
+  renderer_->WaitUntilIdle();
 }
 
 void Application::Stop() {
@@ -56,8 +63,8 @@ void Application::PushLayer(ILayer* layer) {
   layerStack_.push_back(layer);
 }
 
-void Application::RemoveLayer(ILayer* layer) {
-  auto it = std::find(layerStack_.begin(), layerStack_.end(), layer);
+void Application::RemoveLayer(const ILayer* layer) {
+  const auto it = std::find(layerStack_.begin(), layerStack_.end(), layer);
   if (it != layerStack_.end())
     return;
   layerStack_.erase(it);
@@ -69,9 +76,12 @@ float Application::GetTime() {
 Window& Application::GetWindow() const {
   return *window_;
 }
+gfx::vulkan::Renderer& Application::GetRenderer() const {
+  return *renderer_;
+}
 
 // ==============================
 // Private Methods
 // ==============================
 
-} // namespace Engine
+} // namespace engine

@@ -13,17 +13,16 @@ namespace engine::gfx::vulkan {
 Sync::Sync(Context& context) : context_(context) {}
 
 Sync::~Sync() {
-  auto device = context_.GetDevice().Logical();
-
-  this->DestroyPerImageSemaphores();
+  const auto vkDevice = context_.GetDevice().Logical();
   for (size_t i = 0; i < config::MaxFramesInFlight; i++) {
-    vkDestroySemaphore(device, imageAvailableSemaphores_[i], nullptr);
-    vkDestroyFence(device, inFlightFences_[i], nullptr);
+    vkDestroySemaphore(vkDevice, imageAvailableSemaphores_[i], nullptr);
+    vkDestroyFence(vkDevice, inFlightFences_[i], nullptr);
   }
+  cleanupPerImageSemaphores_();
 }
 
 void Sync::Init() {
-  auto device = context_.GetDevice().Logical();
+  const auto device = context_.GetDevice().Logical();
 
   imageAvailableSemaphores_.resize(config::MaxFramesInFlight);
   inFlightFences_.resize(config::MaxFramesInFlight);
@@ -35,38 +34,17 @@ void Sync::Init() {
   fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  this->CreatePerImageSemaphores();
-
   for (size_t i = 0; i < config::MaxFramesInFlight; i++) {
     if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS ||
         vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS) {
       throw std::runtime_error("failed to create semaphores!");
     }
   }
+  createPerImageSemaphores_();
 }
-
-void Sync::CreatePerImageSemaphores() {
-  auto device = context_.GetDevice().Logical();
-  auto images = context_.GetSwapchain().Images();
-
-  this->DestroyPerImageSemaphores();
-  VkSemaphoreCreateInfo semaphoreInfo{};
-  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-  renderFinishedSemaphores_.resize(images.size());
-  for (size_t i = 0; i < images.size(); i++) {
-    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create render finished semaphores!");
-    }
-  }
-}
-
-void Sync::DestroyPerImageSemaphores() {
-  auto device = context_.GetDevice().Logical();
-
-  for (const auto& m_renderFinishedSemaphore : renderFinishedSemaphores_) {
-    vkDestroySemaphore(device, m_renderFinishedSemaphore, nullptr);
-  }
+void Sync::RecreatePerImageSemaphores() {
+  cleanupPerImageSemaphores_();
+  createPerImageSemaphores_();
 }
 
 VkSemaphore& Sync::ImageAvailableSemaphore(uint32_t frame) {
@@ -85,4 +63,25 @@ VkFence& Sync::InFlightFence(uint32_t frame) {
 // Private Methods
 // ==============================
 
-} // namespace Engine::GFX::Vulkan
+void Sync::createPerImageSemaphores_() {
+  const auto vkDevice = context_.GetDevice().Logical();
+  const size_t numImages = context_.GetSwapchain().Images().size();
+
+  renderFinishedSemaphores_.resize(numImages);
+
+  VkSemaphoreCreateInfo semaphoreInfo{};
+  semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+  for (size_t i = 0; i < numImages; i++) {
+    if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS)
+      throw std::runtime_error("failed to create semaphores!");
+  }
+}
+
+void Sync::cleanupPerImageSemaphores_() {
+  const auto vkDevice = context_.GetDevice().Logical();
+  for (const auto semaphore : renderFinishedSemaphores_)
+    vkDestroySemaphore(vkDevice, semaphore, nullptr);
+}
+
+} // namespace engine::gfx::vulkan

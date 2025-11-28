@@ -2,6 +2,7 @@
 
 #include "VulkanContext.hpp"
 #include "VulkanDevice.hpp"
+#include "VulkanSync.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -82,17 +83,17 @@ void SwapChain::Init() {
 }
 
 void SwapChain::Cleanup() {
-  auto device = context_.GetDevice().Logical();
+  const auto vkDevice = context_.GetDevice().Logical();
 
-  for (auto framebuffer : framebuffers_) {
-    vkDestroyFramebuffer(device, framebuffer, nullptr);
+  for (const auto framebuffer : framebuffers_) {
+    vkDestroyFramebuffer(vkDevice, framebuffer, nullptr);
   }
 
-  for (auto imageView : imageViews_) {
-    vkDestroyImageView(device, imageView, nullptr);
+  for (const auto imageView : imageViews_) {
+    vkDestroyImageView(vkDevice, imageView, nullptr);
   }
 
-  vkDestroySwapchainKHR(device, swapchain_, nullptr);
+  vkDestroySwapchainKHR(vkDevice, swapchain_, nullptr);
 }
 void SwapChain::Recreate() {
   auto& window = context_.Window();
@@ -105,6 +106,7 @@ void SwapChain::Recreate() {
 
   Cleanup();
   Init();
+  context_.GetSync().RecreatePerImageSemaphores();
 }
 
 void SwapChain::CreateFrameBuffers(VkRenderPass renderPass) {
@@ -189,4 +191,4 @@ VkExtent2D SwapChain::chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities
 
   return actualExtent;
 }
-} // namespace Engine::GFX::Vulkan
+} // namespace engine::gfx::vulkan

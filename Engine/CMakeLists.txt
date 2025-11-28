@@ -29,8 +29,6 @@ target_compile_features(Engine PUBLIC cxx_std_23)
 
 
 add_library(Engine_GFX
-        Src/Engine/GFX/TileGroup.cpp
-        Src/Engine/GFX/TileGroup.hpp
         Src/Engine/GFX/Vulkan/VulkanCommand.cpp
         Src/Engine/GFX/Vulkan/VulkanCommand.hpp
         Src/Engine/GFX/Vulkan/VulkanContext.cpp
@@ -47,6 +45,9 @@ add_library(Engine_GFX
         Src/Engine/GFX/Vulkan/VulkanSync.hpp
         Src/Engine/GFX/Vulkan/VulkanPipelineCache.cpp
         Src/Engine/GFX/Vulkan/VulkanPipelineCache.hpp
+        Src/Engine/GFX/Mesh.hpp
+        Src/Engine/GFX/RenderObject.cpp
+        Src/Engine/GFX/RenderObject.hpp
 )
 
 target_include_directories(Engine_GFX

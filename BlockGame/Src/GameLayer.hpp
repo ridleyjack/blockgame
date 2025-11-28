@@ -2,11 +2,14 @@
 
 #include "Engine/ILayer.hpp"
 #include "Engine/IEvent.hpp"
-#include "Engine/GFX/Vulkan/VulkanRenderer.hpp"
+
+namespace engine {
+class Application;
+}
 
 class GameLayer : public engine::ILayer {
 public:
-  explicit GameLayer(engine::gfx::vulkan::Renderer& renderer);
+  explicit GameLayer(engine::Application& application);
   ~GameLayer();
 
   void OnEvent(engine::IEvent& event) override;
@@ -16,5 +19,5 @@ public:
   void OnRender() override;
 
 private:
-  engine::gfx::vulkan::Renderer& renderer_;
+  engine::Application& application_;
 };

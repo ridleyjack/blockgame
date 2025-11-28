@@ -17,12 +17,10 @@ public:
   Sync& operator=(const Sync&) = delete;
 
   void Init();
-
-  void CreatePerImageSemaphores();
-  void DestroyPerImageSemaphores();
+  void RecreatePerImageSemaphores();
 
   VkSemaphore& ImageAvailableSemaphore(uint32_t frame);
-  VkSemaphore& RenderFinishedSemaphore(uint32_t frame);
+  VkSemaphore& RenderFinishedSemaphore(uint32_t image);
   VkFence& InFlightFence(uint32_t frame);
 
 private:
@@ -31,6 +29,9 @@ private:
   std::vector<VkSemaphore> imageAvailableSemaphores_{};
   std::vector<VkSemaphore> renderFinishedSemaphores_{};
   std::vector<VkFence> inFlightFences_{};
+
+  void createPerImageSemaphores_();
+  void cleanupPerImageSemaphores_();
 };
 
-} // namespace Engine::GFX::Vulkan
+} // namespace engine::gfx::vulkan

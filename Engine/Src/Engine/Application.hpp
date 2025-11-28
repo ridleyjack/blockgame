@@ -8,6 +8,10 @@
 
 namespace engine {
 
+namespace gfx::vulkan {
+class Renderer;
+}
+
 struct ApplicationConfig {
   std::string Name{"Block Game"};
   WindowConfig Window{};
@@ -22,19 +26,21 @@ public:
   void Stop();
 
   void PushLayer(ILayer* layer);
-  void RemoveLayer(ILayer* layer);
+  void RemoveLayer(const ILayer* layer);
 
   static float GetTime();
 
   Window& GetWindow() const;
+  gfx::vulkan::Renderer& GetRenderer() const;
 
 private:
   ApplicationConfig config_{};
   std::unique_ptr<Window> window_{};
+  std::unique_ptr<gfx::vulkan::Renderer> renderer_{};
 
   std::vector<ILayer*> layerStack_{};
 
   bool running_{false};
 };
 
-} // namespace Engine
+} // namespace engine

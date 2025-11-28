@@ -6,47 +6,13 @@
 #include "VulkanSwapChain.hpp"
 
 #include "Engine/Assets/File.hpp"
+#include "Engine/GFX/Mesh.hpp"
 
 #include <glm/glm.hpp>
 
 #include <array>
 
 namespace engine::gfx::vulkan {
-
-struct Vertex {
-  glm::vec2 pos;
-  glm::vec3 color;
-  glm::vec2 texCoord;
-
-  static VkVertexInputBindingDescription getBindingDescription() {
-    VkVertexInputBindingDescription bindingDescription{};
-    bindingDescription.binding = 0;
-    bindingDescription.stride = sizeof(Vertex);
-    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    return bindingDescription;
-  }
-
-  static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-    std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
-    attributeDescriptions[0].binding = 0;
-    attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-    attributeDescriptions[1].binding = 0;
-    attributeDescriptions[1].location = 1;
-    attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-    attributeDescriptions[2].binding = 0;
-    attributeDescriptions[2].location = 2;
-    attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-    return attributeDescriptions;
-  }
-};
 
 // ==============================
 // Public Methods
@@ -66,7 +32,7 @@ Pipeline::~Pipeline() {
 void Pipeline::Create(const CreatePipelineRequest& request) {
   createRenderPass_();
   context_.GetSwapchain().CreateFrameBuffers(renderPass_);
-  createDescriptorSetLayout_();
+  // createDescriptorSetLayout_();
   createGraphicsPipeline_(request);
 }
 
@@ -186,8 +152,8 @@ void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
 
   VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
-  auto bindingDescription = Vertex::getBindingDescription();
-  auto attributeDescriptions = Vertex::getAttributeDescriptions();
+  auto bindingDescription = Vertex::GetBindingDescription();
+  auto attributeDescriptions = Vertex::GetAttributeDescriptions();
 
   VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
   vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -213,7 +179,7 @@ void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -245,10 +211,11 @@ void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
 
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
-  pipelineLayoutInfo.pushConstantRangeCount = 0;    // Optional
-  pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
+  pipelineLayoutInfo.setLayoutCount = 0;
+  pipelineLayoutInfo.pushConstantRangeCount = 0;
+  // pipelineLayoutInfo.setLayoutCount = 0;
+  // pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
+
   if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create pipeline layout!");
   }
@@ -262,14 +229,11 @@ void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
   pipelineInfo.pViewportState = &viewportState;
   pipelineInfo.pRasterizationState = &rasterizer;
   pipelineInfo.pMultisampleState = &multisampling;
-  pipelineInfo.pDepthStencilState = nullptr; // Optional
   pipelineInfo.pColorBlendState = &colorBlending;
   pipelineInfo.pDynamicState = &dynamicState;
   pipelineInfo.layout = pipelineLayout_;
   pipelineInfo.renderPass = renderPass_;
   pipelineInfo.subpass = 0;
-  pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-  pipelineInfo.basePipelineIndex = -1;              // Optional
 
   if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create graphics pipeline!");
@@ -294,4 +258,4 @@ VkShaderModule Pipeline::createShaderModule_(const std::vector<char>& code) cons
   return shaderModule;
 }
 
-} // namespace Engine::GFX::Vulkan
+} // namespace engine::gfx::vulkan

@@ -5,7 +5,7 @@
 struct GLFWwindow;
 
 namespace engine::gfx {
-class TileGroup;
+class RenderObject;
 }
 
 namespace engine::gfx::vulkan {
@@ -30,7 +30,7 @@ private:
   uint32_t currentFrame_{};
 
   std::unique_ptr<Context> context_{};
-  std::unique_ptr<TileGroup> tileGroup_{};
+  std::unique_ptr<RenderObject> renderObject_{};
 };
 
 } // namespace engine::gfx::vulkan

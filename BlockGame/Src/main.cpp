@@ -7,10 +7,8 @@ int main() {
 
   engine::ApplicationConfig config{};
   engine::Application app{config};
-  engine::gfx::vulkan::Renderer renderer{app.GetWindow().GetHandle()};
-  renderer.Init();
 
-  GameLayer layer{renderer};
+  GameLayer layer{app};
   app.PushLayer(&layer);
   app.Run();
 

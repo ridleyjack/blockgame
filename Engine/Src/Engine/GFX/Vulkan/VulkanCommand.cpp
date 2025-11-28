@@ -22,6 +22,7 @@ void Command::Init() {
   createCommandPool_();
   createCommandBuffers_();
 }
+
 VkCommandBuffer& Command::Buffer(uint32_t index) {
   return commandBuffers_[index];
 }
