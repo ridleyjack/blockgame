@@ -3,3 +3,6 @@ cmake-build-debug/
 
 # CLion / JetBrains IDE settings
 .idea/
+
+# Compiled Shaders
+*.spv
