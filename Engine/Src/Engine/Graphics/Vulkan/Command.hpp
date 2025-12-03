@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
 class Context;
 
@@ -16,9 +16,7 @@ public:
   Command(const Command&) = delete;
   Command& operator=(const Command&) = delete;
 
-  void Init();
-
-  VkCommandBuffer& Buffer(uint32_t index);
+  VkCommandBuffer& Buffer(uint32_t index) noexcept;
 
   VkCommandBuffer BeginSingleTimeCommands_();
   void EndSingleTimeCommands_(VkCommandBuffer commandBuffer);
@@ -32,4 +30,4 @@ private:
   void createCommandBuffers_();
 };
 
-} // namespace Engine::GFX::Vulkan
+} // namespace engine::graphics::vulkan

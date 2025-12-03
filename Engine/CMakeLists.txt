@@ -12,6 +12,7 @@ add_library(Engine
         Src/Engine/Assets/File.hpp
         Src/Engine/Assets/ImageLoader.cpp
         Src/Engine/Assets/ImageLoader.hpp
+        Src/Engine/Core/Containers/HandlePool.hpp
 )
 target_include_directories(Engine
         PUBLIC
@@ -28,34 +29,43 @@ target_link_libraries(Engine
 target_compile_features(Engine PUBLIC cxx_std_23)
 
 
-add_library(Engine_GFX
-        Src/Engine/GFX/Vulkan/VulkanCommand.cpp
-        Src/Engine/GFX/Vulkan/VulkanCommand.hpp
-        Src/Engine/GFX/Vulkan/VulkanContext.cpp
-        Src/Engine/GFX/Vulkan/VulkanContext.hpp
-        Src/Engine/GFX/Vulkan/VulkanDevice.cpp
-        Src/Engine/GFX/Vulkan/VulkanDevice.hpp
-        Src/Engine/GFX/Vulkan/VulkanPipeline.cpp
-        Src/Engine/GFX/Vulkan/VulkanPipeline.hpp
-        Src/Engine/GFX/Vulkan/VulkanRenderer.cpp
-        Src/Engine/GFX/Vulkan/VulkanRenderer.hpp
-        Src/Engine/GFX/Vulkan/VulkanSwapChain.cpp
-        Src/Engine/GFX/Vulkan/VulkanSwapChain.hpp
-        Src/Engine/GFX/Vulkan/VulkanSync.cpp
-        Src/Engine/GFX/Vulkan/VulkanSync.hpp
-        Src/Engine/GFX/Vulkan/VulkanPipelineCache.cpp
-        Src/Engine/GFX/Vulkan/VulkanPipelineCache.hpp
-        Src/Engine/GFX/Mesh.hpp
-        Src/Engine/GFX/RenderObject.cpp
-        Src/Engine/GFX/RenderObject.hpp
+add_library(Engine_Graphics
+        Src/Engine/Graphics/Vulkan/Command.cpp
+        Src/Engine/Graphics/Vulkan/Command.hpp
+        Src/Engine/Graphics/Vulkan/Context.cpp
+        Src/Engine/Graphics/Vulkan/Context.hpp
+        Src/Engine/Graphics/Vulkan/Device.cpp
+        Src/Engine/Graphics/Vulkan/Device.hpp
+        Src/Engine/Graphics/Vulkan/Pipeline.cpp
+        Src/Engine/Graphics/Vulkan/Pipeline.hpp
+        Src/Engine/Graphics/Vulkan/Renderer.cpp
+        Src/Engine/Graphics/Vulkan/Renderer.hpp
+        Src/Engine/Graphics/Vulkan/SwapChain.cpp
+        Src/Engine/Graphics/Vulkan/SwapChain.hpp
+        Src/Engine/Graphics/Vulkan/Sync.cpp
+        Src/Engine/Graphics/Vulkan/Sync.hpp
+        Src/Engine/Graphics/Vulkan/PipelineCache.cpp
+        Src/Engine/Graphics/Vulkan/PipelineCache.hpp
+        Src/Engine/Graphics/Mesh.hpp
+        Src/Engine/Graphics/RenderObject.cpp
+        Src/Engine/Graphics/RenderObject.hpp
+        Src/Engine/Graphics/Handles.hpp
+        Src/Engine/Graphics/PipelineCreateInfo.hpp
+        Src/Engine/Graphics/MeshCreateInfo.hpp
+        Src/Engine/Graphics/MeshCreateInfo.hpp
+        Src/Engine/Graphics/MeshCreateInfo.hpp
+        Src/Engine/Graphics/Vulkan/RenderPass.cpp
+        Src/Engine/Graphics/Vulkan/RenderPass.hpp
+        Src/Engine/Graphics/Vulkan/FramebufferSet.cpp
+        Src/Engine/Graphics/Vulkan/FramebufferSet.hpp
 )
 
-target_include_directories(Engine_GFX
+target_include_directories(Engine_Graphics
         PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/Src
 )
 
-target_link_libraries(Engine_GFX
+target_link_libraries(Engine_Graphics
         PUBLIC
         Engine
         Vulkan::Vulkan
@@ -63,6 +73,6 @@ target_link_libraries(Engine_GFX
         glfw
 )
 
-target_compile_features(Engine_GFX PUBLIC cxx_std_23)
+target_compile_features(Engine_Graphics PUBLIC cxx_std_23)
 
 

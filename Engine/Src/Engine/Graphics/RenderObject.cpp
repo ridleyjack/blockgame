@@ -1,20 +1,17 @@
 #include "RenderObject.hpp"
 
-#include "Engine/GFX/Vulkan/VulkanDevice.hpp"
-#include "Engine/GFX/Vulkan/VulkanCommand.hpp"
-#include "Engine/GFX/Vulkan/VulkanContext.hpp"
-#include "Engine/GFX/Mesh.hpp"
-#include "Vulkan/VulkanPipeline.hpp"
-#include "Vulkan/VulkanPipelineCache.hpp"
-#include "Vulkan/VulkanSwapChain.hpp"
+#include "PipelineCreateInfo.hpp"
+#include "Engine/Graphics/Vulkan/Device.hpp"
+#include "Engine/Graphics/Vulkan/Command.hpp"
+#include "Engine/Graphics/Vulkan/Context.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+#include "Vulkan/Pipeline.hpp"
+#include "Vulkan/PipelineCache.hpp"
+#include "Vulkan/SwapChain.hpp"
 
 #include <cstring>
 
-namespace engine::gfx {
-
-// ==============================
-// Public Methods
-// ==============================
+namespace engine::graphics {
 
 RenderObject::RenderObject(vulkan::Context& context) : context_(context) {}
 
@@ -25,11 +22,6 @@ RenderObject::~RenderObject() {
   vkFreeMemory(vkDevice, vertexBufferMemory_, nullptr);
   vkDestroyBuffer(vkDevice, indexBuffer_, nullptr);
   vkFreeMemory(vkDevice, indexBufferMemory_, nullptr);
-}
-
-void RenderObject::Init() {
-  const vulkan::CreatePipelineRequest request{"Shaders/vert.spv", "Shaders/frag.spv"};
-  context_.GetPipelineLibrary().CreatePipeline(request);
 }
 
 void RenderObject::Record(VkCommandBuffer commandBuffer, uint32_t imageIndex, uint32_t currentFrame) {
@@ -43,15 +35,12 @@ void RenderObject::Record(VkCommandBuffer commandBuffer, uint32_t imageIndex, ui
   // &descriptorSets_[currentFrame], 0, nullptr);
 
   // vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(Indices.size()), 1, 0, 0, 0);
-  vkCmdDraw(commandBuffer, static_cast<uint32_t>(verticesSize_), 1, 0, 0);
+  vkCmdDraw(commandBuffer, verticesSize_, 1, 0, 0);
 }
+
 void RenderObject::UploadMesh(Mesh& mesh) {
   createVertexBuffer_(mesh.Vertices);
 }
-
-// ==============================
-// Private Methods
-// ==============================
 
 void RenderObject::createVertexBuffer_(const std::vector<Vertex>& vertices) {
   const auto vkDevice = context_.GetDevice().Logical();
@@ -143,4 +132,4 @@ void RenderObject::copyBuffer_(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceS
   cmd.EndSingleTimeCommands_(commandBuffer);
 }
 
-} // namespace engine::gfx
+} // namespace engine::graphics

@@ -5,10 +5,6 @@
 
 namespace engine {
 
-// ==============================
-// Public Methods
-// ==============================
-
 Window::Window(const WindowConfig& config) : config_{config} {}
 
 Window::~Window() {
@@ -28,10 +24,11 @@ void Window::Create() {
   glfwMakeContextCurrent(handle_);
 }
 void Window::Destroy() {
-  if (handle_)
+  if (handle_) {
     glfwDestroyWindow(handle_);
-
-  handle_ = nullptr;
+    handle_ = nullptr;
+  }
+  glfwTerminate();
 }
 
 int Window::GetFramebufferWidth() const {
@@ -53,8 +50,4 @@ GLFWwindow* Window::GetHandle() const {
   return handle_;
 }
 
-// ==============================
-// Private Methods
-// ==============================
-
-} // namespace Engine
+} // namespace engine

@@ -1,17 +1,17 @@
-#include "VulkanContext.hpp"
+#include "Context.hpp"
 
-#include "VulkanCommand.hpp"
-#include "VulkanDevice.hpp"
-#include "VulkanPipelineCache.hpp"
-#include "VulkanSwapChain.hpp"
-#include "VulkanSync.hpp"
+#include "Command.hpp"
+#include "Device.hpp"
+#include "PipelineCache.hpp"
+#include "SwapChain.hpp"
+#include "Sync.hpp"
 
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 namespace debug {
 VkResult CreateUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
                                  const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
@@ -89,24 +89,24 @@ std::vector<const char*> GetRequiredExtensions() {
 }
 } // namespace
 
-// ==============================
-// Public Methods
-// ==============================
+Context::Context(GLFWwindow* window) : window_(window) {
+  createInstance_();
+  setupDebugMessenger_();
+  createSurface_();
 
-Context::Context(GLFWwindow* window) {
   device_ = std::make_unique<Device>(*this);
   swapchain_ = std::make_unique<SwapChain>(*this);
-  pipelineLibrary_ = std::make_unique<PipelineCache>(*this);
   command_ = std::make_unique<Command>(*this);
   sync_ = std::make_unique<Sync>(*this);
-  window_ = window;
 }
 
 Context::~Context() {
+  if (device_)
+    vkDeviceWaitIdle(device_->Logical());
+
   sync_.reset();
   command_.reset();
   swapchain_.reset();
-  pipelineLibrary_.reset();
   device_.reset();
 
   vkDestroySurfaceKHR(instance_, surface_, nullptr);
@@ -116,71 +116,50 @@ Context::~Context() {
   }
 
   vkDestroyInstance(instance_, nullptr);
-  glfwDestroyWindow(window_);
-  glfwTerminate();
 }
 
-void Context::Init() {
-  createInstance_();
-  setupDebugMessenger_();
-  createSurface_();
-
-  device_->Init();
-  swapchain_->Init();
-  command_->Init();
-  sync_->Init();
-}
-
-GLFWwindow& Context::Window() const {
+GLFWwindow& Context::Window() const noexcept {
   return *window_;
 }
 
-VkInstance Context::Instance() const {
+VkInstance Context::Instance() const noexcept {
   return instance_;
 }
 
-VkSurfaceKHR Context::Surface() const {
+VkSurfaceKHR Context::Surface() const noexcept {
   return surface_;
 }
 
-Device& Context::GetDevice() const {
+Device& Context::GetDevice() noexcept {
   return *device_;
 }
 
-SwapChain& Context::GetSwapchain() const {
+SwapChain& Context::GetSwapchain() noexcept {
   return *swapchain_;
 }
 
-PipelineCache& Context::GetPipelineLibrary() const {
-  return *pipelineLibrary_;
-}
-
-Command& Context::GetCommand() const {
+Command& Context::GetCommand() noexcept {
   return *command_;
 }
-Sync& Context::GetSync() const {
+Sync& Context::GetSync() noexcept {
   return *sync_;
 }
 
-bool Context::GetFramebufferResized() const {
-  return framebufferResized_;
+bool Context::GetFramebufferHasResized() const noexcept {
+  return framebufferHasResized_;
 }
 
-void Context::SetFramebufferResized(bool value) {
-  framebufferResized_ = value;
+void Context::SetFramebufferHasResized(bool value) noexcept {
+  framebufferHasResized_ = value;
 }
 
-bool Context::WindowShouldClose() const {
+bool Context::WindowShouldClose() const noexcept {
   return glfwWindowShouldClose(window_);
 }
 
-void Context::WaitUntilIdle() const {
+void Context::WaitUntilIdle() const noexcept {
   vkDeviceWaitIdle(device_->Logical());
 }
-
-// ==============================
-// Private Methods
-// ==============================
 
 void Context::createInstance_() {
   if (config::EnableValidationLayers && !CheckValidationLayerSupport()) {
@@ -232,4 +211,4 @@ void Context::createSurface_() {
     throw std::runtime_error("failed to create window surface!");
   }
 }
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

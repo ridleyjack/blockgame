@@ -1,34 +1,32 @@
-#include "VulkanCommand.hpp"
+#include "Command.hpp"
 
-#include "VulkanContext.hpp"
-#include "Engine/GFX/Vulkan/VulkanDevice.hpp"
+#include "Context.hpp"
+#include "Engine/Graphics/Vulkan/Device.hpp"
 
 #include <stdexcept>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
 // ==============================
 // Public Methods
 // ==============================
 
-Command::Command(Context& context) : context_{context} {}
+Command::Command(Context& context) : context_{context} {
+  createCommandPool_();
+  createCommandBuffers_();
+}
 
 Command::~Command() {
   auto vkDevice = context_.GetDevice().Logical();
   vkDestroyCommandPool(vkDevice, commandPool_, nullptr);
 }
 
-void Command::Init() {
-  createCommandPool_();
-  createCommandBuffers_();
-}
-
-VkCommandBuffer& Command::Buffer(uint32_t index) {
+VkCommandBuffer& Command::Buffer(uint32_t index) noexcept {
   return commandBuffers_[index];
 }
 
 VkCommandBuffer Command::BeginSingleTimeCommands_() {
-  auto vkDevice = context_.GetDevice().Logical();
+  const auto vkDevice = context_.GetDevice().Logical();
 
   // TODO: Command pool for short lived operations allows optimization.
   VkCommandBufferAllocateInfo allocInfo{};
@@ -97,4 +95,4 @@ void Command::createCommandBuffers_() {
     throw std::runtime_error("failed to allocate command buffers!");
   }
 }
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

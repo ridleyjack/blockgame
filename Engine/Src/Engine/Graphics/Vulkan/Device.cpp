@@ -1,25 +1,15 @@
-#include "VulkanDevice.hpp"
+#include "Device.hpp"
 
-#include "VulkanContext.hpp"
+#include "Context.hpp"
 
 #include <iostream>
 #include <set>
 #include <stdexcept>
 #include <vector>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
-// ==============================
-// Public Methods
-// ==============================
-
-Device::Device(Context& context) : context_{context} {}
-
-Device::~Device() {
-  vkDestroyDevice(device_, nullptr);
-}
-
-void Device::Init() {
+Device::Device(Context& context) : context_{context} {
   pickPhysicalDevice_();
 
   QueueFamilyIndices indices = findQueueFamilies_(physicalDevice_, context_.Surface());
@@ -57,23 +47,26 @@ void Device::Init() {
     throw std::runtime_error("failed to create logical device!");
   }
 
-  std::fprintf(stderr, "[Device] Logical=%p Physical=%p\n", (void*)device_, (void*)physicalDevice_);
   vkGetDeviceQueue(device_, indices.GraphicsFamily.value(), 0, &graphicsQueue_);
   vkGetDeviceQueue(device_, indices.PresentFamily.value(), 0, &presentQueue_);
 }
 
-VkDevice Device::Logical() const {
+Device::~Device() {
+  vkDestroyDevice(device_, nullptr);
+}
+
+VkDevice Device::Logical() const noexcept {
   return device_;
 }
-VkPhysicalDevice Device::Physical() const {
+VkPhysicalDevice Device::Physical() const noexcept {
   return physicalDevice_;
 }
 
-VkQueue Device::GraphicsQueue() const {
+VkQueue Device::GraphicsQueue() const noexcept {
   return graphicsQueue_;
 }
 
-VkQueue Device::PresentQueue() const {
+VkQueue Device::PresentQueue() const noexcept {
   return presentQueue_;
 }
 
@@ -139,10 +132,6 @@ VkImageView Device::CreateImageView(VkImage image, VkFormat format) const {
 
   return imageView;
 }
-
-// ==============================
-// Private Methods
-// ==============================
 
 bool Device::checkDeviceExtensionSupport_(VkPhysicalDevice device) {
   uint32_t extensionCount;
@@ -254,4 +243,4 @@ void Device::pickPhysicalDevice_() {
   }
 }
 
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

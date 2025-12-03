@@ -5,7 +5,7 @@
 #include <optional>
 #include <vector>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
 class Context;
 
@@ -32,12 +32,10 @@ public:
   Device(const Device&) = delete;
   Device& operator=(const Device&) = delete;
 
-  void Init();
-
-  VkDevice Logical() const;
-  VkPhysicalDevice Physical() const;
-  VkQueue GraphicsQueue() const;
-  VkQueue PresentQueue() const;
+  VkDevice Logical() const noexcept;
+  VkPhysicalDevice Physical() const noexcept;
+  VkQueue GraphicsQueue() const noexcept;
+  VkQueue PresentQueue() const noexcept;
 
   // FindQueueFamilies returns a struct containing the index of a GraphicsFamily and a PresentFamily, preference is
   // given for a family that supports both. Supported families are usually determined by hardware support.
@@ -65,4 +63,4 @@ private:
 
   void pickPhysicalDevice_();
 };
-} // namespace Engine::GFX::Vulkan
+} // namespace engine::graphics::vulkan

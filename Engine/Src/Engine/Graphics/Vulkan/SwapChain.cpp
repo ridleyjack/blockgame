@@ -1,30 +1,70 @@
-#include "VulkanSwapChain.hpp"
+#include "SwapChain.hpp"
 
-#include "VulkanContext.hpp"
-#include "VulkanDevice.hpp"
-#include "VulkanSync.hpp"
+#include "Context.hpp"
+#include "Device.hpp"
+#include "Sync.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <limits>
 #include <stdexcept>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
-// ==============================
-// Public Methods
-// ==============================
-
-SwapChain::SwapChain(Context& context) : context_(context) {}
+SwapChain::SwapChain(Context& context) : context_(context) {
+  create_();
+}
 
 SwapChain::~SwapChain() {
   Cleanup();
 }
 
-void SwapChain::Init() {
-  auto& device = context_.GetDevice();
-  auto logicalDevice = device.Logical();
-  auto surface = context_.Surface();
+void SwapChain::Cleanup() {
+  const auto vkDevice = context_.GetDevice().Logical();
+
+  for (const auto imageView : imageViews_) {
+    vkDestroyImageView(vkDevice, imageView, nullptr);
+  }
+
+  vkDestroySwapchainKHR(vkDevice, swapchain_, nullptr);
+}
+void SwapChain::Recreate() {
+  auto& window = context_.Window();
+  int width = 0, height = 0;
+  glfwGetFramebufferSize(&window, &width, &height);
+  while (width == 0 || height == 0) {
+    glfwGetFramebufferSize(&window, &width, &height);
+    glfwWaitEvents();
+  }
+
+  Cleanup();
+  create_();
+  context_.GetSync().RecreatePerImageSemaphores();
+}
+
+VkSwapchainKHR SwapChain::Handle() const noexcept {
+  return swapchain_;
+}
+
+VkFormat SwapChain::ImageFormat() const noexcept {
+  return imageFormat_;
+}
+
+VkExtent2D SwapChain::Extent() const noexcept {
+  return extent_;
+}
+
+std::vector<VkImage> SwapChain::Images() const noexcept {
+  return images_;
+}
+std::vector<VkImageView> SwapChain::ImageViews() const noexcept {
+  return imageViews_;
+}
+
+void SwapChain::create_() {
+  const auto& device = context_.GetDevice();
+  const auto logicalDevice = device.Logical();
+  const auto surface = context_.Surface();
 
   SwapChainSupportDetails swapChainSupport = device.QuerySwapChainSupport();
 
@@ -81,81 +121,6 @@ void SwapChain::Init() {
     imageViews_[i] = device.CreateImageView(images_[i], imageFormat_);
   }
 }
-
-void SwapChain::Cleanup() {
-  const auto vkDevice = context_.GetDevice().Logical();
-
-  for (const auto framebuffer : framebuffers_) {
-    vkDestroyFramebuffer(vkDevice, framebuffer, nullptr);
-  }
-
-  for (const auto imageView : imageViews_) {
-    vkDestroyImageView(vkDevice, imageView, nullptr);
-  }
-
-  vkDestroySwapchainKHR(vkDevice, swapchain_, nullptr);
-}
-void SwapChain::Recreate() {
-  auto& window = context_.Window();
-  int width = 0, height = 0;
-  glfwGetFramebufferSize(&window, &width, &height);
-  while (width == 0 || height == 0) {
-    glfwGetFramebufferSize(&window, &width, &height);
-    glfwWaitEvents();
-  }
-
-  Cleanup();
-  Init();
-  context_.GetSync().RecreatePerImageSemaphores();
-}
-
-void SwapChain::CreateFrameBuffers(VkRenderPass renderPass) {
-  assert(renderPass != VK_NULL_HANDLE && "Render pass must be initialized before framebuffer creation");
-
-  framebuffers_.resize(imageViews_.size());
-  for (size_t i = 0; i < imageViews_.size(); i++) {
-    VkImageView attachments[] = {imageViews_[i]};
-
-    VkFramebufferCreateInfo framebufferInfo{};
-    framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = renderPass;
-    framebufferInfo.attachmentCount = 1;
-    framebufferInfo.pAttachments = attachments;
-    framebufferInfo.width = extent_.width;
-    framebufferInfo.height = extent_.height;
-    framebufferInfo.layers = 1;
-
-    if (vkCreateFramebuffer(context_.GetDevice().Logical(), &framebufferInfo, nullptr, &framebuffers_[i]) !=
-        VK_SUCCESS) {
-      throw std::runtime_error("failed to create framebuffer!");
-    }
-  }
-}
-
-VkSwapchainKHR SwapChain::Handle() const {
-  return swapchain_;
-}
-
-VkFormat SwapChain::ImageFormat() const {
-  return imageFormat_;
-}
-
-VkExtent2D SwapChain::Extent() const {
-  return extent_;
-}
-
-VkFramebuffer SwapChain::Framebuffer(size_t index) const {
-  return framebuffers_[index];
-}
-
-std::vector<VkImage> SwapChain::Images() const {
-  return images_;
-}
-
-// ==============================
-// Private Methods
-// ==============================
-
 VkSurfaceFormatKHR SwapChain::chooseSurfaceFormat_(const std::vector<VkSurfaceFormatKHR>& availableFormats) const {
   for (const auto& availableFormat : availableFormats) {
     if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -191,4 +156,4 @@ VkExtent2D SwapChain::chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities
 
   return actualExtent;
 }
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

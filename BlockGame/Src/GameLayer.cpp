@@ -1,7 +1,7 @@
 #include "GameLayer.hpp"
 
 #include "Engine/Application.hpp"
-#include "Engine/GFX/Vulkan/VulkanRenderer.hpp"
+#include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 // ==============================
 // Public Methods

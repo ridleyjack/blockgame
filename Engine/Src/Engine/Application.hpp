@@ -8,7 +8,7 @@
 
 namespace engine {
 
-namespace gfx::vulkan {
+namespace graphics::vulkan {
 class Renderer;
 }
 
@@ -31,12 +31,12 @@ public:
   static float GetTime();
 
   Window& GetWindow() const;
-  gfx::vulkan::Renderer& GetRenderer() const;
+  graphics::vulkan::Renderer& GetRenderer() const;
 
 private:
   ApplicationConfig config_{};
   std::unique_ptr<Window> window_{};
-  std::unique_ptr<gfx::vulkan::Renderer> renderer_{};
+  std::unique_ptr<graphics::vulkan::Renderer> renderer_{};
 
   std::vector<ILayer*> layerStack_{};
 

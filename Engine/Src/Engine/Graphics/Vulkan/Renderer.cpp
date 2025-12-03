@@ -1,17 +1,20 @@
-#include "VulkanRenderer.hpp"
+#include "Renderer.hpp"
 
-#include "VulkanCommand.hpp"
-#include "VulkanContext.hpp"
-#include "VulkanDevice.hpp"
-#include "VulkanPipeline.hpp"
-#include "VulkanPipelineCache.hpp"
-#include "VulkanSwapChain.hpp"
-#include "VulkanSync.hpp"
+#include "Command.hpp"
+#include "Context.hpp"
+#include "Device.hpp"
+#include "Pipeline.hpp"
+#include "PipelineCache.hpp"
+#include "SwapChain.hpp"
+#include "Sync.hpp"
+#include "RenderPass.hpp"
 
-#include "Engine/GFX/RenderObject.hpp"
-#include "Engine/GFX/Mesh.hpp"
+#include "Engine/Graphics/RenderObject.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Handles.hpp"
+#include "Engine/Graphics/PipelineCreateInfo.hpp"
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
 Mesh gMesh{
     .Vertices{{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}}, //
@@ -19,32 +22,21 @@ Mesh gMesh{
               {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}}  //
 };
 
-// ==============================
-// Public Methods
-// ==============================
+Renderer::Renderer(GLFWwindow* window) : context_(window), pipelineCache_(context_), renderObject_(context_) {
+  renderPasses_.Create(context_);
+  framebuffers_.Create(context_, context_.GetSwapchain(), renderPasses_.Get(0));
+  const PipelineCreateInfo info{"Shaders/vert.spv", "Shaders/frag.spv"};
+  pipelineCache_.CreatePipeline(info, renderPasses_.Get(0));
 
-Renderer::Renderer(GLFWwindow* window) {
-  context_ = std::make_unique<Context>(window);
-  renderObject_ = std::make_unique<gfx::RenderObject>(*context_);
-}
-
-Renderer::~Renderer() {
-  renderObject_.reset();
-  context_.reset();
-}
-
-void Renderer::Init() {
-  context_->Init();
-  renderObject_->Init();
-  renderObject_->UploadMesh(gMesh);
+  renderObject_.UploadMesh(gMesh);
 }
 
 void Renderer::DrawFrame() {
-  auto& device = context_->GetDevice();
-  auto& sync = context_->GetSync();
-  auto& swapchain = context_->GetSwapchain();
-  auto& cmd = context_->GetCommand();
-  auto& pipeline = context_->GetPipelineLibrary().GetPipeline(0);
+  auto& device = context_.GetDevice();
+  auto& sync = context_.GetSync();
+  auto& swapchain = context_.GetSwapchain();
+  auto& cmd = context_.GetCommand();
+  auto& pipeline = pipelineCache_.GetPipeline(PipelineHandle{0});
 
   vkWaitForFences(device.Logical(), 1, &sync.InFlightFence(currentFrame_), VK_TRUE, UINT64_MAX);
 
@@ -73,8 +65,8 @@ void Renderer::DrawFrame() {
 
   VkRenderPassBeginInfo renderPassInfo{};
   renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  renderPassInfo.renderPass = pipeline.RenderPass();
-  renderPassInfo.framebuffer = swapchain.Framebuffer(imageIndex);
+  renderPassInfo.renderPass = renderPasses_.Get(0).Handle();
+  renderPassInfo.framebuffer = framebuffers_.Get(0).Framebuffer(imageIndex);
   renderPassInfo.renderArea.offset = {0, 0};
   renderPassInfo.renderArea.extent = swapChainExtent;
 
@@ -83,7 +75,7 @@ void Renderer::DrawFrame() {
   renderPassInfo.pClearValues = &clearColor;
 
   vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.GraphicsPipeline());
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
 
   VkViewport viewport{};
   viewport.x = 0.0f;
@@ -99,7 +91,7 @@ void Renderer::DrawFrame() {
   scissor.extent = swapChainExtent;
   vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-  renderObject_->Record(cmd.Buffer(currentFrame_), imageIndex, currentFrame_);
+  renderObject_.Record(cmd.Buffer(currentFrame_), imageIndex, currentFrame_);
 
   vkCmdEndRenderPass(commandBuffer);
 
@@ -139,9 +131,9 @@ void Renderer::DrawFrame() {
 
   result = vkQueuePresentKHR(device.PresentQueue(), &presentInfo);
 
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || context_->GetFramebufferResized()) {
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || context_.GetFramebufferHasResized()) {
     swapchain.Recreate();
-    context_->SetFramebufferResized(false);
+    context_.SetFramebufferHasResized(false);
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("failed to present swap chain image!");
   }
@@ -149,16 +141,26 @@ void Renderer::DrawFrame() {
   currentFrame_ = (currentFrame_ + 1) % config::MaxFramesInFlight;
 }
 
-bool Renderer::ShouldClose() const {
-  return context_->WindowShouldClose();
+bool Renderer::ShouldClose() const noexcept {
+  return context_.WindowShouldClose();
 }
 
 void Renderer::WaitUntilIdle() const {
-  return context_->WaitUntilIdle();
+  return context_.WaitUntilIdle();
 }
 
-// ==============================
-// Private Methods
-// ==============================
+PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
+  return pipelineCache_.CreatePipeline(info, renderPasses_.Get(0));
+}
 
-} // namespace engine::gfx::vulkan
+void Renderer::DeletePipeline(const PipelineHandle handle) {
+  pipelineCache_.DestroyPipeline(handle);
+}
+
+MeshHandle Renderer::CreateMesh(const MeshCreateInfo& info) {
+  return MeshHandle{};
+}
+
+void Renderer::DeleteMesh(MeshHandle Handle) {}
+
+} // namespace engine::graphics::vulkan

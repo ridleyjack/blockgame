@@ -1,27 +1,14 @@
-#include "VulkanSync.hpp"
+#include "Sync.hpp"
 
-#include "VulkanContext.hpp"
-#include "VulkanDevice.hpp"
-#include "VulkanSwapChain.hpp"
+#include "Context.hpp"
+#include "Device.hpp"
+#include "SwapChain.hpp"
 
-namespace engine::gfx::vulkan {
+#include <cassert>
 
-// ==============================
-// Public Methods
-// ==============================
+namespace engine::graphics::vulkan {
 
-Sync::Sync(Context& context) : context_(context) {}
-
-Sync::~Sync() {
-  const auto vkDevice = context_.GetDevice().Logical();
-  for (size_t i = 0; i < config::MaxFramesInFlight; i++) {
-    vkDestroySemaphore(vkDevice, imageAvailableSemaphores_[i], nullptr);
-    vkDestroyFence(vkDevice, inFlightFences_[i], nullptr);
-  }
-  cleanupPerImageSemaphores_();
-}
-
-void Sync::Init() {
+Sync::Sync(Context& context) : context_(context) {
   const auto device = context_.GetDevice().Logical();
 
   imageAvailableSemaphores_.resize(config::MaxFramesInFlight);
@@ -42,26 +29,37 @@ void Sync::Init() {
   }
   createPerImageSemaphores_();
 }
+
+Sync::~Sync() {
+  const auto vkDevice = context_.GetDevice().Logical();
+  for (const auto semaphore : imageAvailableSemaphores_) {
+    vkDestroySemaphore(vkDevice, semaphore, nullptr);
+  }
+  for (const auto fence : inFlightFences_) {
+    vkDestroyFence(vkDevice, fence, nullptr);
+  }
+  cleanupPerImageSemaphores_();
+}
+
 void Sync::RecreatePerImageSemaphores() {
   cleanupPerImageSemaphores_();
   createPerImageSemaphores_();
 }
 
-VkSemaphore& Sync::ImageAvailableSemaphore(uint32_t frame) {
+VkSemaphore& Sync::ImageAvailableSemaphore(const uint32_t frame) noexcept {
+  assert(frame < imageAvailableSemaphores_.size());
   return imageAvailableSemaphores_[frame];
 }
 
-VkSemaphore& Sync::RenderFinishedSemaphore(uint32_t frame) {
-  return renderFinishedSemaphores_[frame];
+VkSemaphore& Sync::RenderFinishedSemaphore(const uint32_t image) noexcept {
+  assert(image < renderFinishedSemaphores_.size());
+  return renderFinishedSemaphores_[image];
 }
 
-VkFence& Sync::InFlightFence(uint32_t frame) {
+VkFence& Sync::InFlightFence(const uint32_t frame) noexcept {
+  assert(frame < inFlightFences_.size());
   return inFlightFences_[frame];
 }
-
-// ==============================
-// Private Methods
-// ==============================
 
 void Sync::createPerImageSemaphores_() {
   const auto vkDevice = context_.GetDevice().Logical();
@@ -84,4 +82,4 @@ void Sync::cleanupPerImageSemaphores_() {
     vkDestroySemaphore(vkDevice, semaphore, nullptr);
 }
 
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

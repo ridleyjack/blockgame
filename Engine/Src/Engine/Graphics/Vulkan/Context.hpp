@@ -6,12 +6,11 @@
 #include <memory>
 #include <vector>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
 class Device;
-class SwapChain;
-class PipelineCache;
 class Command;
+class SwapChain;
 class Sync;
 
 namespace config {
@@ -43,24 +42,21 @@ public:
   Context(const Context&) = delete;
   Context& operator=(const Context&) = delete;
 
-  void Init();
+  GLFWwindow& Window() const noexcept;
 
-  GLFWwindow& Window() const;
+  VkInstance Instance() const noexcept;
+  VkSurfaceKHR Surface() const noexcept;
 
-  VkInstance Instance() const;
-  VkSurfaceKHR Surface() const;
+  Device& GetDevice() noexcept;
+  SwapChain& GetSwapchain() noexcept;
+  Command& GetCommand() noexcept;
+  Sync& GetSync() noexcept;
 
-  Device& GetDevice() const;
-  SwapChain& GetSwapchain() const;
-  PipelineCache& GetPipelineLibrary() const;
-  Command& GetCommand() const;
-  Sync& GetSync() const;
+  bool GetFramebufferHasResized() const noexcept;
+  void SetFramebufferHasResized(bool value) noexcept;
 
-  bool GetFramebufferResized() const;
-  void SetFramebufferResized(bool value);
-
-  bool WindowShouldClose() const;
-  void WaitUntilIdle() const;
+  bool WindowShouldClose() const noexcept;
+  void WaitUntilIdle() const noexcept;
 
 private:
   GLFWwindow* window_{};
@@ -69,17 +65,16 @@ private:
   VkInstance instance_{VK_NULL_HANDLE};
   VkSurfaceKHR surface_{VK_NULL_HANDLE};
 
-  std::unique_ptr<Device> device_{nullptr};
-  std::unique_ptr<SwapChain> swapchain_{nullptr};
-  std::unique_ptr<PipelineCache> pipelineLibrary_{nullptr};
-  std::unique_ptr<Command> command_{nullptr};
-  std::unique_ptr<Sync> sync_{nullptr};
+  std::unique_ptr<Device> device_;
+  std::unique_ptr<SwapChain> swapchain_;
+  std::unique_ptr<Command> command_;
+  std::unique_ptr<Sync> sync_;
 
-  bool framebufferResized_{false};
+  bool framebufferHasResized_{false};
 
   void createInstance_();
   void setupDebugMessenger_();
   void createSurface_();
 };
 
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

@@ -6,7 +6,7 @@ add_executable(Blockgame
 
 target_link_libraries(Blockgame
         PRIVATE Engine
-        PRIVATE Engine_GFX
+        PRIVATE Engine_Graphics
 )
 
 target_compile_features(Blockgame PRIVATE cxx_std_23)

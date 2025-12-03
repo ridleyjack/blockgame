@@ -5,7 +5,7 @@
 
 #include <vector>
 
-namespace engine::gfx {
+namespace engine::graphics {
 
 struct Vertex;
 struct Mesh;
@@ -16,13 +16,12 @@ class Context;
 
 class RenderObject {
 public:
-  RenderObject(vulkan::Context& context);
+  explicit RenderObject(vulkan::Context& context);
   ~RenderObject();
 
   RenderObject(const RenderObject&) = delete;
   RenderObject& operator=(const RenderObject&) = delete;
 
-  void Init();
   void Record(VkCommandBuffer commandBuffer, uint32_t imageIndex, uint32_t currentFrame);
   void UploadMesh(Mesh& mesh);
 
@@ -38,10 +37,10 @@ private:
   VkDeviceMemory indexBufferMemory_{VK_NULL_HANDLE};
 
   void createVertexBuffer_(const std::vector<Vertex>& vertices);
-  void createIndexBuffer_(const std::vector<uint32_t> indices);
+  void createIndexBuffer_(std::vector<uint32_t> indices);
   void createBuffer_(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer,
                      VkDeviceMemory& bufferMemory);
   void copyBuffer_(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 };
 
-} // namespace engine::gfx
+} // namespace engine::graphics

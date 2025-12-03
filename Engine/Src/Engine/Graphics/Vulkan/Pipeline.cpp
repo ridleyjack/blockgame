@@ -1,106 +1,44 @@
-#include "VulkanPipeline.hpp"
+#include "Pipeline.hpp"
 
-#include "VulkanContext.hpp"
-#include "VulkanPipelineCache.hpp"
-#include "VulkanDevice.hpp"
-#include "VulkanSwapChain.hpp"
+#include "Context.hpp"
+#include "Device.hpp"
+#include "RenderPass.hpp"
 
 #include "Engine/Assets/File.hpp"
-#include "Engine/GFX/Mesh.hpp"
-
-#include <glm/glm.hpp>
+#include "Engine/Graphics/Mesh.hpp"
+#include "Engine/Graphics/Handles.hpp"
+#include "Engine/Graphics/PipelineCreateInfo.hpp"
 
 #include <array>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
-// ==============================
-// Public Methods
-// ==============================
-
-Pipeline::Pipeline(Context& context) : context_{context} {}
+Pipeline::Pipeline(Context& context, const PipelineCreateInfo& info, const RenderPass& renderPass) : context_{context} {
+  createPipelineLayout_();
+  createPipeline_(info, renderPass);
+}
 
 Pipeline::~Pipeline() {
-  auto device = context_.GetDevice().Logical();
+  const auto vkDevice = context_.GetDevice().Logical();
 
-  vkDestroyPipeline(device, graphicsPipeline_, nullptr);
-  vkDestroyPipelineLayout(device, pipelineLayout_, nullptr);
-  vkDestroyDescriptorSetLayout(device, descriptorSetLayout_, nullptr);
-  vkDestroyRenderPass(device, renderPass_, nullptr);
+  vkDestroyPipeline(vkDevice, pipeline_, nullptr);
+  vkDestroyPipelineLayout(vkDevice, pipelineLayout_, nullptr);
+  vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout_, nullptr);
 }
 
-void Pipeline::Create(const CreatePipelineRequest& request) {
-  createRenderPass_();
-  context_.GetSwapchain().CreateFrameBuffers(renderPass_);
-  // createDescriptorSetLayout_();
-  createGraphicsPipeline_(request);
-}
-
-VkRenderPass Pipeline::RenderPass() const {
-  return renderPass_;
-}
-
-VkDescriptorSetLayout Pipeline::DescriptorSetLayout() const {
+VkDescriptorSetLayout Pipeline::DescriptorSetLayout() const noexcept {
   return descriptorSetLayout_;
 }
-VkPipelineLayout Pipeline::PipelineLayout() const {
+VkPipelineLayout Pipeline::PipelineLayout() const noexcept {
   return pipelineLayout_;
 }
 
-VkPipeline Pipeline::GraphicsPipeline() const {
-  return graphicsPipeline_;
-}
-
-// ==============================
-// Private Methods
-// ==============================
-
-void Pipeline::createRenderPass_() {
-  const auto& swapchain = context_.GetSwapchain();
-  const auto& device = context_.GetDevice();
-
-  VkAttachmentDescription colorAttachment{};
-  colorAttachment.format = swapchain.ImageFormat();
-  colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-  VkAttachmentReference colorAttachmentRef{};
-  colorAttachmentRef.attachment = 0;
-  colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-  VkSubpassDescription subpass{};
-  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colorAttachmentRef;
-
-  VkSubpassDependency dependency{};
-  dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-  dependency.dstSubpass = 0;
-  dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask = 0;
-  dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-  VkRenderPassCreateInfo renderPassInfo{};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  renderPassInfo.attachmentCount = 1;
-  renderPassInfo.pAttachments = &colorAttachment;
-  renderPassInfo.subpassCount = 1;
-  renderPassInfo.pSubpasses = &subpass;
-  renderPassInfo.dependencyCount = 1;
-  renderPassInfo.pDependencies = &dependency;
-
-  if (vkCreateRenderPass(device.Logical(), &renderPassInfo, nullptr, &renderPass_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create render pass!");
-  }
+VkPipeline Pipeline::Handle() const noexcept {
+  return pipeline_;
 }
 
 void Pipeline::createDescriptorSetLayout_() {
+  // TODO: Unused.. migrate process somewhere
   const auto& device = context_.GetDevice().Logical();
 
   VkDescriptorSetLayoutBinding uboLayoutBinding{};
@@ -129,11 +67,25 @@ void Pipeline::createDescriptorSetLayout_() {
   }
 }
 
-void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
-  const auto device = context_.GetDevice().Logical();
+void Pipeline::createPipelineLayout_() {
+  const auto vkDevice = context_.GetDevice().Logical();
+  VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipelineLayoutInfo.setLayoutCount = 0;
+  pipelineLayoutInfo.pushConstantRangeCount = 0;
+  // pipelineLayoutInfo.setLayoutCount = 0;
+  // pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
 
-  auto vertShaderCode = Assets::ReadBinaryFile(request.VertexShaderFile);
-  auto fragShaderCode = Assets::ReadBinaryFile(request.FragmentShaderFile);
+  if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create pipeline layout!");
+  }
+}
+
+void Pipeline::createPipeline_(const PipelineCreateInfo& info, const RenderPass& renderPass) {
+  const auto vkDevice = context_.GetDevice().Logical();
+
+  auto vertShaderCode = Assets::ReadBinaryFile(info.VertexShaderFile);
+  auto fragShaderCode = Assets::ReadBinaryFile(info.FragmentShaderFile);
 
   VkShaderModule vertShaderModule = createShaderModule_(vertShaderCode);
   VkShaderModule fragShaderModule = createShaderModule_(fragShaderCode);
@@ -209,17 +161,6 @@ void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
   dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
   dynamicState.pDynamicStates = dynamicStates.data();
 
-  VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-  pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = 0;
-  pipelineLayoutInfo.pushConstantRangeCount = 0;
-  // pipelineLayoutInfo.setLayoutCount = 0;
-  // pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
-
-  if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create pipeline layout!");
-  }
-
   VkGraphicsPipelineCreateInfo pipelineInfo{};
   pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineInfo.stageCount = 2;
@@ -232,15 +173,15 @@ void Pipeline::createGraphicsPipeline_(const CreatePipelineRequest& request) {
   pipelineInfo.pColorBlendState = &colorBlending;
   pipelineInfo.pDynamicState = &dynamicState;
   pipelineInfo.layout = pipelineLayout_;
-  pipelineInfo.renderPass = renderPass_;
+  pipelineInfo.renderPass = renderPass.Handle();
   pipelineInfo.subpass = 0;
 
-  if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS) {
+  if (vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create graphics pipeline!");
   }
 
-  vkDestroyShaderModule(device, vertShaderModule, nullptr);
-  vkDestroyShaderModule(device, fragShaderModule, nullptr);
+  vkDestroyShaderModule(vkDevice, vertShaderModule, nullptr);
+  vkDestroyShaderModule(vkDevice, fragShaderModule, nullptr);
 }
 
 VkShaderModule Pipeline::createShaderModule_(const std::vector<char>& code) const {
@@ -258,4 +199,4 @@ VkShaderModule Pipeline::createShaderModule_(const std::vector<char>& code) cons
   return shaderModule;
 }
 
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

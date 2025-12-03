@@ -4,8 +4,9 @@
 #include <glm/glm.hpp>
 
 #include <array>
+#include <vector>
 
-namespace engine::gfx {
+namespace engine::graphics {
 
 struct Vertex {
   glm::vec2 Position{};

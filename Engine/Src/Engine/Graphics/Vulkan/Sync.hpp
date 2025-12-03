@@ -4,7 +4,7 @@
 
 #include <vector>
 
-namespace engine::gfx::vulkan {
+namespace engine::graphics::vulkan {
 
 class Context;
 
@@ -16,12 +16,11 @@ public:
   Sync(const Sync&) = delete;
   Sync& operator=(const Sync&) = delete;
 
-  void Init();
   void RecreatePerImageSemaphores();
 
-  VkSemaphore& ImageAvailableSemaphore(uint32_t frame);
-  VkSemaphore& RenderFinishedSemaphore(uint32_t image);
-  VkFence& InFlightFence(uint32_t frame);
+  VkSemaphore& ImageAvailableSemaphore(uint32_t frame) noexcept;
+  VkSemaphore& RenderFinishedSemaphore(uint32_t image) noexcept;
+  VkFence& InFlightFence(uint32_t frame) noexcept;
 
 private:
   Context& context_;
@@ -34,4 +33,4 @@ private:
   void cleanupPerImageSemaphores_();
 };
 
-} // namespace engine::gfx::vulkan
+} // namespace engine::graphics::vulkan

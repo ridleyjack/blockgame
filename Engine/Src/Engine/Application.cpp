@@ -1,6 +1,6 @@
 #include "Application.hpp"
 
-#include "GFX/Vulkan/VulkanRenderer.hpp"
+#include "Graphics/Vulkan/Renderer.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -21,8 +21,7 @@ Application::Application(const ApplicationConfig& config) : config_(config) {
   window_ = std::make_unique<Window>(config.Window);
   window_->Create();
 
-  renderer_ = std::make_unique<gfx::vulkan::Renderer>(window_->GetHandle());
-  renderer_->Init();
+  renderer_ = std::make_unique<graphics::vulkan::Renderer>(window_->GetHandle());
 }
 
 Application::~Application() {
@@ -76,7 +75,7 @@ float Application::GetTime() {
 Window& Application::GetWindow() const {
   return *window_;
 }
-gfx::vulkan::Renderer& Application::GetRenderer() const {
+graphics::vulkan::Renderer& Application::GetRenderer() const {
   return *renderer_;
 }
 
