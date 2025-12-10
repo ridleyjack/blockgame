@@ -40,7 +40,7 @@ FramebufferSet::~FramebufferSet() {
     vkDestroyFramebuffer(vkDevice, framebuffer, nullptr);
   }
 }
-VkFramebuffer FramebufferSet::Framebuffer(const int frameID) const noexcept {
+VkFramebuffer FramebufferSet::Framebuffer(const uint32_t frameID) const noexcept {
   assert(frameID < framebuffers_.size());
   return framebuffers_[frameID];
 }

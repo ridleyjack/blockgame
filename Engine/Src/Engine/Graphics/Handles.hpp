@@ -9,4 +9,8 @@ struct PipelineHandle {
 struct MeshHandle {
   uint32_t MeshID{};
 };
+
+struct UniformHandle {
+  uint32_t UniformID{};
+};
 } // namespace engine::graphics

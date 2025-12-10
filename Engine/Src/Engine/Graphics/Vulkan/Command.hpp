@@ -16,10 +16,10 @@ public:
   Command(const Command&) = delete;
   Command& operator=(const Command&) = delete;
 
-  VkCommandBuffer& Buffer(uint32_t index) noexcept;
+  VkCommandBuffer Buffer(uint32_t index) const noexcept;
 
-  VkCommandBuffer BeginSingleTimeCommands_();
-  void EndSingleTimeCommands_(VkCommandBuffer commandBuffer);
+  VkCommandBuffer BeginSingleTimeCommands_() const noexcept;
+  void EndSingleTimeCommands_(VkCommandBuffer commandBuffer) const noexcept;
 
 private:
   Context& context_;

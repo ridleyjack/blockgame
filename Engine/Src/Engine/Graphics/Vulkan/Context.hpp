@@ -47,10 +47,10 @@ public:
   VkInstance Instance() const noexcept;
   VkSurfaceKHR Surface() const noexcept;
 
-  Device& GetDevice() noexcept;
-  SwapChain& GetSwapchain() noexcept;
-  Command& GetCommand() noexcept;
-  Sync& GetSync() noexcept;
+  Device& GetDevice() const noexcept;
+  SwapChain& GetSwapchain() const noexcept;
+  Command& GetCommand() const noexcept;
+  Sync& GetSync() const noexcept;
 
   bool GetFramebufferHasResized() const noexcept;
   void SetFramebufferHasResized(bool value) noexcept;

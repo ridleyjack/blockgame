@@ -14,6 +14,7 @@
 namespace engine::graphics::vulkan {
 
 Pipeline::Pipeline(Context& context, const PipelineCreateInfo& info, const RenderPass& renderPass) : context_{context} {
+  createDescriptorSetLayout_();
   createPipelineLayout_();
   createPipeline_(info, renderPass);
 }
@@ -38,7 +39,6 @@ VkPipeline Pipeline::Handle() const noexcept {
 }
 
 void Pipeline::createDescriptorSetLayout_() {
-  // TODO: Unused.. migrate process somewhere
   const auto& device = context_.GetDevice().Logical();
 
   VkDescriptorSetLayoutBinding uboLayoutBinding{};
@@ -48,14 +48,15 @@ void Pipeline::createDescriptorSetLayout_() {
   uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
   uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
 
-  VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-  samplerLayoutBinding.binding = 1;
-  samplerLayoutBinding.descriptorCount = 1;
-  samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  samplerLayoutBinding.pImmutableSamplers = nullptr;
-  samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  // VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+  // samplerLayoutBinding.binding = 1;
+  // samplerLayoutBinding.descriptorCount = 1;
+  // samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  // samplerLayoutBinding.pImmutableSamplers = nullptr;
+  // samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-  std::array<VkDescriptorSetLayoutBinding, 2> bindings{uboLayoutBinding, samplerLayoutBinding};
+  // std::array<VkDescriptorSetLayoutBinding, 2> bindings{uboLayoutBinding, samplerLayoutBinding};
+  std::array<VkDescriptorSetLayoutBinding, 1> bindings{uboLayoutBinding};
 
   VkDescriptorSetLayoutCreateInfo layoutInfo{};
   layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -71,10 +72,9 @@ void Pipeline::createPipelineLayout_() {
   const auto vkDevice = context_.GetDevice().Logical();
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutInfo.setLayoutCount = 0;
   pipelineLayoutInfo.pushConstantRangeCount = 0;
-  // pipelineLayoutInfo.setLayoutCount = 0;
-  // pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
+  pipelineLayoutInfo.setLayoutCount = 1;
+  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
 
   if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create pipeline layout!");

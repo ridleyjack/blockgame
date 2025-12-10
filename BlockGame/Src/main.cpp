@@ -5,7 +5,7 @@
 
 int main() {
 
-  engine::ApplicationConfig config{};
+  const engine::ApplicationConfig config{};
   engine::Application app{config};
 
   GameLayer layer{app};

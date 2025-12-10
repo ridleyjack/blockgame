@@ -4,14 +4,16 @@
 #include "FramebufferSet.hpp"
 #include "PipelineCache.hpp"
 #include "RenderPass.hpp"
+#include "MeshGPU.hpp"
+#include "UniformBuffer.hpp"
 
-#include "Engine/Graphics/RenderObject.hpp"
-#include "Engine/Core/Containers/HandlePool.hpp"
+#include <expected>
 
 struct GLFWwindow;
 
 namespace engine::graphics {
 struct MeshHandle;
+struct Mesh;
 struct MeshCreateInfo;
 
 struct PipelineHandle;
@@ -21,36 +23,59 @@ struct PipelineCreateInfo;
 namespace engine::graphics::vulkan {
 
 class Context;
+
 class PipelineCache;
+struct MeshGPU;
+
+enum class RenderError {
+  FrameAcquireFailed,
+  FrameOutOfDate,
+  RecordCommandFailed,
+  SubmitCommandFailed,
+  PresentFailed
+};
+
+struct FrameContext {
+  uint32_t ImageIndex{};
+};
 
 class Renderer {
 public:
   explicit Renderer(GLFWwindow* window);
-  ~Renderer() = default;
+  ~Renderer();
 
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  void DrawFrame();
+  std::expected<FrameContext, RenderError> BeginFrame() noexcept;
+  std::expected<void, RenderError> EndFrame(const FrameContext& ctx);
+  void Submit(const MeshHandle& handle);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
 
   PipelineHandle CreatePipeline(const PipelineCreateInfo& info);
-  void DeletePipeline(PipelineHandle Handle);
+  void DeletePipeline(PipelineHandle handle);
 
-  MeshHandle CreateMesh(const MeshCreateInfo& info);
-  void DeleteMesh(MeshHandle Handle);
+  MeshHandle CreateMesh(const Mesh& mesh);
+  void DeleteMesh(MeshHandle handle);
 
 private:
-  uint32_t currentFrame_{};
-
   Context context_;
+
   PipelineCache pipelineCache_;
   core::containers::HandlePool<FramebufferSet> framebuffers_;
   core::containers::HandlePool<RenderPass> renderPasses_;
+  core::containers::HandlePool<MeshGPU> meshes_;
+  core::containers::HandlePool<UniformBuffer> uniforms_;
 
-  RenderObject renderObject_;
+  VkDescriptorPool descriptorPool_{VK_NULL_HANDLE};
+  std::vector<VkDescriptorSet> descriptorSets_{};
+
+  uint32_t currentFrame_{};
+
+  AllocatedBuffer createVertexBuffer_(const Mesh& mesh);
+  AllocatedBuffer createIndexBuffer_(const Mesh& mesh);
 };
 
 } // namespace engine::graphics::vulkan

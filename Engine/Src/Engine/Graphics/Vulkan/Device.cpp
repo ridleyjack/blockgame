@@ -1,6 +1,7 @@
 #include "Device.hpp"
 
 #include "Context.hpp"
+#include "Command.hpp"
 
 #include <iostream>
 #include <set>
@@ -131,6 +132,57 @@ VkImageView Device::CreateImageView(VkImage image, VkFormat format) const {
   }
 
   return imageView;
+}
+
+AllocatedBuffer Device::CreateBuffer(const VkDeviceSize size,
+                                     const VkBufferUsageFlags usage,
+                                     const VkMemoryPropertyFlags properties) const {
+  VkBuffer buffer;
+  VkDeviceMemory memory;
+
+  // Buffer
+  VkBufferCreateInfo bufferInfo{};
+  bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  bufferInfo.size = size;
+  bufferInfo.usage = usage;
+  bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create vertex buffer!");
+  }
+
+  // Buffer Memory
+  VkMemoryRequirements memRequirements;
+  vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
+
+  VkMemoryAllocateInfo allocInfo{};
+  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  allocInfo.allocationSize = memRequirements.size;
+  allocInfo.memoryTypeIndex = this->FindMemoryType(memRequirements.memoryTypeBits, properties);
+  if (vkAllocateMemory(device_, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate vertex buffer memory!");
+  }
+  vkBindBufferMemory(device_, buffer, memory, 0);
+
+  return AllocatedBuffer{.Buffer = buffer, .Memory = memory};
+}
+
+void Device::DestroyBuffer(const AllocatedBuffer& buffer) const noexcept {
+  vkDestroyBuffer(device_, buffer.Buffer, nullptr);
+  vkFreeMemory(device_, buffer.Memory, nullptr);
+}
+
+void Device::CopyBuffer(const VkBuffer src, const VkBuffer dst, const VkDeviceSize size) const {
+  auto& cmd = context_.GetCommand();
+  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands_();
+
+  VkBufferCopy copyRegion{};
+  copyRegion.srcOffset = 0; // Optional
+  copyRegion.dstOffset = 0; // Optional
+  copyRegion.size = size;
+  vkCmdCopyBuffer(commandBuffer, src, dst, 1, &copyRegion);
+
+  cmd.EndSingleTimeCommands_(commandBuffer);
 }
 
 bool Device::checkDeviceExtensionSupport_(VkPhysicalDevice device) {

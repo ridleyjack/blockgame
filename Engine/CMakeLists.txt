@@ -12,7 +12,10 @@ add_library(Engine
         Src/Engine/Assets/File.hpp
         Src/Engine/Assets/ImageLoader.cpp
         Src/Engine/Assets/ImageLoader.hpp
-        Src/Engine/Core/Containers/HandlePool.hpp
+        Src/Engine/Containers/HandlePool.hpp
+        Src/Engine/Events/IEventHandler.hpp
+        Src/Engine/Events/IEventRaiser.hpp
+        Src/Engine/Events/Events.hpp
 )
 target_include_directories(Engine
         PUBLIC
@@ -46,18 +49,15 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/Sync.hpp
         Src/Engine/Graphics/Vulkan/PipelineCache.cpp
         Src/Engine/Graphics/Vulkan/PipelineCache.hpp
-        Src/Engine/Graphics/Mesh.hpp
-        Src/Engine/Graphics/RenderObject.cpp
-        Src/Engine/Graphics/RenderObject.hpp
         Src/Engine/Graphics/Handles.hpp
         Src/Engine/Graphics/PipelineCreateInfo.hpp
-        Src/Engine/Graphics/MeshCreateInfo.hpp
-        Src/Engine/Graphics/MeshCreateInfo.hpp
-        Src/Engine/Graphics/MeshCreateInfo.hpp
+        Src/Engine/Graphics/Mesh.hpp
         Src/Engine/Graphics/Vulkan/RenderPass.cpp
         Src/Engine/Graphics/Vulkan/RenderPass.hpp
         Src/Engine/Graphics/Vulkan/FramebufferSet.cpp
         Src/Engine/Graphics/Vulkan/FramebufferSet.hpp
+        Src/Engine/Graphics/Vulkan/MeshGPU.hpp
+        Src/Engine/Graphics/Vulkan/UniformBuffer.hpp
 )
 
 target_include_directories(Engine_Graphics

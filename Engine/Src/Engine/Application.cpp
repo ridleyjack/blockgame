@@ -1,15 +1,16 @@
 #include "Application.hpp"
 
+#include "ILayer.hpp"
+
+#include "Events/IEventHandler.hpp"
+
 #include "Graphics/Vulkan/Renderer.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <ranges>
 
 namespace engine {
-
-// ==============================
-// Public Methods
-// ==============================
 
 Application::Application(const ApplicationConfig& config) : config_(config) {
   glfwInit();
@@ -18,7 +19,7 @@ Application::Application(const ApplicationConfig& config) : config_(config) {
     config_.Window.Title = config.Name;
   }
 
-  window_ = std::make_unique<Window>(config.Window);
+  window_ = std::make_unique<Window>(config.Window, *this);
   window_->Create();
 
   renderer_ = std::make_unique<graphics::vulkan::Renderer>(window_->GetHandle());
@@ -26,6 +27,7 @@ Application::Application(const ApplicationConfig& config) : config_(config) {
 
 Application::~Application() {
   window_.reset();
+  glfwTerminate();
 }
 
 void Application::Run() {
@@ -37,7 +39,6 @@ void Application::Run() {
 
     if (window_->ShouldClose()) {
       Stop();
-      break;
     }
 
     const float currentTime = GetTime();
@@ -64,7 +65,7 @@ void Application::PushLayer(ILayer* layer) {
 
 void Application::RemoveLayer(const ILayer* layer) {
   const auto it = std::find(layerStack_.begin(), layerStack_.end(), layer);
-  if (it != layerStack_.end())
+  if (it == layerStack_.end())
     return;
   layerStack_.erase(it);
 }
@@ -72,15 +73,21 @@ void Application::RemoveLayer(const ILayer* layer) {
 float Application::GetTime() {
   return static_cast<float>(glfwGetTime());
 }
+
 Window& Application::GetWindow() const {
   return *window_;
 }
+
 graphics::vulkan::Renderer& Application::GetRenderer() const {
   return *renderer_;
 }
 
-// ==============================
-// Private Methods
-// ==============================
+void Application::RaiseEvent(const events::Event& event) {
+  for (const auto& layer : std::views::reverse(layerStack_)) {
+    if (auto* handler = dynamic_cast<events::IKeyEventHandler*>(layer)) {
+      std::visit(events::KeyEventDispatch{.Handler = *handler}, event);
+    }
+  }
+}
 
 } // namespace engine

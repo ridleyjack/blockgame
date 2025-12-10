@@ -13,8 +13,10 @@
 
 namespace engine::graphics::vulkan {
 namespace debug {
-VkResult CreateUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
-                                 const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+VkResult CreateUtilsMessengerEXT(const VkInstance instance,
+                                 const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
+                                 const VkAllocationCallbacks* pAllocator,
+                                 VkDebugUtilsMessengerEXT* pDebugMessenger) {
   auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
       vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
   if (func != nullptr) {
@@ -24,7 +26,8 @@ VkResult CreateUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessenge
   }
 }
 
-void DestroyUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
+void DestroyUtilsMessengerEXT(VkInstance instance,
+                              VkDebugUtilsMessengerEXT debugMessenger,
                               const VkAllocationCallbacks* pAllocator) {
   auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
       vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
@@ -130,18 +133,18 @@ VkSurfaceKHR Context::Surface() const noexcept {
   return surface_;
 }
 
-Device& Context::GetDevice() noexcept {
+Device& Context::GetDevice() const noexcept {
   return *device_;
 }
 
-SwapChain& Context::GetSwapchain() noexcept {
+SwapChain& Context::GetSwapchain() const noexcept {
   return *swapchain_;
 }
 
-Command& Context::GetCommand() noexcept {
+Command& Context::GetCommand() const noexcept {
   return *command_;
 }
-Sync& Context::GetSync() noexcept {
+Sync& Context::GetSync() const noexcept {
   return *sync_;
 }
 

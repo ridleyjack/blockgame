@@ -3,14 +3,14 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include <array>
 #include <vector>
+#include <array>
 
 namespace engine::graphics {
 
 struct Vertex {
-  glm::vec2 Position{};
-  glm::vec3 Color{};
+  glm::vec3 pos{};
+  glm::vec3 color{};
 
   static VkVertexInputBindingDescription GetBindingDescription() {
     VkVertexInputBindingDescription bindingDescription{};
@@ -23,15 +23,16 @@ struct Vertex {
 
   static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions() {
     std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+
     attributeDescriptions[0].binding = 0;
     attributeDescriptions[0].location = 0;
-    attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
-    attributeDescriptions[0].offset = offsetof(Vertex, Position);
+    attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    attributeDescriptions[0].offset = offsetof(Vertex, pos);
 
     attributeDescriptions[1].binding = 0;
     attributeDescriptions[1].location = 1;
     attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    attributeDescriptions[1].offset = offsetof(Vertex, Color);
+    attributeDescriptions[1].offset = offsetof(Vertex, color);
 
     return attributeDescriptions;
   }
@@ -39,6 +40,6 @@ struct Vertex {
 
 struct Mesh {
   std::vector<Vertex> Vertices{};
-  std::vector<uint32_t> Indices{};
+  std::vector<uint16_t> Indices{};
 };
-} // namespace engine::gfx
+} // namespace engine::graphics

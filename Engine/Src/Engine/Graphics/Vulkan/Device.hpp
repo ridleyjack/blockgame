@@ -24,6 +24,11 @@ struct SwapChainSupportDetails {
   std::vector<VkPresentModeKHR> presentModes{};
 };
 
+struct AllocatedBuffer {
+  VkBuffer Buffer{VK_NULL_HANDLE};
+  VkDeviceMemory Memory{VK_NULL_HANDLE};
+};
+
 class Device {
 public:
   explicit Device(Context& context);
@@ -46,6 +51,10 @@ public:
   uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
 
   VkImageView CreateImageView(VkImage image, VkFormat format) const;
+
+  AllocatedBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
+  void DestroyBuffer(const AllocatedBuffer& buffer) const noexcept;
+  void CopyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
 
 private:
   static bool checkDeviceExtensionSupport_(VkPhysicalDevice device);

@@ -2,7 +2,7 @@
 
 #include "Pipeline.hpp"
 
-#include "Engine/Core/Containers/HandlePool.hpp"
+#include "Engine/Containers/HandlePool.hpp"
 
 namespace engine::graphics {
 struct PipelineCreateInfo;

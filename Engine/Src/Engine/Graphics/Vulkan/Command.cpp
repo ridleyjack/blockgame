@@ -17,15 +17,15 @@ Command::Command(Context& context) : context_{context} {
 }
 
 Command::~Command() {
-  auto vkDevice = context_.GetDevice().Logical();
+  const auto vkDevice = context_.GetDevice().Logical();
   vkDestroyCommandPool(vkDevice, commandPool_, nullptr);
 }
 
-VkCommandBuffer& Command::Buffer(uint32_t index) noexcept {
+VkCommandBuffer Command::Buffer(const uint32_t index) const noexcept {
   return commandBuffers_[index];
 }
 
-VkCommandBuffer Command::BeginSingleTimeCommands_() {
+VkCommandBuffer Command::BeginSingleTimeCommands_() const noexcept {
   const auto vkDevice = context_.GetDevice().Logical();
 
   // TODO: Command pool for short lived operations allows optimization.
@@ -46,8 +46,8 @@ VkCommandBuffer Command::BeginSingleTimeCommands_() {
   return commandBuffer;
 }
 
-void Command::EndSingleTimeCommands_(VkCommandBuffer commandBuffer) {
-  auto& device = context_.GetDevice();
+void Command::EndSingleTimeCommands_(VkCommandBuffer commandBuffer) const noexcept {
+  const auto& device = context_.GetDevice();
 
   vkEndCommandBuffer(commandBuffer);
 
@@ -61,10 +61,6 @@ void Command::EndSingleTimeCommands_(VkCommandBuffer commandBuffer) {
 
   vkFreeCommandBuffers(device.Logical(), commandPool_, 1, &commandBuffer);
 }
-
-// ==============================
-// Private Methods
-// ==============================
 
 void Command::createCommandPool_() {
   const auto& device = context_.GetDevice();

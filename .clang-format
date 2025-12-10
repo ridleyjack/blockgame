@@ -2,8 +2,14 @@ Language: Cpp
 BasedOnStyle: LLVM
 
 AlignArrayOfStructures: Left
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
 AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
+
+
+BinPackParameters: false
+BinPackArguments: false
 
 BreakBeforeBraces: Custom
 BraceWrapping:
@@ -18,7 +24,7 @@ ColumnLimit: 120
 
 IncludeBlocks: Preserve
 
-PackConstructorInitializers: CurrentLine
+PackConstructorInitializers: NextLine
 PointerAlignment: Left
 
 SortIncludes:

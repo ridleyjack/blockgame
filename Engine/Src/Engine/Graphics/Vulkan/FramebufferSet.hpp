@@ -15,7 +15,7 @@ public:
   FramebufferSet(Context& context, const SwapChain& swapChain, const RenderPass& renderPass);
   ~FramebufferSet();
 
-  VkFramebuffer Framebuffer(int frameID) const noexcept;
+  VkFramebuffer Framebuffer(uint32_t frameID) const noexcept;
 
 private:
   Context& context_;

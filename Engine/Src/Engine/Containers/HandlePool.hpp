@@ -46,6 +46,12 @@ public:
     return *pool_[index];
   }
 
+  bool Contains(uint32_t index) const noexcept {
+    if (index >= pool_.size())
+      return false;
+    return pool_[index].has_value();
+  }
+
   const T& Get(uint32_t index) const noexcept {
     assert(index < pool_.size());
     return *pool_[index];
@@ -54,6 +60,10 @@ public:
   void Clear() noexcept {
     pool_.clear();
     freeIndices_.clear();
+  }
+
+  size_t Size() const noexcept {
+    return pool_.size();
   }
 
 private:

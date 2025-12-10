@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
+#include <glm/glm.hpp>
 
 #include <vector>
 
@@ -10,6 +11,10 @@ struct PipelineHandle;
 } // namespace engine::graphics
 
 namespace engine::graphics::vulkan {
+
+struct UniformBufferObject {
+  glm::mat4 Model{};
+};
 
 class Context;
 class RenderPass;

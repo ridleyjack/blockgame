@@ -7,17 +7,21 @@
 
 namespace engine {
 
+namespace events {
+class IEventRaiser;
+}
+
 struct WindowConfig {
   std::string Title{};
   int Width{1280};
   int Height{720};
   bool IsResizable{true};
-  bool VSync{true};
+  bool VSync{true}; // TODO: set via vulkan presentMode.
 };
 
 class Window {
 public:
-  explicit Window(const WindowConfig& config);
+  explicit Window(const WindowConfig& config, events::IEventRaiser& eventRaiser);
   ~Window();
 
   void Create();
@@ -33,6 +37,8 @@ public:
 private:
   WindowConfig config_{};
   GLFWwindow* handle_{nullptr};
+
+  events::IEventRaiser& eventRaiser_;
 };
 
-} // namespace Engine
+} // namespace engine

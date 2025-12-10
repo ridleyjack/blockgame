@@ -1,14 +1,15 @@
 #pragma once
 
-#include "IEvent.hpp"
+#include "Events/Events.hpp"
 
 namespace engine {
 class ILayer {
 public:
-  virtual void OnEvent(IEvent& event) {};
+  virtual ~ILayer() = default;
+  // virtual void OnEvent(Event& event) {};
 
-  virtual void OnUpdate(float deltaTime) {};
+  virtual void OnUpdate(float deltaTime) = 0;
 
-  virtual void OnRender() {};
+  virtual void OnRender() = 0;
 };
-} // namespace Engine
+} // namespace engine

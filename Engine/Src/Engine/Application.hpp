@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ILayer.hpp"
 #include "Window.hpp"
+#include "Events/Events.hpp"
+#include "Events/IEventRaiser.hpp"
 
 #include <memory>
 #include <vector>
@@ -10,17 +11,20 @@ namespace engine {
 
 namespace graphics::vulkan {
 class Renderer;
-}
+} // namespace graphics::vulkan
+
+class ILayer;
+class Window;
 
 struct ApplicationConfig {
   std::string Name{"Block Game"};
   WindowConfig Window{};
 };
 
-class Application {
+class Application : public events::IEventRaiser {
 public:
   explicit Application(const ApplicationConfig& config);
-  ~Application();
+  ~Application() override;
 
   void Run();
   void Stop();
@@ -32,6 +36,8 @@ public:
 
   Window& GetWindow() const;
   graphics::vulkan::Renderer& GetRenderer() const;
+
+  void RaiseEvent(const events::Event& event) override;
 
 private:
   ApplicationConfig config_{};
