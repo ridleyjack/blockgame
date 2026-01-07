@@ -3,6 +3,7 @@
 #include "Context.hpp"
 #include "Device.hpp"
 #include "SwapChain.hpp"
+#include "Config.hpp"
 
 #include <cassert>
 

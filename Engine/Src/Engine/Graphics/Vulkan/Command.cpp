@@ -1,15 +1,12 @@
 #include "Command.hpp"
 
 #include "Context.hpp"
+#include "Config.hpp"
 #include "Engine/Graphics/Vulkan/Device.hpp"
 
 #include <stdexcept>
 
 namespace engine::graphics::vulkan {
-
-// ==============================
-// Public Methods
-// ==============================
 
 Command::Command(Context& context) : context_{context} {
   createCommandPool_();
@@ -25,7 +22,7 @@ VkCommandBuffer Command::Buffer(const uint32_t index) const noexcept {
   return commandBuffers_[index];
 }
 
-VkCommandBuffer Command::BeginSingleTimeCommands_() const noexcept {
+VkCommandBuffer Command::BeginSingleTimeCommands() const noexcept {
   const auto vkDevice = context_.GetDevice().Logical();
 
   // TODO: Command pool for short lived operations allows optimization.
@@ -46,7 +43,7 @@ VkCommandBuffer Command::BeginSingleTimeCommands_() const noexcept {
   return commandBuffer;
 }
 
-void Command::EndSingleTimeCommands_(VkCommandBuffer commandBuffer) const noexcept {
+void Command::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const noexcept {
   const auto& device = context_.GetDevice();
 
   vkEndCommandBuffer(commandBuffer);

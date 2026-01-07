@@ -41,9 +41,8 @@ public:
 
 private:
   ApplicationConfig config_{};
-  std::unique_ptr<Window> window_{};
   std::unique_ptr<graphics::vulkan::Renderer> renderer_{};
-
+  std::unique_ptr<Window> window_{};
   std::vector<ILayer*> layerStack_{};
 
   bool running_{false};

@@ -52,12 +52,22 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Handles.hpp
         Src/Engine/Graphics/PipelineCreateInfo.hpp
         Src/Engine/Graphics/Mesh.hpp
-        Src/Engine/Graphics/Vulkan/RenderPass.cpp
-        Src/Engine/Graphics/Vulkan/RenderPass.hpp
+        Src/Engine/Graphics/Vulkan/RenderPassCache.cpp
+        Src/Engine/Graphics/Vulkan/RenderPassCache.hpp
         Src/Engine/Graphics/Vulkan/FramebufferSet.cpp
         Src/Engine/Graphics/Vulkan/FramebufferSet.hpp
         Src/Engine/Graphics/Vulkan/MeshGPU.hpp
         Src/Engine/Graphics/Vulkan/UniformBuffer.hpp
+        Src/Engine/Graphics/Vulkan/DescriptorAllocator.cpp
+        Src/Engine/Graphics/Vulkan/DescriptorAllocator.hpp
+        Src/Engine/Graphics/Vulkan/Config.hpp
+        Src/Engine/Graphics/Vulkan/MeshGPU.cpp
+        Src/Engine/Graphics/Vulkan/TextureAllocator.cpp
+        Src/Engine/Graphics/Vulkan/TextureAllocator.h
+        Src/Engine/Graphics/Vulkan/MeshAllocator.cpp
+        Src/Engine/Graphics/Vulkan/MeshAllocator.hpp
+        Src/Engine/Graphics/Vulkan/ImageUtil.cpp
+        Src/Engine/Graphics/Vulkan/ImageUtil.hpp
 )
 
 target_include_directories(Engine_Graphics

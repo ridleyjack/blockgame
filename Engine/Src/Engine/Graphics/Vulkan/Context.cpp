@@ -5,6 +5,7 @@
 #include "PipelineCache.hpp"
 #include "SwapChain.hpp"
 #include "Sync.hpp"
+#include "Config.hpp"
 
 #include <cstring>
 #include <iostream>

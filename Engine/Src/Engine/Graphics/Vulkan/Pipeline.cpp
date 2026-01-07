@@ -2,20 +2,22 @@
 
 #include "Context.hpp"
 #include "Device.hpp"
-#include "RenderPass.hpp"
+#include "RenderPassCache.hpp"
 
 #include "Engine/Assets/File.hpp"
 #include "Engine/Graphics/Mesh.hpp"
-#include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 
 #include <array>
 
 namespace engine::graphics::vulkan {
 
-Pipeline::Pipeline(Context& context, const PipelineCreateInfo& info, const RenderPass& renderPass) : context_{context} {
-  createDescriptorSetLayout_();
-  createPipelineLayout_();
+Pipeline::Pipeline(Context& context,
+                   const PipelineCreateInfo& info,
+                   const RenderPass& renderPass,
+                   VkDescriptorSetLayout descriptorLayout)
+    : context_{context} {
+  createPipelineLayout_(descriptorLayout);
   createPipeline_(info, renderPass);
 }
 
@@ -24,12 +26,8 @@ Pipeline::~Pipeline() {
 
   vkDestroyPipeline(vkDevice, pipeline_, nullptr);
   vkDestroyPipelineLayout(vkDevice, pipelineLayout_, nullptr);
-  vkDestroyDescriptorSetLayout(vkDevice, descriptorSetLayout_, nullptr);
 }
 
-VkDescriptorSetLayout Pipeline::DescriptorSetLayout() const noexcept {
-  return descriptorSetLayout_;
-}
 VkPipelineLayout Pipeline::PipelineLayout() const noexcept {
   return pipelineLayout_;
 }
@@ -38,43 +36,13 @@ VkPipeline Pipeline::Handle() const noexcept {
   return pipeline_;
 }
 
-void Pipeline::createDescriptorSetLayout_() {
-  const auto& device = context_.GetDevice().Logical();
-
-  VkDescriptorSetLayoutBinding uboLayoutBinding{};
-  uboLayoutBinding.binding = 0;
-  uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  uboLayoutBinding.descriptorCount = 1;
-  uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
-
-  // VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-  // samplerLayoutBinding.binding = 1;
-  // samplerLayoutBinding.descriptorCount = 1;
-  // samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  // samplerLayoutBinding.pImmutableSamplers = nullptr;
-  // samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-  // std::array<VkDescriptorSetLayoutBinding, 2> bindings{uboLayoutBinding, samplerLayoutBinding};
-  std::array<VkDescriptorSetLayoutBinding, 1> bindings{uboLayoutBinding};
-
-  VkDescriptorSetLayoutCreateInfo layoutInfo{};
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = bindings.size();
-  layoutInfo.pBindings = bindings.data();
-
-  if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create descriptor set layout!");
-  }
-}
-
-void Pipeline::createPipelineLayout_() {
+void Pipeline::createPipelineLayout_(VkDescriptorSetLayout descriptorLayout) {
   const auto vkDevice = context_.GetDevice().Logical();
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
   pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipelineLayoutInfo.pushConstantRangeCount = 0;
   pipelineLayoutInfo.setLayoutCount = 1;
-  pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout_;
+  pipelineLayoutInfo.pSetLayouts = &descriptorLayout;
 
   if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create pipeline layout!");
@@ -82,10 +50,11 @@ void Pipeline::createPipelineLayout_() {
 }
 
 void Pipeline::createPipeline_(const PipelineCreateInfo& info, const RenderPass& renderPass) {
+
   const auto vkDevice = context_.GetDevice().Logical();
 
-  auto vertShaderCode = Assets::ReadBinaryFile(info.VertexShaderFile);
-  auto fragShaderCode = Assets::ReadBinaryFile(info.FragmentShaderFile);
+  auto vertShaderCode = assets::ReadBinaryFile(info.VertexShaderFile);
+  auto fragShaderCode = assets::ReadBinaryFile(info.FragmentShaderFile);
 
   VkShaderModule vertShaderModule = createShaderModule_(vertShaderCode);
   VkShaderModule fragShaderModule = createShaderModule_(fragShaderCode);
@@ -102,7 +71,7 @@ void Pipeline::createPipeline_(const PipelineCreateInfo& info, const RenderPass&
   fragShaderStageInfo.module = fragShaderModule;
   fragShaderStageInfo.pName = "main";
 
-  VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+  std::array shaderStages = {vertShaderStageInfo, fragShaderStageInfo};
 
   auto bindingDescription = Vertex::GetBindingDescription();
   auto attributeDescriptions = Vertex::GetAttributeDescriptions();
@@ -131,7 +100,7 @@ void Pipeline::createPipeline_(const PipelineCreateInfo& info, const RenderPass&
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
   rasterizer.lineWidth = 1.0f;
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.depthBiasEnable = VK_FALSE;
 
   VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -161,10 +130,18 @@ void Pipeline::createPipeline_(const PipelineCreateInfo& info, const RenderPass&
   dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
   dynamicState.pDynamicStates = dynamicStates.data();
 
+  VkPipelineDepthStencilStateCreateInfo depthStencil{};
+  depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depthStencil.depthTestEnable = VK_TRUE;
+  depthStencil.depthWriteEnable = VK_TRUE;
+  depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+  depthStencil.depthBoundsTestEnable = VK_FALSE;
+  depthStencil.stencilTestEnable = VK_FALSE;
+
   VkGraphicsPipelineCreateInfo pipelineInfo{};
   pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineInfo.stageCount = 2;
-  pipelineInfo.pStages = shaderStages;
+  pipelineInfo.pStages = shaderStages.data();
   pipelineInfo.pVertexInputState = &vertexInputInfo;
   pipelineInfo.pInputAssemblyState = &inputAssembly;
   pipelineInfo.pViewportState = &viewportState;
@@ -172,8 +149,9 @@ void Pipeline::createPipeline_(const PipelineCreateInfo& info, const RenderPass&
   pipelineInfo.pMultisampleState = &multisampling;
   pipelineInfo.pColorBlendState = &colorBlending;
   pipelineInfo.pDynamicState = &dynamicState;
+  pipelineInfo.pDepthStencilState = &depthStencil;
   pipelineInfo.layout = pipelineLayout_;
-  pipelineInfo.renderPass = renderPass.Handle();
+  pipelineInfo.renderPass = renderPass.Handle;
   pipelineInfo.subpass = 0;
 
   if (vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline_) != VK_SUCCESS) {

@@ -18,8 +18,8 @@ public:
 
   VkCommandBuffer Buffer(uint32_t index) const noexcept;
 
-  VkCommandBuffer BeginSingleTimeCommands_() const noexcept;
-  void EndSingleTimeCommands_(VkCommandBuffer commandBuffer) const noexcept;
+  VkCommandBuffer BeginSingleTimeCommands() const noexcept;
+  void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const noexcept;
 
 private:
   Context& context_;

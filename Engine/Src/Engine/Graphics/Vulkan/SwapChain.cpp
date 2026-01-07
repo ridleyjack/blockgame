@@ -2,12 +2,15 @@
 
 #include "Context.hpp"
 #include "Device.hpp"
+#include "ImageUtil.hpp"
 #include "Sync.hpp"
+#include "RenderPassCache.hpp"
 
 #include <algorithm>
 #include <cassert>
 #include <limits>
 #include <stdexcept>
+#include <print>
 
 namespace engine::graphics::vulkan {
 
@@ -20,14 +23,21 @@ SwapChain::~SwapChain() {
 }
 
 void SwapChain::Cleanup() {
-  const auto vkDevice = context_.GetDevice().Logical();
+  auto vkDevice = context_.GetDevice().Logical();
 
-  for (const auto imageView : imageViews_) {
+  framebuffers_.clear();
+
+  for (auto imageView : imageViews_) {
     vkDestroyImageView(vkDevice, imageView, nullptr);
   }
 
+  vkDestroyImageView(vkDevice, depthImageView_, nullptr);
+  vkDestroyImage(vkDevice, depthImage_, nullptr);
+  vkFreeMemory(vkDevice, depthImageMemory_, nullptr);
+
   vkDestroySwapchainKHR(vkDevice, swapchain_, nullptr);
 }
+
 void SwapChain::Recreate() {
   auto& window = context_.Window();
   int width = 0, height = 0;
@@ -37,9 +47,21 @@ void SwapChain::Recreate() {
     glfwWaitEvents();
   }
 
+  auto vkDevice = context_.GetDevice().Logical();
+  vkDeviceWaitIdle(vkDevice);
+
   Cleanup();
   create_();
   context_.GetSync().RecreatePerImageSemaphores();
+}
+void SwapChain::CreateFramebuffers(RenderPass& renderPass) {
+  renderPasses_.push_back(&renderPass);
+  framebuffers_.emplace_back(context_, *this, renderPass);
+}
+
+FramebufferSet& SwapChain::Framebuffers(const size_t setID) noexcept {
+  assert(setID < framebuffers_.size());
+  return framebuffers_[setID];
 }
 
 VkSwapchainKHR SwapChain::Handle() const noexcept {
@@ -60,10 +82,13 @@ std::vector<VkImage> SwapChain::Images() const noexcept {
 std::vector<VkImageView> SwapChain::ImageViews() const noexcept {
   return imageViews_;
 }
+VkImageView SwapChain::DepthImageView() const noexcept {
+  return depthImageView_;
+}
 
 void SwapChain::create_() {
   const auto& device = context_.GetDevice();
-  const auto logicalDevice = device.Logical();
+  const auto vkDevice = device.Logical();
   const auto surface = context_.Surface();
 
   SwapChainSupportDetails swapChainSupport = device.QuerySwapChainSupport();
@@ -88,11 +113,11 @@ void SwapChain::create_() {
   createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
   QueueFamilyIndices indices = device.FindQueueFamilies();
-  uint32_t queueFamilyIndices[] = {indices.GraphicsFamily.value(), indices.PresentFamily.value()};
+  std::array queueFamilyIndices = {indices.GraphicsFamily.value(), indices.PresentFamily.value()};
   if (indices.GraphicsFamily != indices.PresentFamily) {
     createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     createInfo.queueFamilyIndexCount = 2;
-    createInfo.pQueueFamilyIndices = queueFamilyIndices;
+    createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
   } else {
     createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     createInfo.queueFamilyIndexCount = 0;     // Optional
@@ -104,13 +129,13 @@ void SwapChain::create_() {
   createInfo.clipped = VK_TRUE;
   createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-  if (vkCreateSwapchainKHR(logicalDevice, &createInfo, nullptr, &swapchain_) != VK_SUCCESS) {
+  if (vkCreateSwapchainKHR(vkDevice, &createInfo, nullptr, &swapchain_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create swap chain!");
   }
 
-  vkGetSwapchainImagesKHR(logicalDevice, swapchain_, &imageCount, nullptr);
+  vkGetSwapchainImagesKHR(vkDevice, swapchain_, &imageCount, nullptr);
   images_.resize(imageCount);
-  vkGetSwapchainImagesKHR(logicalDevice, swapchain_, &imageCount, images_.data());
+  vkGetSwapchainImagesKHR(vkDevice, swapchain_, &imageCount, images_.data());
 
   imageFormat_ = surfaceFormat.format;
   extent_ = extent;
@@ -118,9 +143,19 @@ void SwapChain::create_() {
   // Create image views
   imageViews_.resize(images_.size());
   for (uint32_t i = 0; i < images_.size(); i++) {
-    imageViews_[i] = device.CreateImageView(images_[i], imageFormat_);
+    if (auto result = imageutil::CreateImageView(device, images_[i], imageFormat_, VK_IMAGE_ASPECT_COLOR_BIT); result)
+      imageViews_[i] = *result;
+    else
+      throw std::runtime_error("failed to create image views!");
   }
+
+  for (const auto& renderPass : renderPasses_) {
+    framebuffers_.emplace_back(context_, *this, *renderPass);
+  }
+
+  createDepthResources_();
 }
+
 VkSurfaceFormatKHR SwapChain::chooseSurfaceFormat_(const std::vector<VkSurfaceFormatKHR>& availableFormats) const {
   for (const auto& availableFormat : availableFormats) {
     if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
@@ -155,5 +190,36 @@ VkExtent2D SwapChain::chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities
       std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
   return actualExtent;
+}
+
+void SwapChain::createDepthResources_() {
+  const auto& device = context_.GetDevice();
+  VkFormat depthFormat = findDepthFormat_();
+
+  imageutil::CreateImage(device,
+                         this->extent_.width,
+                         this->extent_.height,
+                         depthFormat,
+                         VK_IMAGE_TILING_OPTIMAL,
+                         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                         depthImage_,
+                         depthImageMemory_);
+
+  auto result = imageutil::CreateImageView(device, depthImage_, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+  if (!result)
+    throw std::runtime_error("failed to create depth image views!");
+  depthImageView_ = *result;
+}
+
+VkFormat SwapChain::findDepthFormat_() {
+  return context_.GetDevice().FindSupportedFormat(
+      {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+      VK_IMAGE_TILING_OPTIMAL,
+      VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
+bool SwapChain::hasStencilComponent_(const VkFormat format) {
+  return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 } // namespace engine::graphics::vulkan

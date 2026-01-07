@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-namespace engine::Assets {
+namespace engine::assets {
 
 std::vector<char> ReadBinaryFile(const std::string& path) {
   std::ifstream file(path, std::ios::ate | std::ios::binary);
@@ -33,4 +33,4 @@ std::vector<char> ReadBinaryFile(const std::string& path) {
   return buffer;
 }
 
-} // namespace Engine::Assets
+} // namespace engine::assets

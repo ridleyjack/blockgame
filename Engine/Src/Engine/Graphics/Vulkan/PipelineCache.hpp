@@ -6,7 +6,6 @@
 
 namespace engine::graphics {
 struct PipelineCreateInfo;
-struct PipelineHandle;
 } // namespace engine::graphics
 
 namespace engine::graphics::vulkan {
@@ -17,18 +16,24 @@ class RenderPass;
 class PipelineCache {
 public:
   explicit PipelineCache(Context& context);
-  ~PipelineCache() = default;
+  ~PipelineCache();
 
   PipelineCache(const PipelineCache&) = delete;
   PipelineCache& operator=(const PipelineCache&) = delete;
 
+  VkDescriptorSetLayout DescriptorSetLayout() const noexcept;
+
   PipelineHandle CreatePipeline(const PipelineCreateInfo& info, RenderPass& renderPass);
-  Pipeline& GetPipeline(PipelineHandle handle) noexcept;
-  void DestroyPipeline(PipelineHandle handle) noexcept;
+  Pipeline& GetPipeline(uint32_t pipelineID) noexcept;
+  void DestroyPipeline(uint32_t pipelineID) noexcept;
+
+  void createDescriptorSetLayout_();
 
 private:
   Context& context_;
-  core::containers::HandlePool<Pipeline> pipelines_;
+  containers::HandlePool<Pipeline> pipelines_;
+
+  VkDescriptorSetLayout descriptorSetLayout_{VK_NULL_HANDLE};
 };
 
 } // namespace engine::graphics::vulkan

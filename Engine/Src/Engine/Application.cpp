@@ -26,6 +26,7 @@ Application::Application(const ApplicationConfig& config) : config_(config) {
 }
 
 Application::~Application() {
+  renderer_.reset();
   window_.reset();
   glfwTerminate();
 }

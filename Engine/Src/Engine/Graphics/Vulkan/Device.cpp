@@ -2,11 +2,14 @@
 
 #include "Context.hpp"
 #include "Command.hpp"
+#include "Config.hpp"
 
+#include <cassert>
 #include <iostream>
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <print>
 
 namespace engine::graphics::vulkan {
 
@@ -109,29 +112,21 @@ uint32_t Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags prope
 
   throw std::runtime_error("failed to find suitable memory type!");
 }
+VkFormat Device::FindSupportedFormat(const std::vector<VkFormat>& candidates,
+                                     const VkImageTiling tiling,
+                                     const VkFormatFeatureFlags features) const {
+  for (const VkFormat format : candidates) {
+    VkFormatProperties props;
+    vkGetPhysicalDeviceFormatProperties(physicalDevice_, format, &props);
 
-VkImageView Device::CreateImageView(VkImage image, VkFormat format) const {
-  VkImageViewCreateInfo viewInfo{};
-  viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image = image;
-  viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  viewInfo.format = format;
-  viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-  viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = 1;
-  viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount = 1;
-
-  VkImageView imageView;
-  if (vkCreateImageView(context_.GetDevice().Logical(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture image view!");
+    if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
+      return format;
+    }
+    if (tiling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features) {
+      return format;
+    }
   }
-
-  return imageView;
+  throw std::runtime_error("failed to find supported format!");
 }
 
 AllocatedBuffer Device::CreateBuffer(const VkDeviceSize size,
@@ -173,8 +168,8 @@ void Device::DestroyBuffer(const AllocatedBuffer& buffer) const noexcept {
 }
 
 void Device::CopyBuffer(const VkBuffer src, const VkBuffer dst, const VkDeviceSize size) const {
-  auto& cmd = context_.GetCommand();
-  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands_();
+  const auto& cmd = context_.GetCommand();
+  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
 
   VkBufferCopy copyRegion{};
   copyRegion.srcOffset = 0; // Optional
@@ -182,7 +177,7 @@ void Device::CopyBuffer(const VkBuffer src, const VkBuffer dst, const VkDeviceSi
   copyRegion.size = size;
   vkCmdCopyBuffer(commandBuffer, src, dst, 1, &copyRegion);
 
-  cmd.EndSingleTimeCommands_(commandBuffer);
+  cmd.EndSingleTimeCommands(commandBuffer);
 }
 
 bool Device::checkDeviceExtensionSupport_(VkPhysicalDevice device) {
@@ -202,7 +197,6 @@ bool Device::checkDeviceExtensionSupport_(VkPhysicalDevice device) {
 bool Device::isDeviceSuitable_(VkPhysicalDevice device, VkSurfaceKHR surface) {
   VkPhysicalDeviceProperties deviceProperties;
   vkGetPhysicalDeviceProperties(device, &deviceProperties);
-  std::cout << deviceProperties.deviceName << std::endl;
 
   VkPhysicalDeviceFeatures supportedFeatures;
   vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
@@ -285,6 +279,9 @@ void Device::pickPhysicalDevice_() {
       suitableDevices.push_back(device);
     }
   }
+
+  VkSurfaceCapabilitiesKHR caps;
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(suitableDevices[0], context_.Surface(), &caps);
 
   if (!suitableDevices.empty()) {
     physicalDevice_ = suitableDevices[0];

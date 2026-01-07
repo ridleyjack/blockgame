@@ -2,34 +2,40 @@
 
 #include "stb_image.h"
 
-#include <stdexcept>
+#include <cstring>
 
-namespace engine::Assets {
+constexpr int outputChannels{STBI_rgb_alpha};
 
-ImageLoader::~ImageLoader() {
-  stbi_image_free(pixels_);
-}
+namespace engine::assets {
 
-void ImageLoader::Load(const std::string& path) {
-  pixels_ = stbi_load(path.c_str(), &width_, &height_, &channels_, STBI_rgb_alpha);
-  if (!pixels_) {
-    throw std::runtime_error("failed to load texture image!");
+std::expected<void, std::string> ImageLoader::Load(const std::filesystem::path& path) {
+  int channels;
+  stbi_uc* data = stbi_load(path.c_str(), &width_, &height_, &channels, outputChannels);
+  if (!data) {
+    return std::unexpected{"Failed to load image: " + path.string() + ": " + stbi_failure_reason()};
   }
+
+  const size_t size = static_cast<size_t>(width_) * height_ * outputChannels;
+  pixels_.resize(size);
+  std::memcpy(pixels_.data(), data, size);
+
+  stbi_image_free(data);
+  return {};
 }
 
-const unsigned char* ImageLoader::Data() const {
+std::span<const std::byte> ImageLoader::Data() const noexcept {
   return pixels_;
 }
 
-int ImageLoader::Width() const {
+int ImageLoader::Width() const noexcept {
   return width_;
 }
 
-int ImageLoader::Height() const {
+int ImageLoader::Height() const noexcept {
   return height_;
 }
 
-int ImageLoader::Channels() const {
-  return channels_;
+int ImageLoader::Channels() const noexcept {
+  return outputChannels;
 }
-} // namespace Engine::Assets
+} // namespace engine::assets

@@ -2,7 +2,7 @@
 
 #include "Context.hpp"
 #include "Device.hpp"
-#include "RenderPass.hpp"
+#include "RenderPassCache.hpp"
 #include "SwapChain.hpp"
 
 #include <cassert>
@@ -17,13 +17,13 @@ FramebufferSet::FramebufferSet(Context& context, const SwapChain& swapChain, con
 
   framebuffers_.resize(imageViews.size());
   for (size_t i = 0; i < imageViews.size(); i++) {
-    const VkImageView attachments[] = {imageViews[i]};
+    const std::array attachments = {imageViews[i], swapChain.DepthImageView()};
 
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebufferInfo.renderPass = renderPass.Handle();
-    framebufferInfo.attachmentCount = 1;
-    framebufferInfo.pAttachments = attachments;
+    framebufferInfo.renderPass = renderPass.Handle;
+    framebufferInfo.attachmentCount = attachments.size();
+    framebufferInfo.pAttachments = attachments.data();
     framebufferInfo.width = swapChain.Extent().width;
     framebufferInfo.height = swapChain.Extent().height;
     framebufferInfo.layers = 1;

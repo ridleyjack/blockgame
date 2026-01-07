@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace engine::Assets {
+namespace engine::assets {
 
 std::vector<char> ReadBinaryFile(const std::string& path);
 

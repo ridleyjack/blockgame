@@ -4,7 +4,7 @@
 #include <vector>
 #include <cassert>
 
-namespace engine::core::containers {
+namespace engine::containers {
 template <typename T> class HandlePool {
 public:
   HandlePool() = default;
@@ -70,4 +70,4 @@ private:
   std::vector<std::optional<T>> pool_;
   std::vector<uint32_t> freeIndices_;
 };
-} // namespace engine::core::containers
+} // namespace engine::containers

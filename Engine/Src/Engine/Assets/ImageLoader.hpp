@@ -1,22 +1,32 @@
 #pragma once
-#include <string>
 
-namespace engine::Assets {
+#include <expected>
+#include <filesystem>
+#include <vector>
+
+namespace engine::assets {
 
 class ImageLoader {
 public:
   ImageLoader() = default;
-  ~ImageLoader();
+  ~ImageLoader() = default;
 
-  void Load(const std::string& path);
+  ImageLoader(const ImageLoader&) = delete;
+  ImageLoader& operator=(const ImageLoader&) = delete;
 
-  const unsigned char* Data() const;
-  int Width() const;
-  int Height() const;
-  int Channels() const;
+  ImageLoader(ImageLoader&& other) noexcept = delete;
+  ImageLoader& operator=(ImageLoader&& other) = delete;
+
+  std::expected<void, std::string> Load(const std::filesystem::path& path);
+
+  std::span<const std::byte> Data() const noexcept;
+
+  int Width() const noexcept;
+  int Height() const noexcept;
+  int Channels() const noexcept;
 
 private:
-  unsigned char* pixels_{nullptr};
-  int width_{}, height_{}, channels_{};
+  std::vector<std::byte> pixels_{};
+  int width_{}, height_{};
 };
-} // namespace Engine::Assets
+} // namespace engine::assets

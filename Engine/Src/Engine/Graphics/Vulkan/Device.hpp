@@ -45,12 +45,12 @@ public:
   // FindQueueFamilies returns a struct containing the index of a GraphicsFamily and a PresentFamily, preference is
   // given for a family that supports both. Supported families are usually determined by hardware support.
   QueueFamilyIndices FindQueueFamilies() const;
-
   SwapChainSupportDetails QuerySwapChainSupport() const;
 
   uint32_t FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
-
-  VkImageView CreateImageView(VkImage image, VkFormat format) const;
+  VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates,
+                               VkImageTiling tiling,
+                               VkFormatFeatureFlags features) const;
 
   AllocatedBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
   void DestroyBuffer(const AllocatedBuffer& buffer) const noexcept;

@@ -1,14 +1,17 @@
 #pragma once
 
 #include "Context.hpp"
-#include "FramebufferSet.hpp"
+#include "DescriptorAllocator.hpp"
+#include "MeshAllocator.hpp"
 #include "PipelineCache.hpp"
-#include "RenderPass.hpp"
-#include "MeshGPU.hpp"
+#include "RenderPassCache.hpp"
 #include "UniformBuffer.hpp"
+#include "TextureAllocator.h"
+#include "Engine/Graphics/Handles.hpp"
 
 #include <expected>
 
+namespace engine::graphics::vulkan {}
 struct GLFWwindow;
 
 namespace engine::graphics {
@@ -18,6 +21,10 @@ struct MeshCreateInfo;
 
 struct PipelineHandle;
 struct PipelineCreateInfo;
+
+struct TextureHandle;
+
+struct RenderPassHandle;
 } // namespace engine::graphics
 
 namespace engine::graphics::vulkan {
@@ -36,7 +43,10 @@ enum class RenderError {
 };
 
 struct FrameContext {
+  uint32_t CurrentFrame{};
   uint32_t ImageIndex{};
+  uint32_t RenderPassID{};
+  uint32_t PipelineID{};
 };
 
 class Renderer {
@@ -47,12 +57,15 @@ public:
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  std::expected<FrameContext, RenderError> BeginFrame() noexcept;
-  std::expected<void, RenderError> EndFrame(const FrameContext& ctx);
+  std::expected<void, RenderError> BeginFrame(const RenderPassHandle& renderPassHandle,
+                                              const PipelineHandle& pipelineHandle) noexcept;
+  std::expected<void, RenderError> EndFrame();
   void Submit(const MeshHandle& handle);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
+
+  RenderPassHandle CreateRenderPass();
 
   PipelineHandle CreatePipeline(const PipelineCreateInfo& info);
   void DeletePipeline(PipelineHandle handle);
@@ -60,22 +73,21 @@ public:
   MeshHandle CreateMesh(const Mesh& mesh);
   void DeleteMesh(MeshHandle handle);
 
+  TextureHandle CreateTexture(std::span<const std::byte> data, int width, int height);
+
 private:
   Context context_;
 
+  RenderPassCache renderPassCache_;
   PipelineCache pipelineCache_;
-  core::containers::HandlePool<FramebufferSet> framebuffers_;
-  core::containers::HandlePool<RenderPass> renderPasses_;
-  core::containers::HandlePool<MeshGPU> meshes_;
-  core::containers::HandlePool<UniformBuffer> uniforms_;
 
-  VkDescriptorPool descriptorPool_{VK_NULL_HANDLE};
-  std::vector<VkDescriptorSet> descriptorSets_{};
+  DescriptorAllocator descriptorAllocator_;
+  TextureAllocator textureAllocator_;
+  MeshAllocator meshAllocator_;
 
-  uint32_t currentFrame_{};
+  UniformBuffer cameraGPU_{};
 
-  AllocatedBuffer createVertexBuffer_(const Mesh& mesh);
-  AllocatedBuffer createIndexBuffer_(const Mesh& mesh);
+  FrameContext frameContext_{};
 };
 
 } // namespace engine::graphics::vulkan
