@@ -21,9 +21,8 @@ void Window::Create() {
 
   handle_ = glfwCreateWindow(config_.Width, config_.Height, config_.Title.c_str(), nullptr, nullptr);
   if (!handle_) {
-    std::cerr << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
-    assert(false);
+    throw std::runtime_error("Failed to create glfw window.");
   }
   glfwMakeContextCurrent(handle_);
 
@@ -60,6 +59,7 @@ int Window::GetFramebufferWidth() const {
   glfwGetFramebufferSize(handle_, &width, nullptr);
   return width;
 }
+
 int Window::GetFramebufferHeight() const {
   int height{};
   glfwGetFramebufferSize(handle_, nullptr, &height);

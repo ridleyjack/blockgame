@@ -10,6 +10,7 @@ namespace engine::assets {
 
 std::expected<void, std::string> ImageLoader::Load(const std::filesystem::path& path) {
   int channels;
+  stbi_set_flip_vertically_on_load(true);
   stbi_uc* data = stbi_load(path.c_str(), &width_, &height_, &channels, outputChannels);
   if (!data) {
     return std::unexpected{"Failed to load image: " + path.string() + ": " + stbi_failure_reason()};

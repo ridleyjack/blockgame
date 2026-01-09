@@ -8,6 +8,7 @@
 #include "SwapChain.hpp"
 #include "Sync.hpp"
 #include "RenderPassCache.hpp"
+#include "Engine/Graphics/Camera.h"
 
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
@@ -39,7 +40,8 @@ Renderer::Renderer(GLFWwindow* window)
   const auto& device = context_.GetDevice();
 
   // Init hardcoded render pass at index 0;.
-  renderPassCache_.CreateRenderPass();
+  if (const auto result = renderPassCache_.CreateRenderPass(); !result)
+    throw std::runtime_error("Failed to create Render Pass");
   RenderPass& renderPass = renderPassCache_.GetRenderPass(defaultRenderPassID);
 
   // Init hardcoded framebufferSet at index 0;.
@@ -55,12 +57,12 @@ Renderer::Renderer(GLFWwindow* window)
   if (auto result = loader.Load("Textures/texture.jpg"); !result) {
     std::println("Failed to load texture: {}", result.error());
   }
-  auto handle = CreateTexture(loader.Data(), loader.Width(), loader.Height());
-  auto& texture = textureAllocator_.Get(handle.TextureID);
+  const auto handle = CreateTexture(loader.Data(), loader.Width(), loader.Height());
+  const auto& texture = textureAllocator_.Get(handle.TextureID);
 
-  cameraGPU_ = DescriptorAllocator::CreateUniformBuffer(device);
+  frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
   descriptorAllocator_.CreateDescriptorSet(pipelineCache_.DescriptorSetLayout(),
-                                           cameraGPU_,
+                                           frameContext_.CameraGPU,
                                            texture.ImageView,
                                            texture.Sampler);
 }
@@ -68,12 +70,13 @@ Renderer::Renderer(GLFWwindow* window)
 Renderer::~Renderer() {
   const auto& device = context_.GetDevice();
 
-  for (const auto buffer : cameraGPU_.Buffers)
+  for (const auto buffer : frameContext_.CameraGPU.Buffers)
     device.DestroyBuffer(buffer);
 }
 
 std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& renderPassHandle,
-                                                      const PipelineHandle& pipelineHandle) noexcept {
+                                                      const PipelineHandle& pipelineHandle,
+                                                      const Camera& camera) noexcept {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
@@ -114,14 +117,12 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   //                          0.1f,
   //                          10.0f)};
 
-  const float aspect = static_cast<float>(swapchain.Extent().width) / static_cast<float>(swapchain.Extent().height);
-  UniformBufferObject ubo{
-      .Model = glm::mat4(1.0f),
-      .View = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-      .Projection = glm::perspectiveRH_ZO(glm::radians(45.0f), aspect, 0.1f, 100.0f)};
-  ubo.View = glm::translate(ubo.View, glm::vec3(0.0f, 0.0f, 0.0f));
-  ubo.Projection[1][1] *= -1;
-  memcpy(cameraGPU_.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(UniformBufferObject));
+  // Camera
+  UniformBufferObject ubo{.Model = glm::mat4(1.0f),
+                          .View = camera.View(),
+                          .Projection = camera.Projection(swapchain.Extent().width, swapchain.Extent().height)};
+
+  memcpy(frameContext_.CameraGPU.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(UniformBufferObject));
 
   // Command Buffer
   const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
@@ -182,20 +183,20 @@ std::expected<void, RenderError> Renderer::EndFrame() {
     return std::unexpected(RenderError::RecordCommandFailed);
   }
 
-  const VkSemaphore waitSemaphores[] = {sync.ImageAvailableSemaphore(frameContext_.CurrentFrame)};
-  const VkSemaphore signalSemaphores[] = {sync.RenderFinishedSemaphore(frameContext_.ImageIndex)};
-  constexpr VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  const std::array<VkSemaphore, 1> waitSemaphores = {sync.ImageAvailableSemaphore(frameContext_.CurrentFrame)};
+  const std::array<VkSemaphore, 1> signalSemaphores = {sync.RenderFinishedSemaphore(frameContext_.ImageIndex)};
+  constexpr std::array<VkPipelineStageFlags, 1> waitStages = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = waitSemaphores;
-  submitInfo.pWaitDstStageMask = waitStages;
+  submitInfo.pWaitSemaphores = waitSemaphores.data();
+  submitInfo.pWaitDstStageMask = waitStages.data();
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
 
   submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = signalSemaphores;
+  submitInfo.pSignalSemaphores = signalSemaphores.data();
 
   if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)) !=
       VK_SUCCESS) {
@@ -205,10 +206,10 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = signalSemaphores;
-  const VkSwapchainKHR swapChains[] = {swapchain.Handle()};
+  presentInfo.pWaitSemaphores = signalSemaphores.data();
+  const std::array<VkSwapchainKHR, 1> swapChains = {swapchain.Handle()};
   presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = swapChains;
+  presentInfo.pSwapchains = swapChains.data();
   presentInfo.pImageIndices = &frameContext_.ImageIndex;
   presentInfo.pResults = nullptr; // Optional
 
@@ -229,10 +230,10 @@ void Renderer::Submit(const MeshHandle& handle) {
   const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
 
   const MeshGPU& gpuMesh = meshAllocator_.Get(handle.MeshID);
-  const VkBuffer vertexBuffers[] = {gpuMesh.VertexBuffer.Buffer};
-  constexpr VkDeviceSize offsets[] = {0};
+  const std::array<VkBuffer, 1> vertexBuffers = {gpuMesh.VertexBuffer.Buffer};
+  constexpr std::array<VkDeviceSize, 1> offsets = {0};
 
-  vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+  vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
   vkCmdBindIndexBuffer(commandBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
 
   auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
@@ -246,7 +247,6 @@ void Renderer::Submit(const MeshHandle& handle) {
                           0,
                           nullptr);
   vkCmdDrawIndexed(commandBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
-  // vkCmdDraw(commandBuffer, gpuMesh.VertexCount, 1, 0, 0);
 }
 
 bool Renderer::ShouldClose() const noexcept {
@@ -257,11 +257,11 @@ void Renderer::WaitUntilIdle() const {
   context_.WaitUntilIdle();
 }
 RenderPassHandle Renderer::CreateRenderPass() {
-  if (auto r = renderPassCache_.CreateRenderPass(); !r) {
-    const std::string msg = std::format("Failed to create render pass: {}", ToString(r.error()));
+  if (auto result = renderPassCache_.CreateRenderPass(); !result) {
+    const std::string msg = std::format("Failed to create render pass: {}", ToString(result.error()));
     throw std::runtime_error(msg);
   } else {
-    return RenderPassHandle{*r};
+    return RenderPassHandle{*result};
   }
 }
 

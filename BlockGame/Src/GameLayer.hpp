@@ -2,6 +2,7 @@
 
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
+#include "Engine/Graphics/Camera.h"
 #include "Engine/Graphics/Handles.hpp"
 
 namespace engine {
@@ -11,7 +12,15 @@ namespace events {
 struct KeyPressedEvent;
 struct KeyReleasedEvent;
 } // namespace events
+
 } // namespace engine
+
+struct MovementInput {
+  bool Forward{};
+  bool Backward{};
+  bool Left{};
+  bool Right{};
+};
 
 class GameLayer : public engine::ILayer, public engine::events::IKeyEventHandler {
 public:
@@ -27,7 +36,12 @@ public:
   void OnKeyPressed(const engine::events::KeyPressedEvent& event) override;
 
 private:
+  MovementInput movement_{};
+
   engine::Application& application_;
 
+  engine::graphics::Camera camera_{};
   engine::graphics::MeshHandle myMesh_{};
+
+  void handleKeyInput(int keycode, bool state);
 };

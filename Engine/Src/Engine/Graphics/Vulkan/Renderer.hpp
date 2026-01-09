@@ -3,18 +3,18 @@
 #include "Context.hpp"
 #include "DescriptorAllocator.hpp"
 #include "MeshAllocator.hpp"
-#include "PipelineCache.hpp"
 #include "RenderPassCache.hpp"
 #include "UniformBuffer.hpp"
 #include "TextureAllocator.h"
-#include "Engine/Graphics/Handles.hpp"
+#include "PipelineCache.hpp"
 
 #include <expected>
 
-namespace engine::graphics::vulkan {}
 struct GLFWwindow;
 
 namespace engine::graphics {
+class Camera;
+
 struct MeshHandle;
 struct Mesh;
 struct MeshCreateInfo;
@@ -28,13 +28,10 @@ struct RenderPassHandle;
 } // namespace engine::graphics
 
 namespace engine::graphics::vulkan {
-
-class Context;
-
 class PipelineCache;
 struct MeshGPU;
 
-enum class RenderError {
+enum class RenderError : uint8_t {
   FrameAcquireFailed,
   FrameOutOfDate,
   RecordCommandFailed,
@@ -47,6 +44,8 @@ struct FrameContext {
   uint32_t ImageIndex{};
   uint32_t RenderPassID{};
   uint32_t PipelineID{};
+
+  UniformBuffer CameraGPU{};
 };
 
 class Renderer {
@@ -58,7 +57,8 @@ public:
   Renderer& operator=(const Renderer&) = delete;
 
   std::expected<void, RenderError> BeginFrame(const RenderPassHandle& renderPassHandle,
-                                              const PipelineHandle& pipelineHandle) noexcept;
+                                              const PipelineHandle& pipelineHandle,
+                                              const Camera& camera) noexcept;
   std::expected<void, RenderError> EndFrame();
   void Submit(const MeshHandle& handle);
 
@@ -84,8 +84,6 @@ private:
   DescriptorAllocator descriptorAllocator_;
   TextureAllocator textureAllocator_;
   MeshAllocator meshAllocator_;
-
-  UniformBuffer cameraGPU_{};
 
   FrameContext frameContext_{};
 };
