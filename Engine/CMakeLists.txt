@@ -68,8 +68,7 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/MeshAllocator.hpp
         Src/Engine/Graphics/Vulkan/ImageUtil.cpp
         Src/Engine/Graphics/Vulkan/ImageUtil.hpp
-        Src/Engine/Graphics/Camera.cpp
-        Src/Engine/Graphics/Camera.h
+        Src/Engine/Graphics/CameraMatrices.h
 )
 
 target_include_directories(Engine_Graphics

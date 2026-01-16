@@ -48,10 +48,10 @@ DescriptorAllocator::~DescriptorAllocator() {
   vkDestroyDescriptorPool(device.Logical(), descriptorPool_, nullptr);
 }
 
-void DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout,
-                                              const UniformBuffer& uniformGPU,
-                                              VkImageView imageView,
-                                              VkSampler sampler) {
+std::uint32_t DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout,
+                                                       const UniformBuffer& uniformGPU,
+                                                       VkImageView imageView,
+                                                       VkSampler sampler) {
 
   const auto& vkDevice = context_.GetDevice().Logical();
 
@@ -64,8 +64,8 @@ void DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSe
   allocInfo.descriptorSetCount = static_cast<uint32_t>(config::MaxFramesInFlight);
   allocInfo.pSetLayouts = layouts.data();
 
-  descriptorSets_.resize(config::MaxFramesInFlight);
-  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, descriptorSets_.data()) != VK_SUCCESS) {
+  std::vector<VkDescriptorSet> descriptorSets(config::MaxFramesInFlight, VK_NULL_HANDLE);
+  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate descriptor sets!");
   }
 
@@ -84,7 +84,7 @@ void DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSe
     std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSets_[i];
+    descriptorWrites[0].dstSet = descriptorSets[i];
     descriptorWrites[0].dstBinding = 0;
     descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -92,7 +92,7 @@ void DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSe
     descriptorWrites[0].pBufferInfo = &bufferInfo;
 
     descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptorSets_[i];
+    descriptorWrites[1].dstSet = descriptorSets[i];
     descriptorWrites[1].dstBinding = 1;
     descriptorWrites[1].dstArrayElement = 0;
     descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -100,8 +100,15 @@ void DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSe
     descriptorWrites[1].pImageInfo = &imageInfo;
     vkUpdateDescriptorSets(vkDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
   }
+
+  const DescriptorSetBinding binding{.descriptors_ = descriptorSets};
+  descriptorSets_.push_back(binding);
+  return descriptorSets_.size() - 1;
 }
-VkDescriptorSet DescriptorAllocator::DescriptorSet(const uint32_t frame) const noexcept {
-  return descriptorSets_[frame];
+
+VkDescriptorSet DescriptorAllocator::DescriptorSet(const std::uint32_t setID,
+                                                   const std::uint32_t frame) const noexcept {
+  assert(setID < descriptorSets_.size());
+  return descriptorSets_[setID].descriptors_[frame];
 }
 } // namespace engine::graphics::vulkan

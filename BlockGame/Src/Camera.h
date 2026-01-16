@@ -3,8 +3,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace engine::graphics {
-
 class Camera {
 public:
   Camera();
@@ -13,16 +11,21 @@ public:
   glm::vec3 Right() const noexcept;
 
   void Move(const glm::vec3& delta) noexcept;
+  void Rotate(float deltaX, float deltaY) noexcept;
 
-  const glm::mat4 View() const noexcept;
-  glm::mat4 Projection(uint32_t width, uint32_t height) const noexcept;
+  glm::mat4 View() const noexcept;
 
 private:
+  static constexpr glm::vec3 worldUp_{0.0f, 1.0f, 0.0f};
+
+  float yaw_{-90.0f};
+  float pitch_{};
+
   glm::vec3 position_{};
   glm::vec3 front_{};
+
+  glm::vec3 right_{};
   glm::vec3 up_{};
 
-  glm::mat4 view_{1.0f};
+  void updateVectors_() noexcept;
 };
-
-} // namespace engine::graphics

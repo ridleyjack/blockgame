@@ -12,6 +12,11 @@ struct KeyReleasedEvent {
   int Keycode{};
 };
 
-using Event = std::variant<KeyPressedEvent, KeyReleasedEvent>;
+struct MouseMovedEvent {
+  double X{};
+  double Y{};
+};
+
+using Event = std::variant<KeyPressedEvent, KeyReleasedEvent, MouseMovedEvent>;
 
 } // namespace engine::events

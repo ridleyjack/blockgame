@@ -13,7 +13,7 @@
 struct GLFWwindow;
 
 namespace engine::graphics {
-class Camera;
+class CameraMatrices;
 
 struct MeshHandle;
 struct Mesh;
@@ -58,9 +58,9 @@ public:
 
   std::expected<void, RenderError> BeginFrame(const RenderPassHandle& renderPassHandle,
                                               const PipelineHandle& pipelineHandle,
-                                              const Camera& camera) noexcept;
+                                              const CameraMatrices& camera) noexcept;
   std::expected<void, RenderError> EndFrame();
-  void Submit(const MeshHandle& handle);
+  void Submit(const MeshHandle& handle, const MaterialHandle& material);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
@@ -68,12 +68,16 @@ public:
   RenderPassHandle CreateRenderPass();
 
   PipelineHandle CreatePipeline(const PipelineCreateInfo& info);
-  void DeletePipeline(PipelineHandle handle);
+  void DeletePipeline(const PipelineHandle& handle);
 
   MeshHandle CreateMesh(const Mesh& mesh);
-  void DeleteMesh(MeshHandle handle);
+  void DeleteMesh(const MeshHandle& handle);
 
   TextureHandle CreateTexture(std::span<const std::byte> data, int width, int height);
+
+  MaterialHandle CreateMaterial(const TextureHandle& texture);
+
+  glm::mat4 MakeProjection() const noexcept;
 
 private:
   Context context_;

@@ -21,4 +21,9 @@ struct UniformHandle {
 struct TextureHandle {
   uint32_t TextureID{};
 };
+
+struct MaterialHandle {
+  uint32_t TextureID{};
+  uint32_t DescriptorSetID{};
+};
 } // namespace engine::graphics

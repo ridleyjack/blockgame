@@ -2,6 +2,11 @@ add_executable(Blockgame
         Src/main.cpp
         Src/GameLayer.cpp
         Src/GameLayer.hpp
+        Src/Camera.cpp
+        Src/Camera.h
+        Src/Grid3D.hpp
+        Src/ChunkMesh.cpp
+        Src/ChunkMesh.h
 )
 
 target_link_libraries(Blockgame

@@ -8,7 +8,7 @@
 #include "SwapChain.hpp"
 #include "Sync.hpp"
 #include "RenderPassCache.hpp"
-#include "Engine/Graphics/Camera.h"
+#include "Engine/Graphics/CameraMatrices.h"
 
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
@@ -37,46 +37,20 @@ Renderer::Renderer(GLFWwindow* window)
       descriptorAllocator_(context_),
       textureAllocator_(context_),
       meshAllocator_(context_) {
+
   const auto& device = context_.GetDevice();
-
-  // Init hardcoded render pass at index 0;.
-  if (const auto result = renderPassCache_.CreateRenderPass(); !result)
-    throw std::runtime_error("Failed to create Render Pass");
-  RenderPass& renderPass = renderPassCache_.GetRenderPass(defaultRenderPassID);
-
-  // Init hardcoded framebufferSet at index 0;.
-  context_.GetSwapchain().CreateFramebuffers(renderPass);
-
-  // Init hardcoded pipeline at index 0;.
-  const PipelineCreateInfo info{.RenderPass = RenderPassHandle{defaultRenderPassID},
-                                .VertexShaderFile = "Shaders/vert.spv",
-                                .FragmentShaderFile = "Shaders/frag.spv"};
-  pipelineCache_.CreatePipeline(info, renderPass);
-
-  auto loader = assets::ImageLoader{};
-  if (auto result = loader.Load("Textures/texture.jpg"); !result) {
-    std::println("Failed to load texture: {}", result.error());
-  }
-  const auto handle = CreateTexture(loader.Data(), loader.Width(), loader.Height());
-  const auto& texture = textureAllocator_.Get(handle.TextureID);
-
   frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
-  descriptorAllocator_.CreateDescriptorSet(pipelineCache_.DescriptorSetLayout(),
-                                           frameContext_.CameraGPU,
-                                           texture.ImageView,
-                                           texture.Sampler);
 }
 
 Renderer::~Renderer() {
   const auto& device = context_.GetDevice();
-
   for (const auto buffer : frameContext_.CameraGPU.Buffers)
     device.DestroyBuffer(buffer);
 }
 
 std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& renderPassHandle,
                                                       const PipelineHandle& pipelineHandle,
-                                                      const Camera& camera) noexcept {
+                                                      const CameraMatrices& camera) noexcept {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
@@ -107,21 +81,8 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   }
   vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame));
 
-  // Update hardcoded UniformBuffer.
-  // UniformBufferObject ubo{
-  //     .Model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-  //     .View = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-  //     .Projection =
-  //         glm::perspective(glm::radians(45.0f),
-  //                          static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height),
-  //                          0.1f,
-  //                          10.0f)};
-
   // Camera
-  UniformBufferObject ubo{.Model = glm::mat4(1.0f),
-                          .View = camera.View(),
-                          .Projection = camera.Projection(swapchain.Extent().width, swapchain.Extent().height)};
-
+  const UniformBufferObject ubo{.Model = glm::mat4(1.0f), .View = camera.View, .Projection = camera.Projection};
   memcpy(frameContext_.CameraGPU.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(UniformBufferObject));
 
   // Command Buffer
@@ -225,7 +186,7 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   return {};
 }
 
-void Renderer::Submit(const MeshHandle& handle) {
+void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) {
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
 
@@ -234,10 +195,10 @@ void Renderer::Submit(const MeshHandle& handle) {
   constexpr std::array<VkDeviceSize, 1> offsets = {0};
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
-  vkCmdBindIndexBuffer(commandBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT16);
+  vkCmdBindIndexBuffer(commandBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
 
   auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
-  auto descriptor = descriptorAllocator_.DescriptorSet(frameContext_.CurrentFrame);
+  auto descriptor = descriptorAllocator_.DescriptorSet(material.DescriptorSetID, frameContext_.CurrentFrame);
   vkCmdBindDescriptorSets(commandBuffer,
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline.PipelineLayout(),
@@ -257,12 +218,13 @@ void Renderer::WaitUntilIdle() const {
   context_.WaitUntilIdle();
 }
 RenderPassHandle Renderer::CreateRenderPass() {
-  if (auto result = renderPassCache_.CreateRenderPass(); !result) {
+  auto result = renderPassCache_.CreateRenderPass();
+  if (!result) {
     const std::string msg = std::format("Failed to create render pass: {}", ToString(result.error()));
     throw std::runtime_error(msg);
-  } else {
-    return RenderPassHandle{*result};
   }
+  context_.GetSwapchain().CreateFramebuffers(renderPassCache_.GetRenderPass(*result));
+  return RenderPassHandle{*result};
 }
 
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
@@ -270,7 +232,7 @@ PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
   return pipelineCache_.CreatePipeline(info, pass);
 }
 
-void Renderer::DeletePipeline(const PipelineHandle handle) {
+void Renderer::DeletePipeline(const PipelineHandle& handle) {
   pipelineCache_.DestroyPipeline(handle.PipelineID);
 }
 
@@ -279,7 +241,7 @@ MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
   return MeshHandle{.MeshID = meshID};
 }
 
-void Renderer::DeleteMesh(const MeshHandle handle) {
+void Renderer::DeleteMesh(const MeshHandle& handle) {
   meshAllocator_.Delete(handle.MeshID);
 }
 
@@ -289,5 +251,22 @@ TextureHandle Renderer::CreateTexture(const std::span<const std::byte> data, con
     throw std::runtime_error("Failed to create texture");
   }
   return TextureHandle{.TextureID = *result};
+}
+MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
+  const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
+  const std::uint32_t descriptorID = descriptorAllocator_.CreateDescriptorSet(pipelineCache_.DescriptorSetLayout(),
+                                                                              frameContext_.CameraGPU,
+                                                                              textureGPU.ImageView,
+                                                                              textureGPU.Sampler);
+
+  return MaterialHandle{.TextureID = texture.TextureID, .DescriptorSetID = descriptorID};
+}
+
+glm::mat4 Renderer::MakeProjection() const noexcept {
+  const auto extent = context_.GetSwapchain().Extent();
+  const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+  auto proj = glm::perspectiveRH_ZO(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+  proj[1][1] *= -1;
+  return proj;
 }
 } // namespace engine::graphics::vulkan

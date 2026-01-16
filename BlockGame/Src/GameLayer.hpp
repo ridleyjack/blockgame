@@ -1,12 +1,20 @@
 #pragma once
 
+#include "Camera.h"
+#include "ChunkMesh.h"
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
-#include "Engine/Graphics/Camera.h"
 #include "Engine/Graphics/Handles.hpp"
+#include "Engine/Graphics/Mesh.hpp"
+
+#include <vector>
 
 namespace engine {
 class Application;
+
+namespace graphics {
+class Vertex;
+}
 
 namespace events {
 struct KeyPressedEvent;
@@ -15,18 +23,23 @@ struct KeyReleasedEvent;
 
 } // namespace engine
 
-struct MovementInput {
+struct Movements {
   bool Forward{};
   bool Backward{};
   bool Left{};
   bool Right{};
 };
 
-class GameLayer : public engine::ILayer, public engine::events::IKeyEventHandler {
+struct KeyInput {
+  Movements Movement{};
+  bool Exit{};
+};
+
+class GameLayer : public engine::ILayer,
+                  public engine::events::IKeyEventHandler,
+                  public engine::events::IMouseEventHandler {
 public:
   explicit GameLayer(engine::Application& application);
-
-  // void OnEvent(engine::Event& event) override;
 
   void OnUpdate(float deltaTime) override;
 
@@ -35,13 +48,17 @@ public:
   void OnKeyReleased(const engine::events::KeyReleasedEvent& event) override;
   void OnKeyPressed(const engine::events::KeyPressedEvent& event) override;
 
+  void OnMouseMoved(const engine::events::MouseMovedEvent& event) override;
+
 private:
-  MovementInput movement_{};
+  Camera camera_{};
+  KeyInput input_{};
+
+  ChunkMesh myMesh_{};
+
+  bool firstMouse_{true};
+  float lastX_{}, lastY_{};
 
   engine::Application& application_;
-
-  engine::graphics::Camera camera_{};
-  engine::graphics::MeshHandle myMesh_{};
-
   void handleKeyInput(int keycode, bool state);
 };

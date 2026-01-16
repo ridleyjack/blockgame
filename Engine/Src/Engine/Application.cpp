@@ -88,6 +88,9 @@ void Application::RaiseEvent(const events::Event& event) {
     if (auto* handler = dynamic_cast<events::IKeyEventHandler*>(layer)) {
       std::visit(events::KeyEventDispatch{.Handler = *handler}, event);
     }
+    if (auto* handler = dynamic_cast<events::IMouseEventHandler*>(layer)) {
+      std::visit(events::MouseEventDispatch{.Handler = *handler}, event);
+    }
   }
 }
 

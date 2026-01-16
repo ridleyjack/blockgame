@@ -25,28 +25,38 @@ void Window::Create() {
     throw std::runtime_error("Failed to create glfw window.");
   }
   glfwMakeContextCurrent(handle_);
-
   glfwSetWindowUserPointer(handle_, this);
 
-  glfwSetKeyCallback(handle_, [](GLFWwindow* handle, int key, int scancode, int action, int mods) {
-    const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));
+  // Keyboard Input
+  glfwSetKeyCallback(handle_,
+                     [](GLFWwindow* handle, const int key, const int scancode, const int action, const int mods) {
+                       const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));
 
-    switch (action) {
-    case GLFW_PRESS:
-    case GLFW_REPEAT: {
-      events::KeyPressedEvent event{.Keycode = key, .IsRepeat = action == GLFW_REPEAT};
-      window.eventRaiser_.RaiseEvent(event);
-      break;
-    }
-    case GLFW_RELEASE: {
-      events::KeyReleasedEvent event(key);
-      window.eventRaiser_.RaiseEvent(event);
-      break;
-    }
-    default:;
-    }
+                       switch (action) {
+                       case GLFW_PRESS:
+                       case GLFW_REPEAT: {
+                         events::KeyPressedEvent event{.Keycode = key, .IsRepeat = action == GLFW_REPEAT};
+                         window.eventRaiser_.RaiseEvent(event);
+                         break;
+                       }
+                       case GLFW_RELEASE: {
+                         events::KeyReleasedEvent event(key);
+                         window.eventRaiser_.RaiseEvent(event);
+                         break;
+                       }
+                       default:;
+                       }
+                     });
+
+  // Mouse Input
+  glfwSetInputMode(handle_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+  glfwSetCursorPosCallback(handle_, [](GLFWwindow* handle, const double x, const double y) {
+    const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    events::MouseMovedEvent event(x, y);
+    window.eventRaiser_.RaiseEvent(event);
   });
 }
+
 void Window::Destroy() {
   if (handle_) {
     glfwDestroyWindow(handle_);

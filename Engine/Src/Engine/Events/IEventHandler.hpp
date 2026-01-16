@@ -25,4 +25,21 @@ struct KeyEventDispatch {
   template <typename T> void operator()(const T&) const {}
 };
 
+class IMouseEventHandler {
+public:
+  virtual ~IMouseEventHandler() = default;
+
+  virtual void OnMouseMoved(const MouseMovedEvent& event) = 0;
+};
+
+struct MouseEventDispatch {
+  IMouseEventHandler& Handler;
+
+  void operator()(const MouseMovedEvent& e) const {
+    Handler.OnMouseMoved(e);
+  }
+
+  template <typename T> void operator()(const T&) const {}
+};
+
 } // namespace engine::events

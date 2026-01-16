@@ -1,78 +1,123 @@
 #include "GameLayer.hpp"
 
+#include "Grid3D.hpp"
 #include "Engine/Application.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Events/Events.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
-#include "Engine/Graphics/Camera.h"
+#include "Engine/Graphics/CameraMatrices.h"
+#include "Engine/Graphics/PipelineCreateInfo.hpp"
 
 #include <print>
 
-namespace gfx = engine::graphics::vulkan;
+namespace gfx = engine::graphics;
+namespace vlk = gfx::vulkan;
 namespace assets = engine::assets;
 
 const std::vector<engine::graphics::Vertex> vertices = {
-    {{-0.5f, -0.5f, 0.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f},   {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f},    {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f},   {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+    // +Z (Front) - Red
+    {{-0.5f, -0.5f, 0.5f},  {1, 0, 0}, {0, 0}},
+    {{0.5f, -0.5f, 0.5f},   {1, 0, 0}, {1, 0}},
+    {{0.5f, 0.5f, 0.5f},    {1, 0, 0}, {1, 1}},
+    {{-0.5f, 0.5f, 0.5f},   {1, 0, 0}, {0, 1}},
 
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, -0.5f},  {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, -0.5f},   {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, -0.5f},  {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+    // -Z (Back) - Green
+    {{0.5f, -0.5f, -0.5f},  {0, 1, 0}, {0, 0}},
+    {{-0.5f, -0.5f, -0.5f}, {0, 1, 0}, {1, 0}},
+    {{-0.5f, 0.5f, -0.5f},  {0, 1, 0}, {1, 1}},
+    {{0.5f, 0.5f, -0.5f},   {0, 1, 0}, {0, 1}},
 
-    // Triangle to the right of the quad
-    {{0.75f, -0.5f, 0.0f},  {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}}, // left  -> GREEN
-    {{1.25f, -0.5f, 0.0f},  {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}}, // right -> RED
-    {{1.0f, 0.5f, 0.0f},    {0.0f, 0.0f, 1.0f}, {0.5f, 1.0f}}, // top   -> BLUE
+    // +X (Right) - Blue
+    {{0.5f, -0.5f, 0.5f},   {0, 0, 1}, {0, 0}},
+    {{0.5f, -0.5f, -0.5f},  {0, 0, 1}, {1, 0}},
+    {{0.5f, 0.5f, -0.5f},   {0, 0, 1}, {1, 1}},
+    {{0.5f, 0.5f, 0.5f},    {0, 0, 1}, {0, 1}},
+
+    // -X (Left) - Yellow
+    {{-0.5f, -0.5f, -0.5f}, {1, 1, 0}, {0, 0}},
+    {{-0.5f, -0.5f, 0.5f},  {1, 1, 0}, {1, 0}},
+    {{-0.5f, 0.5f, 0.5f},   {1, 1, 0}, {1, 1}},
+    {{-0.5f, 0.5f, -0.5f},  {1, 1, 0}, {0, 1}},
+
+    // +Y (Top) - Magenta
+    {{-0.5f, 0.5f, 0.5f},   {1, 0, 1}, {0, 0}},
+    {{0.5f, 0.5f, 0.5f},    {1, 0, 1}, {1, 0}},
+    {{0.5f, 0.5f, -0.5f},   {1, 0, 1}, {1, 1}},
+    {{-0.5f, 0.5f, -0.5f},  {1, 0, 1}, {0, 1}},
+
+    // -Y (Bottom) - Cyan
+    {{-0.5f, -0.5f, -0.5f}, {0, 1, 1}, {0, 0}},
+    {{0.5f, -0.5f, -0.5f},  {0, 1, 1}, {1, 0}},
+    {{0.5f, -0.5f, 0.5f},   {0, 1, 1}, {1, 1}},
+    {{-0.5f, -0.5f, 0.5f},  {0, 1, 1}, {0, 1}},
 };
 
 // clang-format off
-const std::vector<uint16_t> indices = {
-  0, 1, 2, 2, 3, 0,
-  4, 5, 6, 6, 7, 4,
-
-  8, 9, 10   // new triangle
+const std::vector<std::uint32_t> indices = {
+  0, 1, 2, 2, 3, 0,       // Front
+  4, 5, 6, 6, 7, 4,       // Back
+  8, 9,10,10,11, 8,       // Right
+ 12,13,14,14,15,12,       // Left
+ 16,17,18,18,19,16,       // Top
+ 20,21,22,22,23,20        // Bottom
 };
 // clang-format on
 
 GameLayer::GameLayer(engine::Application& application) : application_(application) {
-  myMesh_ = application.GetRenderer().CreateMesh({.Vertices = vertices, .Indices = indices});
+
+  auto& renderer = application_.GetRenderer();
+
+  const gfx::RenderPassHandle renderPass = renderer.CreateRenderPass();
+  const gfx::PipelineHandle pipeline =
+      renderer.CreatePipeline(gfx::PipelineCreateInfo{.RenderPass = renderPass,
+                                                      .VertexShaderFile = "Shaders/vert.spv",
+                                                      .FragmentShaderFile = "Shaders/frag.spv"});
+
   auto loader = assets::ImageLoader{};
-  if (auto result = loader.Load("Textures/texture.jpg"); !result) {
+  if (auto result = loader.Load("Textures/Tiles/dirt.png"); !result) {
     std::println("Failed to load texture: {}", result.error());
   }
-  // application.GetRenderer().CreateTexture(loader.Data(), loader.Width(), loader.Height());
+
+  const gfx::TextureHandle texture = renderer.CreateTexture(loader.Data(), loader.Width(), loader.Height());
+  const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
+
+  myMesh_.Upload(application.GetRenderer());
 }
 
 void GameLayer::OnUpdate(float deltaTime) {
   const float speed = 2.5f * deltaTime;
-  if (movement_.Forward)
+  if (input_.Movement.Forward)
     camera_.Move(camera_.Forward() * speed);
-  if (movement_.Backward)
+  if (input_.Movement.Backward)
     camera_.Move(camera_.Forward() * -speed);
-  if (movement_.Left)
+  if (input_.Movement.Left)
     camera_.Move(camera_.Right() * -speed);
-  if (movement_.Right)
+  if (input_.Movement.Right)
     camera_.Move(camera_.Right() * speed);
+
+  if (input_.Exit)
+    application_.Stop();
 };
 
 void GameLayer::OnRender() {
   auto& renderer = application_.GetRenderer();
 
-  if (const auto r = renderer.BeginFrame({0}, {0}, camera_); !r) {
-    if (r.error() != gfx::RenderError::FrameOutOfDate) {
+  engine::graphics::CameraMatrices cameraMatrices{};
+  cameraMatrices.View = camera_.View();
+  cameraMatrices.Projection = renderer.MakeProjection();
+
+  if (const auto r = renderer.BeginFrame({0}, {0}, cameraMatrices); !r) {
+    if (r.error() != vlk::RenderError::FrameOutOfDate) {
       std::println("Failed to begin rendering frame", 1);
       return;
     }
   }
 
-  renderer.Submit(myMesh_);
+  renderer.Submit(myMesh_.Mesh(), {0});
 
   if (const auto rv = renderer.EndFrame(); !rv) {
-    std::print("Failed to render frame");
+    std::println("Failed to render frame");
     return;
   }
 };
@@ -83,21 +128,43 @@ void GameLayer::OnKeyReleased(const engine::events::KeyReleasedEvent& event) {
 
 void GameLayer::OnKeyPressed(const engine::events::KeyPressedEvent& event) {
   handleKeyInput(event.Keycode, true);
+}
+
+void GameLayer::OnMouseMoved(const engine::events::MouseMovedEvent& event) {
+  const auto xPos = static_cast<float>(event.X);
+  const auto yPos = static_cast<float>(event.Y);
+
+  if (firstMouse_) {
+    lastX_ = xPos;
+    lastY_ = yPos;
+    firstMouse_ = false;
+  }
+
+  const float deltaX = xPos - lastX_;
+  const float deltaY = lastY_ - yPos;
+  lastX_ = xPos;
+  lastY_ = yPos;
+
+  constexpr float sensitivity = 0.1f;
+  camera_.Rotate(deltaX * sensitivity, deltaY * sensitivity);
 };
 
 void GameLayer::handleKeyInput(const int keycode, const bool state) {
   switch (keycode) {
   case GLFW_KEY_W:
-    movement_.Forward = state;
+    input_.Movement.Forward = state;
     break;
   case GLFW_KEY_S:
-    movement_.Backward = state;
+    input_.Movement.Backward = state;
     break;
   case GLFW_KEY_A:
-    movement_.Left = state;
+    input_.Movement.Left = state;
     break;
   case GLFW_KEY_D:
-    movement_.Right = state;
+    input_.Movement.Right = state;
+    break;
+  case GLFW_KEY_ESCAPE:
+    input_.Exit = true;
     break;
   default:
     // Do nothing.

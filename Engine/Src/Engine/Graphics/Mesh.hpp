@@ -46,6 +46,6 @@ struct Vertex {
 
 struct Mesh {
   std::vector<Vertex> Vertices{};
-  std::vector<uint16_t> Indices{};
+  std::vector<std::uint32_t> Indices{};
 };
 } // namespace engine::graphics
