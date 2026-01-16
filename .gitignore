@@ -6,3 +6,7 @@ cmake-build-debug/
 
 # Compiled Shaders
 *.spv
+
+# External Resources
+BlockGame/Textures/
+
