@@ -77,15 +77,48 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
   auto loader = assets::ImageLoader{};
   if (auto result = loader.Load("Textures/Tiles/dirt.png"); !result) {
     std::println("Failed to load texture: {}", result.error());
+    throw std::runtime_error("Failed to load textures");
   }
 
-  const gfx::TextureHandle texture = renderer.CreateTexture(loader.Data(), loader.Width(), loader.Height());
+  auto& uploader = renderer.GetTextureAllocator();
+  if (auto result = uploader.BeginArray(loader.Width(), loader.Height(), loader.Data().size_bytes(), 4); !result) {
+    std::println("Failed to build texture array: {}", engine::graphics::vulkan::ToString(result.error()));
+    throw std::runtime_error("Failed to load textures");
+  }
+  uploader.UploadLayer(loader.Data());
+
+  if (auto result = loader.Load("Textures/Tiles/stone.png"); !result) {
+    std::println("Failed to load texture: {}", result.error());
+    throw std::runtime_error("Failed to load textures");
+  }
+  uploader.UploadLayer(loader.Data());
+
+  if (auto result = loader.Load("Textures/Tiles/sand.png"); !result) {
+    std::println("Failed to load texture: {}", result.error());
+    throw std::runtime_error("Failed to load textures");
+  }
+  uploader.UploadLayer(loader.Data());
+
+  if (auto result = loader.Load("Textures/Tiles/snow.png"); !result) {
+    std::println("Failed to load texture: {}", result.error());
+    throw std::runtime_error("Failed to load textures");
+  }
+  uploader.UploadLayer(loader.Data());
+
+  engine::graphics::TextureHandle texture{};
+  if (auto result = uploader.FinishArray(); !result) {
+    std::println("Failed to build texture array: {}", engine::graphics::vulkan::ToString(result.error()));
+    throw std::runtime_error("Failed to load textures");
+  } else {
+    texture.TextureID = *result;
+  }
+
   const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
 
   myMesh_.Upload(application.GetRenderer());
 }
 
-void GameLayer::OnUpdate(float deltaTime) {
+void GameLayer::OnUpdate(const float deltaTime) {
   const float speed = 2.5f * deltaTime;
   if (input_.Movement.Forward)
     camera_.Move(camera_.Forward() * speed);

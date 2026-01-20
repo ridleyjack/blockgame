@@ -33,24 +33,38 @@ constexpr std::string_view ToString(const Error e) noexcept {
   return "UnknownImageUtilError";
 }
 
-std::expected<void, Error> CreateImage(const Device& device,
-                                       uint32_t width,
-                                       uint32_t height,
-                                       VkFormat format,
-                                       VkImageTiling tiling,
-                                       VkImageUsageFlags usage,
-                                       VkMemoryPropertyFlags properties,
-                                       VkImage& image,
-                                       VkDeviceMemory& imageMemory);
+struct CreateImageInfo {
+  uint32_t Width{};
+  uint32_t Height{};
+  uint32_t ArrayLayers{1};
+  VkFormat Format{};
+  VkImageTiling Tiling{};
+  VkImageUsageFlags Usage{};
+  VkMemoryPropertyFlags Properties{};
+};
 
-std::expected<VkImageView, Error>
-CreateImageView(const Device& device, VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+struct CreateImageViewInfo {
+  uint32_t ArrayLayers{1};
+  VkFormat Format{};
+  VkImageAspectFlags AspectFlags{};
+  VkImage Image{};
+};
+
+struct Image {
+  VkImage Handle{VK_NULL_HANDLE};
+  VkDeviceMemory Memory{VK_NULL_HANDLE};
+};
+
+std::expected<Image, Error> CreateImage(const Device& device, const CreateImageInfo& info);
+
+std::expected<VkImageView, Error> CreateImageView(const Device& device, const CreateImageViewInfo& info);
 
 std::expected<void, Error> TransitionImageLayout(const Command& command,
                                                  VkImage image,
                                                  VkFormat format,
                                                  VkImageLayout oldLayout,
-                                                 VkImageLayout newLayout);
+                                                 VkImageLayout newLayout,
+                                                 uint32_t numLayers);
 
 } // namespace imageutil
 } // namespace engine::graphics::vulkan

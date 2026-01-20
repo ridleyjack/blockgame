@@ -1,4 +1,4 @@
-#include "TextureAllocator.h"
+#include "TextureAllocator.hpp"
 
 #include "Command.hpp"
 #include "Context.hpp"
@@ -14,84 +14,196 @@ namespace engine::graphics::vulkan {
 
 TextureAllocator::TextureAllocator(Context& context) : context_(context) {}
 TextureAllocator::~TextureAllocator() {
+  const auto& device = context_.GetDevice();
+
   for (auto& texture : textures_) {
     const auto& vkDevice = context_.GetDevice().Logical();
-    vkDestroyImage(vkDevice, texture.Image, nullptr);
-    vkFreeMemory(vkDevice, texture.ImageMemory, nullptr);
+    cleanupGPUTexture_(texture);
+  }
 
-    vkDestroyImageView(vkDevice, texture.ImageView, nullptr);
-    vkDestroySampler(vkDevice, texture.Sampler, nullptr);
+  if (arrayState_.has_value()) {
+    cleanupGPUTexture_(arrayState_->Texture);
+    vkUnmapMemory(device.Logical(), arrayState_->Staging.Buffer.Memory);
+    device.DestroyBuffer(arrayState_->Staging.Buffer);
   }
 }
 
 std::expected<uint32_t, TextureError>
-TextureAllocator::Create(const std::span<const std::byte> pixels, const uint32_t width, const uint32_t height) {
-  const auto& device = context_.GetDevice();
-  VkDevice vkDevice = device.Logical();
-  const auto& cmd = context_.GetCommand();
+TextureAllocator::Create(const std::span<const std::byte>& imageData, const uint32_t width, const uint32_t height) {
+  constexpr std::uint32_t numLayers = 1;
 
-  const VkDeviceSize imageSize = pixels.size_bytes();
   TextureGPU texture{};
-
-  // Image data to Staging Buffer.
-  const AllocatedBuffer staging =
-      device.CreateBuffer(imageSize,
-                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-  void* data;
-  vkMapMemory(vkDevice, staging.Memory, 0, imageSize, 0, &data);
-  memcpy(data, pixels.data(), imageSize);
-  vkUnmapMemory(vkDevice, staging.Memory);
-
-  if (auto result = imageutil::CreateImage(device,
-                                           width,
-                                           height,
-                                           VK_FORMAT_R8G8B8A8_SRGB,
-                                           VK_IMAGE_TILING_OPTIMAL,
-                                           VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                           texture.Image,
-                                           texture.ImageMemory);
-      !result) {
-    device.DestroyBuffer(staging);
-    return std::unexpected(TextureError{.Code = TextureError::ErrorCode::ImageUtilFailure, .Cause = result.error()});
+  if (auto result = createImage_(width, height, numLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    texture = *result;
   }
 
-  // Staging buffer to texture image.
+  TextureStaging staging = createStaging_(imageData.size_bytes());
+  uploadLayer_(texture, staging, width, height, imageData.size_bytes(), 0, imageData);
+
+  std::uint32_t textureID{};
+  if (auto result = finishTexture_(texture, staging, numLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    textureID = *result;
+  }
+  return textureID;
+}
+
+TextureGPU& TextureAllocator::Get(const uint32_t textureID) noexcept {
+  assert(textureID < textures_.size());
+  return textures_[textureID];
+}
+std::expected<void, TextureError> TextureAllocator::BeginArray(const std::uint32_t width,
+                                                               const std::uint32_t height,
+                                                               const VkDeviceSize layerSizeBytes,
+                                                               const std::uint32_t numLayers) noexcept {
+  assert(!arrayState_.has_value());
+  TextureGPU texture{};
+  if (auto result = createImage_(width, height, numLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    texture = *result;
+  }
+
+  const TextureStaging staging = createStaging_(layerSizeBytes);
+
+  arrayState_.emplace(ArrayBuildState{.Texture = texture,
+                                      .Staging = staging,
+                                      .LayerSizeBytes = layerSizeBytes,
+                                      .Width = width,
+                                      .Height = height,
+                                      .NumLayers = numLayers});
+  return {};
+}
+
+void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) {
+  assert(arrayState_.has_value());
+  assert(arrayState_->NextLayer < arrayState_->NumLayers);
+  assert(imageData.size() == arrayState_->LayerSizeBytes);
+
+  uploadLayer_(arrayState_->Texture,
+               arrayState_->Staging,
+               arrayState_->Width,
+               arrayState_->Height,
+               arrayState_->LayerSizeBytes,
+               arrayState_->NextLayer,
+               imageData);
+  arrayState_->NextLayer++;
+}
+
+std::expected<std::uint32_t, TextureError> TextureAllocator::FinishArray() {
+  assert(arrayState_.has_value());
+  assert(arrayState_->NextLayer == arrayState_->NumLayers);
+
+  std::uint32_t textureID{};
+  if (auto result = finishTexture_(arrayState_->Texture, arrayState_->Staging, arrayState_->NumLayers); !result) {
+    arrayState_.reset();
+    return std::unexpected(result.error());
+  } else {
+    textureID = *result;
+  }
+  arrayState_.reset();
+  return textureID;
+}
+
+std::expected<TextureGPU, TextureError> TextureAllocator::createImage_(const std::uint32_t width,
+                                                                       const std::uint32_t height,
+                                                                       const std::uint32_t numLayers) const noexcept {
+
+  const auto& device = context_.GetDevice();
+  const auto& cmd = context_.GetCommand();
+
+  TextureGPU texture{};
+  // Create Image.
+  if (auto result = imageutil::CreateImage(device,
+                                           {.Width = width,
+                                            .Height = height,
+                                            .ArrayLayers = numLayers,
+                                            .Format = VK_FORMAT_R8G8B8A8_SRGB,
+                                            .Tiling = VK_IMAGE_TILING_OPTIMAL,
+                                            .Usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                                            .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT});
+      !result) {
+    return std::unexpected(TextureError{.Code = TextureError::ErrorCode::ImageUtilFailure, .Cause = result.error()});
+  } else {
+    texture.Image = result->Handle;
+    texture.ImageMemory = result->Memory;
+  }
+
+  // Transition new image for writing.
   if (auto result = imageutil::TransitionImageLayout(cmd,
                                                      texture.Image,
                                                      VK_FORMAT_R8G8B8A8_SRGB,
                                                      VK_IMAGE_LAYOUT_UNDEFINED,
-                                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                                     numLayers);
       !result) {
-    device.DestroyBuffer(staging);
+    cleanupGPUTexture_(texture);
     return std::unexpected(TextureError{.Code = TextureError::ErrorCode::ImageUtilFailure, .Cause = result.error()});
   }
 
-  copyBufferToImage_(staging.Buffer, texture.Image, width, height);
+  return texture;
+}
+
+TextureStaging TextureAllocator::createStaging_(const VkDeviceSize layerSizeBytes) const noexcept {
+  const auto& device = context_.GetDevice();
+
+  const AllocatedBuffer staging =
+      device.CreateBuffer(layerSizeBytes,
+                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  void* data;
+  vkMapMemory(device.Logical(), staging.Memory, 0, layerSizeBytes, 0, &data);
+
+  return {.Buffer = staging, .Data = data};
+}
+
+void TextureAllocator::uploadLayer_(const TextureGPU& texture,
+                                    const TextureStaging& staging,
+                                    const std::uint32_t width,
+                                    const std::uint32_t height,
+                                    const VkDeviceSize layerSizeBytes,
+                                    const std::uint32_t layerIndex,
+                                    const std::span<const std::byte>& bytes) const noexcept {
+  memcpy(staging.Data, bytes.data(), layerSizeBytes);
+  copyBufferToImage_(staging.Buffer.Buffer, texture.Image, width, height, layerIndex);
+}
+
+std::expected<std::uint32_t, TextureError> TextureAllocator::finishTexture_(TextureGPU& texture,
+                                                                            const TextureStaging& staging,
+                                                                            const std::uint32_t numLayers) noexcept {
+  const auto& device = context_.GetDevice();
+  auto vkDevice = device.Logical();
+  const auto& cmd = context_.GetCommand();
+
+  // Cleanup Buffer, method guarantees this is done.
+  vkUnmapMemory(vkDevice, staging.Buffer.Memory);
+  device.DestroyBuffer(staging.Buffer);
 
   if (auto result = imageutil::TransitionImageLayout(cmd,
                                                      texture.Image,
                                                      VK_FORMAT_R8G8B8A8_SRGB,
                                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                                     numLayers);
       !result) {
-    device.DestroyBuffer(staging);
+    cleanupGPUTexture_(texture);
     return std::unexpected(TextureError{.Code = TextureError::ErrorCode::ImageUtilFailure, .Cause = result.error()});
   }
 
-  device.DestroyBuffer(staging);
-
   // Create the Imageview.
-  if (auto result = createTextureImageView_(texture.Image, VK_FORMAT_R8G8B8A8_SRGB); result) {
-    texture.ImageView = *result;
-  } else {
+  if (auto result = createTextureImageView_(texture.Image, VK_FORMAT_R8G8B8A8_SRGB, numLayers); !result) {
+    cleanupGPUTexture_(texture);
     return std::unexpected(result.error());
+  } else {
+    texture.ImageView = *result;
   }
 
   // Create the Sampler.
   if (auto result = createSampler_(); !result) {
+    cleanupGPUTexture_(texture);
     return std::unexpected(result.error());
   } else {
     texture.Sampler = *result;
@@ -102,17 +214,13 @@ TextureAllocator::Create(const std::span<const std::byte> pixels, const uint32_t
   return textures_.size() - 1;
 }
 
-TextureGPU& TextureAllocator::Get(const uint32_t textureID) noexcept {
-  assert(textureID < textures_.size());
-  return textures_[textureID];
-}
-
 void TextureAllocator::copyBufferToImage_(VkBuffer buffer,
                                           VkImage image,
                                           const uint32_t width,
-                                          const uint32_t height) const noexcept {
+                                          const uint32_t height,
+                                          const uint32_t layerIndex) const noexcept {
   const auto& cmd = context_.GetCommand();
-
+  // TODO: Batch these commands.
   VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
 
   VkBufferImageCopy region{};
@@ -122,7 +230,7 @@ void TextureAllocator::copyBufferToImage_(VkBuffer buffer,
 
   region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   region.imageSubresource.mipLevel = 0;
-  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.baseArrayLayer = layerIndex;
   region.imageSubresource.layerCount = 1;
 
   region.imageOffset = {0, 0, 0};
@@ -133,15 +241,17 @@ void TextureAllocator::copyBufferToImage_(VkBuffer buffer,
   cmd.EndSingleTimeCommands(commandBuffer);
 }
 
-std::expected<VkImageView, TextureError> TextureAllocator::createTextureImageView_(VkImage image,
-                                                                                   VkFormat format) const {
-  auto result = imageutil::CreateImageView(context_.GetDevice(), image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+std::expected<VkImageView, TextureError>
+TextureAllocator::createTextureImageView_(VkImage image, VkFormat format, uint32_t arrayLayers) const noexcept {
+  auto result = imageutil::CreateImageView(
+      context_.GetDevice(),
+      {.ArrayLayers = arrayLayers, .Format = format, .AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .Image = image});
   if (!result)
     return std::unexpected(TextureError{.Code = TextureError::ErrorCode::ImageUtilFailure, .Cause = result.error()});
   return *result;
 }
 
-std::expected<VkSampler, TextureError> TextureAllocator::createSampler_() const {
+std::expected<VkSampler, TextureError> TextureAllocator::createSampler_() const noexcept {
   const auto& device = context_.GetDevice();
 
   VkSamplerCreateInfo samplerInfo{};
@@ -171,6 +281,17 @@ std::expected<VkSampler, TextureError> TextureAllocator::createSampler_() const 
   }
 
   return sampler;
+}
+void TextureAllocator::cleanupGPUTexture_(TextureGPU& texture) const noexcept {
+  auto vkDevice = context_.GetDevice().Logical();
+
+  vkDestroySampler(vkDevice, texture.Sampler, nullptr);
+  vkDestroyImageView(vkDevice, texture.ImageView, nullptr);
+
+  vkDestroyImage(vkDevice, texture.Image, nullptr);
+  vkFreeMemory(vkDevice, texture.ImageMemory, nullptr);
+
+  texture = {};
 }
 
 } // namespace engine::graphics::vulkan

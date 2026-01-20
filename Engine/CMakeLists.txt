@@ -63,7 +63,7 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/Config.hpp
         Src/Engine/Graphics/Vulkan/MeshGPU.cpp
         Src/Engine/Graphics/Vulkan/TextureAllocator.cpp
-        Src/Engine/Graphics/Vulkan/TextureAllocator.h
+        Src/Engine/Graphics/Vulkan/TextureAllocator.hpp
         Src/Engine/Graphics/Vulkan/MeshAllocator.cpp
         Src/Engine/Graphics/Vulkan/MeshAllocator.hpp
         Src/Engine/Graphics/Vulkan/ImageUtil.cpp

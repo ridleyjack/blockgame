@@ -143,7 +143,10 @@ void SwapChain::create_() {
   // Create image views
   imageViews_.resize(images_.size());
   for (uint32_t i = 0; i < images_.size(); i++) {
-    if (auto result = imageutil::CreateImageView(device, images_[i], imageFormat_, VK_IMAGE_ASPECT_COLOR_BIT); result)
+    if (auto result = imageutil::CreateImageView(
+            device,
+            {.Format = imageFormat_, .AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .Image = images_[i]});
+        result)
       imageViews_[i] = *result;
     else
       throw std::runtime_error("failed to create image views!");
@@ -196,17 +199,25 @@ void SwapChain::createDepthResources_() {
   const auto& device = context_.GetDevice();
   VkFormat depthFormat = findDepthFormat_();
 
-  imageutil::CreateImage(device,
-                         this->extent_.width,
-                         this->extent_.height,
-                         depthFormat,
-                         VK_IMAGE_TILING_OPTIMAL,
-                         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                         depthImage_,
-                         depthImageMemory_);
+  if (auto result = imageutil::CreateImage(device,
+                                           {
+                                               .Width = this->extent_.width,
+                                               .Height = this->extent_.height,
+                                               .Format = depthFormat,
+                                               .Tiling = VK_IMAGE_TILING_OPTIMAL,
+                                               .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                               .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                           });
+      !result) {
+    throw std::runtime_error("failed to create depth depth texture image!");
+  } else {
+    depthImage_ = result->Handle;
+    depthImageMemory_ = result->Memory;
+  }
 
-  auto result = imageutil::CreateImageView(device, depthImage_, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+  const auto result = imageutil::CreateImageView(
+      device,
+      {.Format = depthFormat, .AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT, .Image = depthImage_});
   if (!result)
     throw std::runtime_error("failed to create depth image views!");
   depthImageView_ = *result;

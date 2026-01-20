@@ -5,7 +5,7 @@
 #include "MeshAllocator.hpp"
 #include "RenderPassCache.hpp"
 #include "UniformBuffer.hpp"
-#include "TextureAllocator.h"
+#include "TextureAllocator.hpp"
 #include "PipelineCache.hpp"
 
 #include <expected>
@@ -73,11 +73,15 @@ public:
   MeshHandle CreateMesh(const Mesh& mesh);
   void DeleteMesh(const MeshHandle& handle);
 
-  TextureHandle CreateTexture(std::span<const std::byte> data, int width, int height);
+  TextureHandle CreateTexture(const std::span<const std::byte>& data, int width, int height);
 
   MaterialHandle CreateMaterial(const TextureHandle& texture);
 
   glm::mat4 MakeProjection() const noexcept;
+
+  // In the future, the TextureAllocator (and this renderer) should not be used directly by the application.
+  // This is currently provided to expose the internal TextureArray allocation API.
+  TextureAllocator& GetTextureAllocator();
 
 private:
   Context context_;

@@ -245,13 +245,14 @@ void Renderer::DeleteMesh(const MeshHandle& handle) {
   meshAllocator_.Delete(handle.MeshID);
 }
 
-TextureHandle Renderer::CreateTexture(const std::span<const std::byte> data, const int width, const int height) {
+TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
   const auto result = textureAllocator_.Create(data, width, height);
   if (!result) {
-    throw std::runtime_error("Failed to create texture");
+    throw std::runtime_error(std::string{"Failed to create texture: "} + std::string{ToString(result.error())});
   }
   return TextureHandle{.TextureID = *result};
 }
+
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
   const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
   const std::uint32_t descriptorID = descriptorAllocator_.CreateDescriptorSet(pipelineCache_.DescriptorSetLayout(),
@@ -268,5 +269,9 @@ glm::mat4 Renderer::MakeProjection() const noexcept {
   auto proj = glm::perspectiveRH_ZO(glm::radians(45.0f), aspect, 0.1f, 100.0f);
   proj[1][1] *= -1;
   return proj;
+}
+
+TextureAllocator& Renderer::GetTextureAllocator() {
+  return textureAllocator_;
 }
 } // namespace engine::graphics::vulkan
