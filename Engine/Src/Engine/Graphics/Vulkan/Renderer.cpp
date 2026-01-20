@@ -8,17 +8,18 @@
 #include "SwapChain.hpp"
 #include "Sync.hpp"
 #include "RenderPassCache.hpp"
-#include "Engine/Graphics/CameraMatrices.h"
 
+#include "Engine/Graphics/CameraMatrices.h"
 #include "Engine/Graphics/Handles.hpp"
+#include "Engine/Graphics/TextureArrayBuilder.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
+#include "Engine/Assets/ImageLoader.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
-
-#include <Engine/Assets/ImageLoader.hpp>
 
 #include <cstring>
 #include <array>
@@ -253,6 +254,13 @@ TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, co
   return TextureHandle{.TextureID = *result};
 }
 
+std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(const TextureArrayInfo& info) noexcept {
+  if (auto result = textureAllocator_.BeginArray(info); !result)
+    return std::unexpected{result.error()};
+
+  return TextureArrayBuilder{textureAllocator_};
+}
+
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
   const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
   const std::uint32_t descriptorID = descriptorAllocator_.CreateDescriptorSet(pipelineCache_.DescriptorSetLayout(),
@@ -269,9 +277,5 @@ glm::mat4 Renderer::MakeProjection() const noexcept {
   auto proj = glm::perspectiveRH_ZO(glm::radians(45.0f), aspect, 0.1f, 100.0f);
   proj[1][1] *= -1;
   return proj;
-}
-
-TextureAllocator& Renderer::GetTextureAllocator() {
-  return textureAllocator_;
 }
 } // namespace engine::graphics::vulkan

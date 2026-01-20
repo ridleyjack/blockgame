@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Device.hpp"
+#include "TextureAllocator.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -12,7 +13,11 @@
 #include <variant>
 #include <vector>
 
-namespace engine::graphics::vulkan {
+namespace engine::graphics {
+
+struct TextureArrayInfo;
+
+namespace vulkan {
 
 namespace imageutil {
 enum class Error;
@@ -43,7 +48,7 @@ struct TextureError {
   std::variant<std::monostate, imageutil::Error> Cause{};
 };
 
-constexpr std::string_view ToString(const TextureError& e) noexcept {
+inline std::string_view ToString(const TextureError& e) noexcept {
   using enum TextureError::ErrorCode;
 
   switch (e.Code) {
@@ -62,10 +67,11 @@ public:
 
   std::expected<uint32_t, TextureError>
   Create(const std::span<const std::byte>& imageData, uint32_t width, uint32_t height);
-  TextureGPU& Get(uint32_t textureID) noexcept;
+  const TextureGPU& Get(uint32_t textureID) const noexcept;
 
-  std::expected<void, TextureError>
-  BeginArray(std::uint32_t width, std::uint32_t height, VkDeviceSize imageSize, std::uint32_t numLayers) noexcept;
+  // BeginArray creates a Texture with multiple layers. A texture can be uploaded to each layer. FinishArray must be
+  // called before another array can be started.
+  std::expected<void, TextureError> BeginArray(const TextureArrayInfo& info) noexcept;
   void UploadLayer(const std::span<const std::byte>& imageData);
   std::expected<std::uint32_t, TextureError> FinishArray();
 
@@ -115,5 +121,6 @@ private:
 
   void cleanupGPUTexture_(TextureGPU& texture) const noexcept;
 };
+} // namespace vulkan
 
-} // namespace engine::graphics::vulkan
+} // namespace engine::graphics

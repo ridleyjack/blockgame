@@ -1,6 +1,5 @@
 #include "GameLayer.hpp"
 
-#include "Grid3D.hpp"
 #include "Engine/Application.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
@@ -8,6 +7,8 @@
 #include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Graphics/CameraMatrices.h"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
+#include "Engine/Graphics/TextureArrayInfo.hpp"
+#include "Engine/Graphics/TextureArrayBuilder.hpp"
 
 #include <print>
 
@@ -74,43 +75,40 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
                                                       .VertexShaderFile = "Shaders/vert.spv",
                                                       .FragmentShaderFile = "Shaders/frag.spv"});
 
+  constexpr gfx::TextureArrayInfo info{
+      .Height = 128,
+      .Width = 128,
+      .NumLayers = 4,
+      .LayerSizeBytes = static_cast<std::size_t>(128) * 128 * 4,
+  };
+
+  auto arrayBuilderResult = renderer.BeginTextureArray(info);
+  if (!arrayBuilderResult) {
+    const auto msg = std::format("Failed to build texture array: {}", vlk::ToString(arrayBuilderResult.error()));
+    throw std::runtime_error(msg);
+  }
+  gfx::TextureArrayBuilder& builder = *arrayBuilderResult;
+
   auto loader = assets::ImageLoader{};
-  if (auto result = loader.Load("Textures/Tiles/dirt.png"); !result) {
-    std::println("Failed to load texture: {}", result.error());
-    throw std::runtime_error("Failed to load textures");
-  }
+  auto upload = [&](std::string_view path) {
+    if (auto r = loader.Load(path); !r) {
+      const auto msg = std::format("Failed to load texture {}: {}", path, r.error());
+      throw std::runtime_error(msg);
+    }
+    builder.Upload(loader.Data());
+  };
 
-  auto& uploader = renderer.GetTextureAllocator();
-  if (auto result = uploader.BeginArray(loader.Width(), loader.Height(), loader.Data().size_bytes(), 4); !result) {
-    std::println("Failed to build texture array: {}", engine::graphics::vulkan::ToString(result.error()));
-    throw std::runtime_error("Failed to load textures");
-  }
-  uploader.UploadLayer(loader.Data());
-
-  if (auto result = loader.Load("Textures/Tiles/stone.png"); !result) {
-    std::println("Failed to load texture: {}", result.error());
-    throw std::runtime_error("Failed to load textures");
-  }
-  uploader.UploadLayer(loader.Data());
-
-  if (auto result = loader.Load("Textures/Tiles/sand.png"); !result) {
-    std::println("Failed to load texture: {}", result.error());
-    throw std::runtime_error("Failed to load textures");
-  }
-  uploader.UploadLayer(loader.Data());
-
-  if (auto result = loader.Load("Textures/Tiles/snow.png"); !result) {
-    std::println("Failed to load texture: {}", result.error());
-    throw std::runtime_error("Failed to load textures");
-  }
-  uploader.UploadLayer(loader.Data());
+  upload("Textures/Tiles/dirt.png");
+  upload("Textures/Tiles/stone.png");
+  upload("Textures/Tiles/sand.png");
+  upload("Textures/Tiles/snow.png");
 
   engine::graphics::TextureHandle texture{};
-  if (auto result = uploader.FinishArray(); !result) {
-    std::println("Failed to build texture array: {}", engine::graphics::vulkan::ToString(result.error()));
-    throw std::runtime_error("Failed to load textures");
+  if (const auto result = builder.Finalize(); !result) {
+    const auto msg = std::format("Failed to finalize texture array: {}", vlk::ToString(arrayBuilderResult.error()));
+    throw std::runtime_error(msg);
   } else {
-    texture.TextureID = *result;
+    texture = *result;
   }
 
   const gfx::MaterialHandle material = renderer.CreateMaterial(texture);

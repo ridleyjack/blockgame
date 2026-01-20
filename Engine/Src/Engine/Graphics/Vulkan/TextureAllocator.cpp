@@ -5,9 +5,11 @@
 #include "Device.hpp"
 #include "ImageUtil.hpp"
 
-#include <cassert>
+#include "Engine/Graphics/TextureArrayInfo.hpp"
+
 #include <vulkan/vulkan.h>
 
+#include <cassert>
 #include <cstring>
 
 namespace engine::graphics::vulkan {
@@ -51,30 +53,28 @@ TextureAllocator::Create(const std::span<const std::byte>& imageData, const uint
   return textureID;
 }
 
-TextureGPU& TextureAllocator::Get(const uint32_t textureID) noexcept {
+const TextureGPU& TextureAllocator::Get(const uint32_t textureID) const noexcept {
   assert(textureID < textures_.size());
   return textures_[textureID];
 }
-std::expected<void, TextureError> TextureAllocator::BeginArray(const std::uint32_t width,
-                                                               const std::uint32_t height,
-                                                               const VkDeviceSize layerSizeBytes,
-                                                               const std::uint32_t numLayers) noexcept {
+
+std::expected<void, TextureError> TextureAllocator::BeginArray(const TextureArrayInfo& info) noexcept {
   assert(!arrayState_.has_value());
   TextureGPU texture{};
-  if (auto result = createImage_(width, height, numLayers); !result) {
+  if (auto result = createImage_(info.Width, info.Height, info.NumLayers); !result) {
     return std::unexpected(result.error());
   } else {
     texture = *result;
   }
 
-  const TextureStaging staging = createStaging_(layerSizeBytes);
+  const TextureStaging staging = createStaging_(info.LayerSizeBytes);
 
   arrayState_.emplace(ArrayBuildState{.Texture = texture,
                                       .Staging = staging,
-                                      .LayerSizeBytes = layerSizeBytes,
-                                      .Width = width,
-                                      .Height = height,
-                                      .NumLayers = numLayers});
+                                      .LayerSizeBytes = info.LayerSizeBytes,
+                                      .Width = info.Width,
+                                      .Height = info.Height,
+                                      .NumLayers = info.NumLayers});
   return {};
 }
 
@@ -282,6 +282,7 @@ std::expected<VkSampler, TextureError> TextureAllocator::createSampler_() const 
 
   return sampler;
 }
+
 void TextureAllocator::cleanupGPUTexture_(TextureGPU& texture) const noexcept {
   auto vkDevice = context_.GetDevice().Logical();
 

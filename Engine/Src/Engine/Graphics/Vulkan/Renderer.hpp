@@ -15,6 +15,9 @@ struct GLFWwindow;
 namespace engine::graphics {
 class CameraMatrices;
 
+struct TextureArrayInfo;
+class TextureArrayBuilder;
+
 struct MeshHandle;
 struct Mesh;
 struct MeshCreateInfo;
@@ -25,11 +28,12 @@ struct PipelineCreateInfo;
 struct TextureHandle;
 
 struct RenderPassHandle;
-} // namespace engine::graphics
 
-namespace engine::graphics::vulkan {
+namespace vulkan {
 class PipelineCache;
 struct MeshGPU;
+
+struct TextureError;
 
 enum class RenderError : uint8_t {
   FrameAcquireFailed,
@@ -74,14 +78,11 @@ public:
   void DeleteMesh(const MeshHandle& handle);
 
   TextureHandle CreateTexture(const std::span<const std::byte>& data, int width, int height);
+  std::expected<TextureArrayBuilder, TextureError> BeginTextureArray(const TextureArrayInfo& info) noexcept;
 
   MaterialHandle CreateMaterial(const TextureHandle& texture);
 
   glm::mat4 MakeProjection() const noexcept;
-
-  // In the future, the TextureAllocator (and this renderer) should not be used directly by the application.
-  // This is currently provided to expose the internal TextureArray allocation API.
-  TextureAllocator& GetTextureAllocator();
 
 private:
   Context context_;
@@ -95,5 +96,5 @@ private:
 
   FrameContext frameContext_{};
 };
-
-} // namespace engine::graphics::vulkan
+} // namespace vulkan
+} // namespace engine::graphics
