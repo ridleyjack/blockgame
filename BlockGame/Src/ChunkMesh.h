@@ -33,6 +33,6 @@ private:
   std::vector<uint32_t> indices_{};
 
   void build_();
-  void buildVertices_(const BlockFaces& faces, float z, float y, float x);
+  void buildVertices_(const BlockFaces& faces, std::uint32_t blockType, float z, float y, float x);
   void buildIndices_(std::uint32_t numFaces, std::uint32_t baseVertex);
 };

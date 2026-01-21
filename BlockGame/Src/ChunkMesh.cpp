@@ -1,10 +1,10 @@
 #include "ChunkMesh.h"
 
-#include <cstddef>
-
 #include "Grid3D.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
+
+#include <cstddef>
 
 ChunkMesh::ChunkMesh() {
   build_();
@@ -20,6 +20,22 @@ void ChunkMesh::Upload(engine::graphics::vulkan::Renderer& renderer) {
 
 void ChunkMesh::build_() {
   Grid3D<uint8_t> map{16, 16, 16, 1};
+
+  for (std::size_t z = 0; z < map.Depth(); z++) {
+    for (std::size_t y = 0; y < map.Height(); y++) {
+      for (std::size_t x = 0; x < map.Width(); x++) {
+        if (x == 0) {
+          map[z, y, x] = 2;
+        }
+        if (x == map.Width() - 1) {
+          map[z, y, x] = 3;
+        }
+        if (z == 0) {
+          map[z, y, x] = 4;
+        }
+      }
+    }
+  }
 
   map[4, 4, 4] = 0;
   map[0, 0, 0] = 0;
@@ -46,7 +62,7 @@ void ChunkMesh::build_() {
           faces.Right = true;
 
         const std::uint32_t nextIndex = vertices_.size();
-        buildVertices_(faces, static_cast<float>(z), static_cast<float>(y), static_cast<float>(x));
+        buildVertices_(faces, map[z, y, x], static_cast<float>(z), static_cast<float>(y), static_cast<float>(x));
         buildIndices_(faces.NumEnabled(), nextIndex);
       }
     }
@@ -55,63 +71,85 @@ void ChunkMesh::build_() {
   assert(vertices_.size() <= std::numeric_limits<uint32_t>::max());
 }
 
-void ChunkMesh::buildVertices_(const BlockFaces& faces, float z, float y, float x) {
+void ChunkMesh::buildVertices_(const BlockFaces& faces, std::uint32_t blockType, float z, float y, float x) {
   constexpr float blockWidth = 1.0f;
   z *= blockWidth;
   y *= blockWidth;
   x *= blockWidth;
 
   constexpr size_t verticesPerFace = 4;
+
+  // BlockType 0 represents air (no texture).
+  // Texture array layers start at 0, so non-air block types are shifted down by 1.
+  blockType -= 1;
+
   vertices_.reserve(vertices_.size() + verticesPerFace * faces.NumEnabled());
 
-  if (faces.Front) // +Z (Front) - Red
+  if (faces.Front) {
+    // +Z (Front)
     vertices_.insert(vertices_.end(),
                      {
-                         {{-0.5f + x, -0.5f + y, 0.5f + z}, {1, 0, 0}, {0, 0}},
-                         {{0.5f + x, -0.5f + y, 0.5f + z},  {1, 0, 0}, {1, 0}},
-                         {{0.5f + x, 0.5f + y, 0.5f + z},   {1, 0, 0}, {1, 1}},
-                         {{-0.5f + x, 0.5f + y, 0.5f + z},  {1, 0, 0}, {0, 1}},
+                         {.Position = {-0.5f + x, -0.5f + y, 0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = blockType},
     });
-  if (faces.Back) // -Z (Back) - Green
+  }
+
+  if (faces.Back) {
+    // -Z (Back)
     vertices_.insert(vertices_.end(),
                      {
-                         {{0.5f + x, -0.5f + y, -0.5f + z},  {0, 1, 0}, {0, 0}},
-                         {{-0.5f + x, -0.5f + y, -0.5f + z}, {0, 1, 0}, {1, 0}},
-                         {{-0.5f + x, 0.5f + y, -0.5f + z},  {0, 1, 0}, {1, 1}},
-                         {{0.5f + x, 0.5f + y, -0.5f + z},   {0, 1, 0}, {0, 1}},
+                         {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, 0.5f + y, -0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = blockType},
     });
-  if (faces.Right) // +X (Right) - Blue
+  }
+
+  if (faces.Right) {
+    // +X (Right)
     vertices_.insert(vertices_.end(),
                      {
-                         {{0.5f + x, -0.5f + y, 0.5f + z},  {0, 0, 1}, {0, 0}},
-                         {{0.5f + x, -0.5f + y, -0.5f + z}, {0, 0, 1}, {1, 0}},
-                         {{0.5f + x, 0.5f + y, -0.5f + z},  {0, 0, 1}, {1, 1}},
-                         {{0.5f + x, 0.5f + y, 0.5f + z},   {0, 0, 1}, {0, 1}},
+                         {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = blockType},
     });
-  if (faces.Left) // -X (Left) - Yellow
+  }
+
+  if (faces.Left) {
+    // -X (Left)
     vertices_.insert(vertices_.end(),
                      {
-                         {{-0.5f + x, -0.5f + y, -0.5f + z}, {1, 1, 0}, {0, 0}},
-                         {{-0.5f + x, -0.5f + y, 0.5f + z},  {1, 1, 0}, {1, 0}},
-                         {{-0.5f + x, 0.5f + y, 0.5f + z},   {1, 1, 0}, {1, 1}},
-                         {{-0.5f + x, 0.5f + y, -0.5f + z},  {1, 1, 0}, {0, 1}},
+                         {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = blockType},
     });
-  if (faces.Top) // +Y (Top) - Magenta
+  }
+
+  if (faces.Top) {
+    // +Y (Top)
     vertices_.insert(vertices_.end(),
                      {
-                         {{-0.5f + x, 0.5f + y, 0.5f + z},  {1, 0, 1}, {0, 0}},
-                         {{0.5f + x, 0.5f + y, 0.5f + z},   {1, 0, 1}, {1, 0}},
-                         {{0.5f + x, 0.5f + y, -0.5f + z},  {1, 0, 1}, {1, 1}},
-                         {{-0.5f + x, 0.5f + y, -0.5f + z}, {1, 0, 1}, {0, 1}},
+                         {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, 0.5f + y, -0.5f + z}, .TexCoord = {0, 1}, .TextureIndex = blockType},
     });
-  if (faces.Bottom) // -Y (Bottom) - Cyan
+  }
+
+  if (faces.Bottom) {
+    // -Y (Bottom)
     vertices_.insert(vertices_.end(),
                      {
-                         {{-0.5f + x, -0.5f + y, -0.5f + z}, {0, 1, 1}, {0, 0}},
-                         {{0.5f + x, -0.5f + y, -0.5f + z},  {0, 1, 1}, {1, 0}},
-                         {{0.5f + x, -0.5f + y, 0.5f + z},   {0, 1, 1}, {1, 1}},
-                         {{-0.5f + x, -0.5f + y, 0.5f + z},  {0, 1, 1}, {0, 1}},
+                         {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = blockType},
+                         {.Position = {0.5f + x, -0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = blockType},
+                         {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = blockType},
     });
+  }
 }
 
 void ChunkMesh::buildIndices_(const std::uint32_t numFaces, std::uint32_t baseVertex) {

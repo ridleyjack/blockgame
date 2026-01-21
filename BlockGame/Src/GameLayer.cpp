@@ -1,7 +1,6 @@
 #include "GameLayer.hpp"
 
 #include "Engine/Application.hpp"
-#include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Events/Events.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
@@ -15,55 +14,6 @@
 namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace assets = engine::assets;
-
-const std::vector<engine::graphics::Vertex> vertices = {
-    // +Z (Front) - Red
-    {{-0.5f, -0.5f, 0.5f},  {1, 0, 0}, {0, 0}},
-    {{0.5f, -0.5f, 0.5f},   {1, 0, 0}, {1, 0}},
-    {{0.5f, 0.5f, 0.5f},    {1, 0, 0}, {1, 1}},
-    {{-0.5f, 0.5f, 0.5f},   {1, 0, 0}, {0, 1}},
-
-    // -Z (Back) - Green
-    {{0.5f, -0.5f, -0.5f},  {0, 1, 0}, {0, 0}},
-    {{-0.5f, -0.5f, -0.5f}, {0, 1, 0}, {1, 0}},
-    {{-0.5f, 0.5f, -0.5f},  {0, 1, 0}, {1, 1}},
-    {{0.5f, 0.5f, -0.5f},   {0, 1, 0}, {0, 1}},
-
-    // +X (Right) - Blue
-    {{0.5f, -0.5f, 0.5f},   {0, 0, 1}, {0, 0}},
-    {{0.5f, -0.5f, -0.5f},  {0, 0, 1}, {1, 0}},
-    {{0.5f, 0.5f, -0.5f},   {0, 0, 1}, {1, 1}},
-    {{0.5f, 0.5f, 0.5f},    {0, 0, 1}, {0, 1}},
-
-    // -X (Left) - Yellow
-    {{-0.5f, -0.5f, -0.5f}, {1, 1, 0}, {0, 0}},
-    {{-0.5f, -0.5f, 0.5f},  {1, 1, 0}, {1, 0}},
-    {{-0.5f, 0.5f, 0.5f},   {1, 1, 0}, {1, 1}},
-    {{-0.5f, 0.5f, -0.5f},  {1, 1, 0}, {0, 1}},
-
-    // +Y (Top) - Magenta
-    {{-0.5f, 0.5f, 0.5f},   {1, 0, 1}, {0, 0}},
-    {{0.5f, 0.5f, 0.5f},    {1, 0, 1}, {1, 0}},
-    {{0.5f, 0.5f, -0.5f},   {1, 0, 1}, {1, 1}},
-    {{-0.5f, 0.5f, -0.5f},  {1, 0, 1}, {0, 1}},
-
-    // -Y (Bottom) - Cyan
-    {{-0.5f, -0.5f, -0.5f}, {0, 1, 1}, {0, 0}},
-    {{0.5f, -0.5f, -0.5f},  {0, 1, 1}, {1, 0}},
-    {{0.5f, -0.5f, 0.5f},   {0, 1, 1}, {1, 1}},
-    {{-0.5f, -0.5f, 0.5f},  {0, 1, 1}, {0, 1}},
-};
-
-// clang-format off
-const std::vector<std::uint32_t> indices = {
-  0, 1, 2, 2, 3, 0,       // Front
-  4, 5, 6, 6, 7, 4,       // Back
-  8, 9,10,10,11, 8,       // Right
- 12,13,14,14,15,12,       // Left
- 16,17,18,18,19,16,       // Top
- 20,21,22,22,23,20        // Bottom
-};
-// clang-format on
 
 GameLayer::GameLayer(engine::Application& application) : application_(application) {
 
@@ -87,7 +37,7 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
     const auto msg = std::format("Failed to build texture array: {}", vlk::ToString(arrayBuilderResult.error()));
     throw std::runtime_error(msg);
   }
-  gfx::TextureArrayBuilder& builder = *arrayBuilderResult;
+  const gfx::TextureArrayBuilder& builder = *arrayBuilderResult;
 
   auto loader = assets::ImageLoader{};
   auto upload = [&](std::string_view path) {

@@ -28,6 +28,7 @@ PipelineHandle PipelineCache::CreatePipeline(const PipelineCreateInfo& info, Ren
 Pipeline& PipelineCache::GetPipeline(const uint32_t pipelineID) noexcept {
   return pipelines_.Get(pipelineID);
 }
+
 void PipelineCache::DestroyPipeline(const uint32_t pipelineID) noexcept {
   pipelines_.Delete(pipelineID);
 }
