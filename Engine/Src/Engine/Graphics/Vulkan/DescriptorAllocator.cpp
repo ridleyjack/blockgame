@@ -41,11 +41,14 @@ DescriptorAllocator::DescriptorAllocator(Context& context) : context_(context) {
   if (vkCreateDescriptorPool(device.Logical(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor pool!");
   }
+
+  createDescriptorSetLayout_();
 }
 
 DescriptorAllocator::~DescriptorAllocator() {
   const auto& device = context_.GetDevice();
   vkDestroyDescriptorPool(device.Logical(), descriptorPool_, nullptr);
+  vkDestroyDescriptorSetLayout(device.Logical(), descriptorSetLayout_, nullptr);
 }
 
 std::uint32_t DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout,
@@ -111,4 +114,35 @@ VkDescriptorSet DescriptorAllocator::DescriptorSet(const std::uint32_t setID,
   assert(setID < descriptorSets_.size());
   return descriptorSets_[setID].descriptors_[frame];
 }
+VkDescriptorSetLayout DescriptorAllocator::DescriptorSetLayout() const noexcept {
+  return descriptorSetLayout_;
+}
+
+void DescriptorAllocator::createDescriptorSetLayout_() {
+  const auto& device = context_.GetDevice().Logical();
+
+  VkDescriptorSetLayoutBinding uboLayoutBinding{};
+  uboLayoutBinding.binding = 0;
+  uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  uboLayoutBinding.descriptorCount = 1;
+  uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  VkDescriptorSetLayoutBinding samplerLayoutBinding{};
+  samplerLayoutBinding.binding = 1;
+  samplerLayoutBinding.descriptorCount = 1;
+  samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  const std::array<VkDescriptorSetLayoutBinding, 2> bindings{uboLayoutBinding, samplerLayoutBinding};
+
+  VkDescriptorSetLayoutCreateInfo layoutInfo{};
+  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layoutInfo.bindingCount = bindings.size();
+  layoutInfo.pBindings = bindings.data();
+
+  if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create descriptor set layout!");
+  }
+}
+
 } // namespace engine::graphics::vulkan

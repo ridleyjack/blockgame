@@ -1,5 +1,7 @@
 #pragma once
 
+#include <expected>
+#include <string_view>
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
@@ -15,31 +17,58 @@ namespace engine::graphics::vulkan {
 class Context;
 class RenderPass;
 
+enum class PipelineError : uint8_t {
+  FailedPipelineCreation,
+  FailedPipelineLayoutCreation,
+  FailedShaderCompile,
+};
+
+constexpr std::string_view ToString(const PipelineError e) noexcept {
+  using enum PipelineError;
+
+  switch (e) {
+  case FailedPipelineCreation:
+    return "FailedPipelineCreation";
+  case FailedPipelineLayoutCreation:
+    return "FailedPipelineLayoutCreation";
+  case FailedShaderCompile:
+    return "FailedShaderCompile";
+  }
+  return "UnknownPipelineError";
+}
+
 class Pipeline {
 public:
-  Pipeline(Context& context,
-           const PipelineCreateInfo& info,
-           const RenderPass& renderPass,
-           VkDescriptorSetLayout descriptorLayout);
+  static std::expected<Pipeline, PipelineError>
+  Create(Context& context, const RenderPass& renderPass, const PipelineCreateInfo& info, VkDescriptorSetLayout layout);
+
+  Pipeline(Context& context, VkPipelineLayout pipelineLayout, VkPipeline pipeline);
   ~Pipeline();
 
   Pipeline(const Pipeline&) = delete;
   Pipeline& operator=(const Pipeline&) = delete;
 
-  Pipeline(Pipeline&&) noexcept = default;
+  Pipeline(Pipeline&& other) noexcept;
+
   VkPipelineLayout PipelineLayout() const noexcept;
   VkPipeline Handle() const noexcept;
 
 private:
+  static std::expected<VkPipelineLayout, PipelineError>
+  createPipelineLayout_(const Context& context, VkDescriptorSetLayout descriptorSetLayout) noexcept;
+
+  static std::expected<VkPipeline, PipelineError> createPipeline_(const Context& context,
+                                                                  const PipelineCreateInfo& info,
+                                                                  const RenderPass& renderPass,
+                                                                  VkPipelineLayout pipelineLayout) noexcept;
+
+  static std::expected<VkShaderModule, PipelineError> createShaderModule_(const Context& context,
+                                                                          const std::vector<char>& code) noexcept;
+
   Context& context_;
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};
   VkPipeline pipeline_{VK_NULL_HANDLE};
-
-  void createPipelineLayout_(VkDescriptorSetLayout descriptorLayout);
-  void createPipeline_(const PipelineCreateInfo& info, const RenderPass& renderPass);
-
-  VkShaderModule createShaderModule_(const std::vector<char>& code) const;
 };
 
 } // namespace engine::graphics::vulkan

@@ -4,6 +4,8 @@
 
 #include "Engine/Containers/HandlePool.hpp"
 
+#include <expected>
+
 namespace engine::graphics {
 struct PipelineCreateInfo;
 } // namespace engine::graphics
@@ -16,24 +18,19 @@ class RenderPass;
 class PipelineCache {
 public:
   explicit PipelineCache(Context& context);
-  ~PipelineCache();
 
   PipelineCache(const PipelineCache&) = delete;
   PipelineCache& operator=(const PipelineCache&) = delete;
 
-  VkDescriptorSetLayout DescriptorSetLayout() const noexcept;
-
-  PipelineHandle CreatePipeline(const PipelineCreateInfo& info, RenderPass& renderPass);
-  Pipeline& GetPipeline(uint32_t pipelineID) noexcept;
-  void DestroyPipeline(uint32_t pipelineID) noexcept;
-
-  void createDescriptorSetLayout_();
+  std::expected<std::uint32_t, PipelineError> CreatePipeline(const PipelineCreateInfo& info,
+                                                             const RenderPass& renderPass,
+                                                             VkDescriptorSetLayout descriptorSetLayout) noexcept;
+  Pipeline& GetPipeline(std::uint32_t pipelineID) noexcept;
+  void DestroyPipeline(std::uint32_t pipelineID) noexcept;
 
 private:
   Context& context_;
   containers::HandlePool<Pipeline> pipelines_;
-
-  VkDescriptorSetLayout descriptorSetLayout_{VK_NULL_HANDLE};
 };
 
 } // namespace engine::graphics::vulkan

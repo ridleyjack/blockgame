@@ -218,6 +218,7 @@ bool Renderer::ShouldClose() const noexcept {
 void Renderer::WaitUntilIdle() const {
   context_.WaitUntilIdle();
 }
+
 RenderPassHandle Renderer::CreateRenderPass() {
   auto result = renderPassCache_.CreateRenderPass();
   if (!result) {
@@ -229,8 +230,14 @@ RenderPassHandle Renderer::CreateRenderPass() {
 }
 
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
-  RenderPass& pass = renderPassCache_.GetRenderPass(info.RenderPass.RenderPassID);
-  return pipelineCache_.CreatePipeline(info, pass);
+  const RenderPass& pass = renderPassCache_.GetRenderPass(info.RenderPass.RenderPassID);
+  auto pipeline = pipelineCache_.CreatePipeline(info, pass, descriptorAllocator_.DescriptorSetLayout());
+  if (!pipeline) {
+    const std::string msg = std::format("Failed to create render pass: {}", ToString(pipeline.error()));
+    throw std::runtime_error(msg);
+  }
+
+  return PipelineHandle{*pipeline};
 }
 
 void Renderer::DeletePipeline(const PipelineHandle& handle) {
@@ -263,11 +270,11 @@ std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(con
 
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
   const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
-  const std::uint32_t descriptorID = descriptorAllocator_.CreateDescriptorSet(pipelineCache_.DescriptorSetLayout(),
-                                                                              frameContext_.CameraGPU,
-                                                                              textureGPU.ImageView,
-                                                                              textureGPU.Sampler);
-
+  const std::uint32_t descriptorID =
+      descriptorAllocator_.CreateDescriptorSet(descriptorAllocator_.DescriptorSetLayout(),
+                                               frameContext_.CameraGPU,
+                                               textureGPU.ImageView,
+                                               textureGPU.Sampler);
   return MaterialHandle{.TextureID = texture.TextureID, .DescriptorSetID = descriptorID};
 }
 

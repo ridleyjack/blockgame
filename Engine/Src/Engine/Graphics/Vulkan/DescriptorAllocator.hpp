@@ -30,11 +30,18 @@ public:
 
   VkDescriptorSet DescriptorSet(std::uint32_t setID, std::uint32_t frame) const noexcept;
 
+  // DescriptorSetLayout returns the default layout that is used by all rendering components at this stage of
+  // development.
+  VkDescriptorSetLayout DescriptorSetLayout() const noexcept;
+
 private:
   Context& context_;
 
+  VkDescriptorSetLayout descriptorSetLayout_{VK_NULL_HANDLE};
   VkDescriptorPool descriptorPool_{VK_NULL_HANDLE};
   std::vector<DescriptorSetBinding> descriptorSets_{};
+
+  void createDescriptorSetLayout_();
 };
 
 } // namespace engine::graphics::vulkan
