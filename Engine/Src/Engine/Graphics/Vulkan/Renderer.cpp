@@ -9,7 +9,7 @@
 #include "Sync.hpp"
 #include "RenderPassCache.hpp"
 
-#include "Engine/Graphics/CameraMatrices.h"
+#include "Engine/Graphics/CameraMatrices.hpp"
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/TextureArrayBuilder.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"

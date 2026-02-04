@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Camera.h"
-#include "ChunkMesh.h"
+#include "Camera.hpp"
+#include "MapMesh.hpp"
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
 #include "Engine/Graphics/Handles.hpp"
@@ -54,7 +54,7 @@ private:
   Camera camera_{};
   KeyInput input_{};
 
-  ChunkMesh myMesh_{};
+  MapMesh myMesh_{};
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};

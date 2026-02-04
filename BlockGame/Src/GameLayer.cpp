@@ -1,10 +1,11 @@
 #include "GameLayer.hpp"
 
+#include "Map.hpp"
 #include "Engine/Application.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Events/Events.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
-#include "Engine/Graphics/CameraMatrices.h"
+#include "Engine/Graphics/CameraMatrices.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 #include "Engine/Graphics/TextureArrayInfo.hpp"
 #include "Engine/Graphics/TextureArrayBuilder.hpp"
@@ -48,6 +49,7 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
     builder.Upload(loader.Data());
   };
 
+  std::println("Loading Textures..");
   upload("Textures/Tiles/dirt.png");
   upload("Textures/Tiles/stone.png");
   upload("Textures/Tiles/sand.png");
@@ -60,10 +62,17 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
   } else {
     texture = *result;
   }
-
   const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
+  std::println("Done!");
 
+  std::println("Creating World Mesh...");
+  Map gameMap(4, 4, 4);
+  myMesh_.Build(gameMap);
+  std::println("Done!");
+
+  std::println("Uploading World Mesh...");
   myMesh_.Upload(application.GetRenderer());
+  std::println("Done!");
 }
 
 void GameLayer::OnUpdate(const float deltaTime) {

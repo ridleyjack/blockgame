@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cassert>
 
 template <typename T> class Grid3D {
 public:
