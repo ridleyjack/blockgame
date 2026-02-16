@@ -5,8 +5,8 @@ add_executable(Blockgame
         Src/Camera.cpp
         Src/Camera.hpp
         Src/Grid3D.hpp
-        Src/MapMesh.cpp
-        Src/MapMesh.hpp
+        Src/ChunkMeshes.cpp
+        Src/ChunkMeshes.hpp
         Src/Map.cpp
         Src/Map.hpp
 )

@@ -16,6 +16,7 @@ add_library(Engine
         Src/Engine/Events/IEventHandler.hpp
         Src/Engine/Events/IEventRaiser.hpp
         Src/Engine/Events/Events.hpp
+        Src/Engine/Math/Vec3Int.hpp
 )
 target_include_directories(Engine
         PUBLIC

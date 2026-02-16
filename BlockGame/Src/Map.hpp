@@ -15,6 +15,9 @@ class Map {
 public:
   Map(std::uint32_t width, std::uint32_t height, std::uint32_t depth);
 
+  Map(const Map&) = delete;
+  Map& operator=(const Map&) = delete;
+
   const Chunk& GetChunk(std::uint32_t z, std::uint32_t y, std::uint32_t x) const noexcept;
 
   std::uint32_t Width() const noexcept;

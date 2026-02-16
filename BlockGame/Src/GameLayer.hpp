@@ -1,13 +1,10 @@
 #pragma once
 
 #include "Camera.hpp"
-#include "MapMesh.hpp"
+#include "ChunkMeshes.hpp"
+#include "Map.hpp"
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
-#include "Engine/Graphics/Handles.hpp"
-#include "Engine/Graphics/Mesh.hpp"
-
-#include <vector>
 
 namespace engine {
 class Application;
@@ -51,14 +48,16 @@ public:
   void OnMouseMoved(const engine::events::MouseMovedEvent& event) override;
 
 private:
+  engine::Application& application_;
+
   Camera camera_{};
   KeyInput input_{};
 
-  MapMesh myMesh_{};
+  Map map_;
+  ChunkMeshes mapMeshes_;
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};
 
-  engine::Application& application_;
   void handleKeyInput(int keycode, bool state);
 };

@@ -12,6 +12,7 @@ Checks: >
   -cppcoreguidelines-avoid-magic-numbers,
   -readability-magic-numbers,
   -readability-identifier-naming
+  -readability-const-parameter
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*'
 FormatStyle: none

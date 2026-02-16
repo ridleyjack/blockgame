@@ -16,7 +16,7 @@ namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace assets = engine::assets;
 
-GameLayer::GameLayer(engine::Application& application) : application_(application) {
+GameLayer::GameLayer(engine::Application& application) : application_(application), map_(4, 4, 4), mapMeshes_(map_) {
 
   auto& renderer = application_.GetRenderer();
 
@@ -65,13 +65,12 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
   const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
   std::println("Done!");
 
-  std::println("Creating World Mesh...");
-  Map gameMap(4, 4, 4);
-  myMesh_.Build(gameMap);
-  std::println("Done!");
+  std::println("Creating and Uploading World Mesh...");
+  for (int z = 0; z < map_.Depth(); z++)
+    for (int y = 0; y < map_.Height(); y++)
+      for (int x = 0; x < map_.Width(); x++)
+        mapMeshes_.BuildChunk(renderer, {x, y, z});
 
-  std::println("Uploading World Mesh...");
-  myMesh_.Upload(application.GetRenderer());
   std::println("Done!");
 }
 
@@ -104,7 +103,13 @@ void GameLayer::OnRender() {
     }
   }
 
-  renderer.Submit(myMesh_.Mesh(), {0});
+  for (int z = 0; z < map_.Depth(); z++)
+    for (int y = 0; y < map_.Height(); y++)
+      for (int x = 0; x < map_.Width(); x++) {
+        const ChunkMesh& mesh{mapMeshes_.Mesh({x, y, z})};
+        if (mesh.HasVertices())
+          renderer.Submit(mesh.Mesh, {0});
+      }
 
   if (const auto rv = renderer.EndFrame(); !rv) {
     std::println("Failed to render frame");
