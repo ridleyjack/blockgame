@@ -16,7 +16,7 @@ namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace assets = engine::assets;
 
-GameLayer::GameLayer(engine::Application& application) : application_(application), map_(4, 4, 4), mapMeshes_(map_) {
+GameLayer::GameLayer(engine::Application& application) : application_(application), map_(40, 40, 40), mapMeshes_(map_) {
 
   auto& renderer = application_.GetRenderer();
 
@@ -65,17 +65,11 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
   const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
   std::println("Done!");
 
-  std::println("Creating and Uploading World Mesh...");
-  for (int z = 0; z < map_.Depth(); z++)
-    for (int y = 0; y < map_.Height(); y++)
-      for (int x = 0; x < map_.Width(); x++)
-        mapMeshes_.BuildChunk(renderer, {x, y, z});
-
-  std::println("Done!");
+  mapMeshes_.BuildAll();
 }
 
 void GameLayer::OnUpdate(const float deltaTime) {
-  const float speed = 2.5f * deltaTime;
+  const float speed = 20.5f * deltaTime;
   if (input_.Movement.Forward)
     camera_.Move(camera_.Forward() * speed);
   if (input_.Movement.Backward)
@@ -87,6 +81,9 @@ void GameLayer::OnUpdate(const float deltaTime) {
 
   if (input_.Exit)
     application_.Stop();
+
+  auto& renderer = application_.GetRenderer();
+  mapMeshes_.Update(renderer);
 };
 
 void GameLayer::OnRender() {

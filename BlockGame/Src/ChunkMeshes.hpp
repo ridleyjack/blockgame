@@ -1,5 +1,6 @@
 #pragma once
 #include "Grid3D.hpp"
+#include "Containers/ThreadSafeQueue.hpp"
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/Vulkan/MeshAllocator.hpp"
@@ -17,7 +18,7 @@ class Map;
 
 struct ChunkMesh {
   engine::graphics::MeshHandle Mesh{};
-  std::vector<engine::graphics::Vertex> Vertices{};
+  std::vector<gfx::Vertex> Vertices{};
   std::vector<uint32_t> Indices{};
 
   bool HasVertices() const {
@@ -38,21 +39,43 @@ struct BlockFaces {
   };
 };
 
+struct ChunkBuildJob {
+  math::Vec3Int Coord{};
+};
+
+struct ChunkBuildResult {
+  math::Vec3Int Coord{};
+  ChunkMesh Mesh{};
+};
+
 class ChunkMeshes {
 public:
   explicit ChunkMeshes(Map& map);
+  ~ChunkMeshes();
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
 
-  void BuildAll(vlk::Renderer& renderer);
-  void BuildChunk(vlk::Renderer& renderer, const math::Vec3Int& mapCoord);
+  void BuildAll();
+  void BuildChunk(const math::Vec3Int& mapCoord);
+
+  void Update(vlk::Renderer& renderer);
 
 private:
   Map& map_;
   Grid3D<ChunkMesh> meshes_{0, 0, 0, {}};
 
-  void buildChunk_(const math::Vec3Int& mapCoord);
+  std::vector<std::thread> workers_{};
+  std::atomic<bool> stop_{};
+  ThreadSafeQueue<ChunkBuildJob> buildQueue_{};
+  ThreadSafeQueue<ChunkBuildResult> resultQueue_{};
+
+  void startWorkers_(std::uint32_t count);
+  void stopWorkers_();
+  void workerLoop_();
+
+  ChunkMesh buildChunk_(const math::Vec3Int& mapCoord);
   void buildVertices_(ChunkMesh& mesh, const BlockFaces& faces, std::uint32_t blockType, float z, float y, float x);
-  void buildIndices_(ChunkMesh& mesh, std::uint32_t numFaces, std::uint32_t baseVertex);
+  void buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, std::uint32_t numFaces);
+
   void upload_(vlk::Renderer& renderer, ChunkMesh& mesh);
 };

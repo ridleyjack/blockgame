@@ -9,6 +9,7 @@ add_executable(Blockgame
         Src/ChunkMeshes.hpp
         Src/Map.cpp
         Src/Map.hpp
+        Src/Containers/ThreadSafeQueue.hpp
 )
 
 target_link_libraries(Blockgame

@@ -7,38 +7,89 @@
 
 #include <cstddef>
 #include <map>
+#include <print>
 
-ChunkMeshes::ChunkMeshes(Map& map) : map_(map), meshes_(map.Depth(), map.Height(), map.Width(), {}) {}
+ChunkMeshes::ChunkMeshes(Map& map) : map_(map), meshes_(map.Depth(), map.Height(), map.Width(), {}) {
+  std::uint32_t threadNum = std::thread::hardware_concurrency();
+  std::println("Thread num is {}", threadNum);
+  threadNum = threadNum < 2 ? 8 : threadNum - 1;
+  startWorkers_(threadNum);
+}
+ChunkMeshes::~ChunkMeshes() {
+  stopWorkers_();
+}
 
 const ChunkMesh& ChunkMeshes::Mesh(const math::Vec3Int& mapCoord) const {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
   return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
 }
 
-void ChunkMeshes::BuildAll(vlk::Renderer& renderer) {
+void ChunkMeshes::BuildAll() {
   for (std::int32_t z = 0; z < map_.Depth(); z++)
     for (std::int32_t y = 0; y < map_.Height(); y++)
-      for (std::int32_t x = 0; x < map_.Width(); x++) {
-        meshes_[z, y, x].Vertices.clear();
-        meshes_[z, y, x].Indices.clear();
-        buildChunk_({z, y, x});
-        upload_(renderer, meshes_[z, y, x]);
-      }
+      for (std::int32_t x = 0; x < map_.Width(); x++)
+        buildQueue_.Push({
+            .Coord = {.X = x, .Y = y, .Z = z}
+        });
 }
 
-void ChunkMeshes::BuildChunk(vlk::Renderer& renderer, const math::Vec3Int& mapCoord) {
-  assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
-  ChunkMesh& mesh = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
-  mesh.Vertices.clear();
-  mesh.Indices.clear();
-
-  buildChunk_(mapCoord);
-  upload_(renderer, mesh);
+void ChunkMeshes::BuildChunk(const math::Vec3Int& mapCoord) {
+  buildQueue_.Push({mapCoord});
 }
 
-void ChunkMeshes::buildChunk_(const math::Vec3Int& mapCoord) {
+void ChunkMeshes::Update(vlk::Renderer& renderer) {
+  constexpr std::uint32_t maxUploads = 1;
+  std::uint32_t uploads = 0;
+
+  while (auto opt = resultQueue_.TryPop()) {
+    auto& result = *opt;
+
+    upload_(renderer, result.Mesh);
+    meshes_[result.Coord.Z, result.Coord.Y, result.Coord.X] = std::move(result.Mesh);
+
+    if (uploads >= maxUploads)
+      break;
+    uploads++;
+  }
+}
+
+void ChunkMeshes::startWorkers_(std::uint32_t count) {
+  stop_ = false;
+  for (std::uint32_t i = 0; i < count; i++) {
+    workers_.emplace_back(&ChunkMeshes::workerLoop_, this);
+  }
+}
+
+void ChunkMeshes::stopWorkers_() {
+  stop_.store(true);
+  buildQueue_.NotifyAll();
+
+  for (auto& t : workers_) {
+    if (t.joinable()) {
+      t.join();
+    }
+  }
+  workers_.clear();
+}
+
+void ChunkMeshes::workerLoop_() {
+  while (true) {
+    auto job = buildQueue_.WaitPop(stop_);
+    if (!job) {
+      return; // Stop requested.
+    }
+
+    // std::println("started chunk at X:{} Y:{} Z:{}", job->Coord.X, job->Coord.Y, job->Coord.Z);
+    ChunkMesh mesh = buildChunk_(job->Coord);
+    resultQueue_.Push({job->Coord, std::move(mesh)});
+    // std::println("finished chunk at X:{} Y:{} Z:{}", job->Coord.X, job->Coord.Y, job->Coord.Z);
+  }
+}
+
+ChunkMesh ChunkMeshes::buildChunk_(const math::Vec3Int& mapCoord) {
   const auto& chunk = map_.GetChunk(mapCoord.Z, mapCoord.Y, mapCoord.X).Blocks;
 
+  ChunkMesh mesh{};
   for (std::int32_t z = 0; z < chunk.Depth(); z++) {
     for (std::int32_t y = 0; y < chunk.Height(); y++) {
       for (std::int32_t x = 0; x < chunk.Width(); x++) {
@@ -96,17 +147,14 @@ void ChunkMeshes::buildChunk_(const math::Vec3Int& mapCoord) {
         const auto worldY = static_cast<float>(chunk.Height() * mapCoord.Y + y);
         const auto worldX = static_cast<float>(chunk.Width() * mapCoord.X + x);
 
-        // TODO: This can be removed unless I add vertices to existing meshes in the future.
-        ChunkMesh& mesh = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
-        const std::uint32_t nextIndex = mesh.Vertices.size();
-
+        const std::uint32_t baseVertex = mesh.Vertices.size();
         buildVertices_(mesh, faces, chunk[z, y, x], worldZ, worldY, worldX);
-        buildIndices_(mesh, faces.NumEnabled(), nextIndex);
-
-        assert(mesh.Vertices.size() <= std::numeric_limits<uint32_t>::max());
+        buildIndices_(mesh, baseVertex, faces.NumEnabled());
       }
     }
   }
+  assert(mesh.Vertices.size() <= std::numeric_limits<uint32_t>::max());
+  return mesh;
 }
 
 void ChunkMeshes::buildVertices_(ChunkMesh& mesh,
@@ -126,7 +174,7 @@ void ChunkMeshes::buildVertices_(ChunkMesh& mesh,
   // Texture array layers start at 0, so non-air block types are shifted down by 1.
   blockType -= 1;
 
-  auto& vertices = mesh.Vertices;
+  std::vector<gfx::Vertex>& vertices = mesh.Vertices;
   vertices.reserve(vertices.size() + verticesPerFace * faces.NumEnabled());
 
   if (faces.Front) {
@@ -196,20 +244,20 @@ void ChunkMeshes::buildVertices_(ChunkMesh& mesh,
   }
 }
 
-void ChunkMeshes::buildIndices_(ChunkMesh& mesh, const std::uint32_t numFaces, std::uint32_t baseVertex) {
-  constexpr std::uint32_t indicesPerFace = 6;
+void ChunkMeshes::buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, const std::uint32_t numFaces) {
+  constexpr std::size_t indicesPerFace = 6;
+  constexpr std::uint32_t verticesPerFace = 4;
   static constexpr std::array<std::uint32_t, indicesPerFace> faceIndices{
       {0, 1, 2, 2, 3, 0}
   };
-  constexpr std::uint32_t verticesPerFace = 4;
 
-  mesh.Indices.reserve(mesh.Indices.size() + static_cast<std::size_t>(indicesPerFace) * numFaces);
+  std::vector<std::uint32_t>& indices = mesh.Indices;
+  indices.reserve(indices.size() + indicesPerFace * numFaces);
 
   for (std::size_t i = 0; i < numFaces; i++) {
     for (const std::uint32_t idx : faceIndices) {
-      mesh.Indices.push_back(idx + baseVertex);
+      indices.push_back(idx + baseVertex + i * verticesPerFace);
     };
-    baseVertex += verticesPerFace;
   }
 }
 
