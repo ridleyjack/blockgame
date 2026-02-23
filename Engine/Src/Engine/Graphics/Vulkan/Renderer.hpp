@@ -3,10 +3,12 @@
 #include "Context.hpp"
 #include "DescriptorAllocator.hpp"
 #include "MeshAllocator.hpp"
+#include "MeshBuffer.hpp"
 #include "RenderPassCache.hpp"
 #include "UniformBuffer.hpp"
 #include "TextureAllocator.hpp"
 #include "PipelineCache.hpp"
+#include "StagingBuffer.hpp"
 
 #include <expected>
 
@@ -92,6 +94,8 @@ private:
 
   DescriptorAllocator descriptorAllocator_;
   TextureAllocator textureAllocator_;
+  StagingBuffer stagingBuffer_;
+  MeshBuffer meshBuffer_;
   MeshAllocator meshAllocator_;
 
   FrameContext frameContext_{};

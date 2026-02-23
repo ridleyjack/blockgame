@@ -37,7 +37,9 @@ Renderer::Renderer(GLFWwindow* window)
       pipelineCache_(context_),
       descriptorAllocator_(context_),
       textureAllocator_(context_),
-      meshAllocator_(context_) {
+      stagingBuffer_(context_),
+      meshBuffer_(context_),
+      meshAllocator_(context_, meshBuffer_, stagingBuffer_) {
 
   const auto& device = context_.GetDevice();
   frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
@@ -192,11 +194,11 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
   const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
 
   const MeshGPU& gpuMesh = meshAllocator_.Get(handle.MeshID);
-  const std::array<VkBuffer, 1> vertexBuffers = {gpuMesh.VertexBuffer.Buffer};
-  constexpr std::array<VkDeviceSize, 1> offsets = {0};
+  const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
+  const std::array<VkDeviceSize, 1> offsets = {gpuMesh.VertexOffset};
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
-  vkCmdBindIndexBuffer(commandBuffer, gpuMesh.IndexBuffer.Buffer, 0, VK_INDEX_TYPE_UINT32);
+  vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), gpuMesh.IndexOffset, VK_INDEX_TYPE_UINT32);
 
   auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
   auto descriptor = descriptorAllocator_.DescriptorSet(material.DescriptorSetID, frameContext_.CurrentFrame);

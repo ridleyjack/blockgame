@@ -11,8 +11,9 @@ Checks: >
   -modernize-use-trailing-return-type,
   -cppcoreguidelines-avoid-magic-numbers,
   -readability-magic-numbers,
-  -readability-identifier-naming
-  -readability-const-parameter
+  -readability-identifier-naming,
+  -readability-const-parameter,
+  -portability-avoid-pragma-once
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*'
 FormatStyle: none

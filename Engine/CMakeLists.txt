@@ -62,7 +62,6 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.cpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.hpp
         Src/Engine/Graphics/Vulkan/Config.hpp
-        Src/Engine/Graphics/Vulkan/MeshGPU.cpp
         Src/Engine/Graphics/Vulkan/TextureAllocator.cpp
         Src/Engine/Graphics/Vulkan/TextureAllocator.hpp
         Src/Engine/Graphics/Vulkan/MeshAllocator.cpp
@@ -73,6 +72,10 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/TextureArrayBuilder.cpp
         Src/Engine/Graphics/TextureArrayBuilder.hpp
         Src/Engine/Graphics/TextureArrayInfo.hpp
+        Src/Engine/Graphics/Vulkan/MeshBuffer.cpp
+        Src/Engine/Graphics/Vulkan/MeshBuffer.hpp
+        Src/Engine/Graphics/Vulkan/StagingBuffer.cpp
+        Src/Engine/Graphics/Vulkan/StagingBuffer.hpp
 )
 
 target_include_directories(Engine_Graphics

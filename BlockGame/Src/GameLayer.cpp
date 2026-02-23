@@ -16,7 +16,7 @@ namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace assets = engine::assets;
 
-GameLayer::GameLayer(engine::Application& application) : application_(application), map_(40, 40, 40), mapMeshes_(map_) {
+GameLayer::GameLayer(engine::Application& application) : application_(application), map_(10, 10, 10), mapMeshes_(map_) {
 
   auto& renderer = application_.GetRenderer();
 

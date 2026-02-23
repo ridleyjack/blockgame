@@ -1,14 +1,19 @@
 #include "MeshAllocator.hpp"
 
+#include "Command.hpp"
 #include "Context.hpp"
+#include "Device.hpp"
 #include "MeshGPU.hpp"
+#include "MeshBuffer.hpp"
+
 #include "Engine/Graphics/Mesh.hpp"
 
 #include <cstring>
 
 namespace engine::graphics::vulkan {
 
-MeshAllocator::MeshAllocator(Context& context) : context_(context) {}
+MeshAllocator::MeshAllocator(Context& context, MeshBuffer& meshBuffer, StagingBuffer& stagingBuffer)
+    : context_(context), meshBuffer_(meshBuffer), stagingBuffer_(stagingBuffer) {}
 
 MeshAllocator::~MeshAllocator() {
   for (size_t i = 0; i < meshes_.Size(); i++) {
@@ -18,13 +23,13 @@ MeshAllocator::~MeshAllocator() {
 }
 
 uint32_t MeshAllocator::Create(const Mesh& mesh) {
-  const AllocatedBuffer gpuVertex = createVertexBuffer_(mesh);
-  const AllocatedBuffer gpuIndex = createIndexBuffer_(mesh);
+  const VkDeviceSize vertexOffset = createVertexBuffer_(mesh);
+  const VkDeviceSize indexOffset = createIndexBuffer_(mesh);
 
   MeshGPU gpuMesh{.VertexCount = static_cast<uint32_t>(mesh.Vertices.size()),
                   .IndexCount = static_cast<uint32_t>(mesh.Indices.size()),
-                  .VertexBuffer = gpuVertex,
-                  .IndexBuffer = gpuIndex};
+                  .VertexOffset = vertexOffset,
+                  .IndexOffset = indexOffset};
 
   const uint32_t meshID = meshes_.Create(gpuMesh);
   return meshID;
@@ -33,8 +38,7 @@ uint32_t MeshAllocator::Create(const Mesh& mesh) {
 void MeshAllocator::Delete(const uint32_t meshID) noexcept {
   const auto& device = context_.GetDevice();
   const MeshGPU& mesh = meshes_.Get(meshID);
-  device.DestroyBuffer(mesh.VertexBuffer);
-  device.DestroyBuffer(mesh.IndexBuffer);
+  // Todo: Free the mesh when supported
   meshes_.Delete(meshID);
 }
 
@@ -43,64 +47,52 @@ MeshGPU& MeshAllocator::Get(const uint32_t meshID) noexcept {
   return meshes_.Get(meshID);
 }
 
-AllocatedBuffer MeshAllocator::createVertexBuffer_(const Mesh& mesh) const {
+VkDeviceSize MeshAllocator::createVertexBuffer_(const Mesh& mesh) {
   const auto& device = context_.GetDevice();
-  const auto& vkDevice = device.Logical();
+  auto vkDevice = device.Logical();
+  const auto& cmd = context_.GetCommand();
 
   const VkDeviceSize bufferSize = sizeof(mesh.Vertices[0]) * mesh.Vertices.size();
-  // Create Staging Buffer.
-  const AllocatedBuffer staging =
-      device.CreateBuffer(bufferSize,
-                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  // Allocate Staging Buffer.
+  VkDeviceSize stagingOffset =
+      stagingBuffer_.Allocate(bufferSize, std::max<VkDeviceSize>(alignof(Vertex), alignof(std::uint32_t)));
 
   // Fill Staging Buffer
-  void* data{};
-  if (vkMapMemory(vkDevice, staging.Memory, 0, bufferSize, 0, &data) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to map staging buffer memory");
-  }
-  std::memcpy(data, mesh.Vertices.data(), bufferSize);
-  vkUnmapMemory(vkDevice, staging.Memory);
+  std::memcpy(static_cast<std::byte*>(stagingBuffer_.Mapping()) + stagingOffset, mesh.Vertices.data(), bufferSize);
 
-  // Allocate Vertex Buffer.
-  const AllocatedBuffer gpuVertex =
-      device.CreateBuffer(bufferSize,
-                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  // Allocate Mesh Buffer.
+  VkDeviceSize meshOffset = meshBuffer_.AllocateDeviceLocal(bufferSize);
 
   // Staging Buffer to Vertex Buffer.
-  device.CopyBuffer(staging.Buffer, gpuVertex.Buffer, bufferSize);
-  device.DestroyBuffer(staging);
-  return gpuVertex;
+  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
+  VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = meshOffset, .size = bufferSize};
+  vkCmdCopyBuffer(commandBuffer, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
+  cmd.EndSingleTimeCommands(commandBuffer);
+
+  return meshOffset;
 }
 
-AllocatedBuffer MeshAllocator::createIndexBuffer_(const Mesh& mesh) const {
+VkDeviceSize MeshAllocator::createIndexBuffer_(const Mesh& mesh) {
   const auto& device = context_.GetDevice();
-  const auto& vkDevice = device.Logical();
+  const auto& cmd = context_.GetCommand();
 
   const VkDeviceSize bufferSize = sizeof(mesh.Indices[0]) * mesh.Indices.size();
   // Create Staging Buffer.
-  const AllocatedBuffer staging =
-      device.CreateBuffer(bufferSize,
-                          VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  VkDeviceSize stagingOffset =
+      stagingBuffer_.Allocate(bufferSize, std::max<VkDeviceSize>(alignof(Vertex), alignof(std::uint32_t)));
 
   // Fill Staging Buffer
-  void* data{};
-  if (vkMapMemory(vkDevice, staging.Memory, 0, bufferSize, 0, &data) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to map staging buffer memory");
-  }
-  std::memcpy(data, mesh.Indices.data(), bufferSize);
-  vkUnmapMemory(vkDevice, staging.Memory);
+  std::memcpy(static_cast<std::byte*>(stagingBuffer_.Mapping()) + stagingOffset, mesh.Indices.data(), bufferSize);
 
-  // Allocate Index Buffer.
-  const AllocatedBuffer gpuIndices =
-      device.CreateBuffer(bufferSize,
-                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  // Staging Buffer to Index Buffer.
-  device.CopyBuffer(staging.Buffer, gpuIndices.Buffer, bufferSize);
-  device.DestroyBuffer(staging);
-  return gpuIndices;
+  // Allocate index buffer.
+  VkDeviceSize indexOffset = meshBuffer_.AllocateDeviceLocal(bufferSize);
+
+  // Staging Buffer to Vertex Buffer.
+  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
+  VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = indexOffset, .size = bufferSize};
+  vkCmdCopyBuffer(commandBuffer, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
+  cmd.EndSingleTimeCommands(commandBuffer);
+
+  return indexOffset;
 }
 } // namespace engine::graphics::vulkan
