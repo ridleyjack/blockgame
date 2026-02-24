@@ -24,6 +24,10 @@ target_include_directories(Engine
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/stb
 )
 
+if (ENABLE_TESTS)
+    add_subdirectory(Tests)
+endif ()
+
 target_link_libraries(Engine
         PUBLIC Vulkan::Vulkan
         PRIVATE glfw

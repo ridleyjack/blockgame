@@ -16,3 +16,16 @@ FetchContent_Declare(
         URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.zip
 )
 FetchContent_MakeAvailable(glm)
+
+# GTest
+if (ENABLE_TESTS)
+    FetchContent_Declare(
+            googletest
+            URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+    )
+
+    # Prevent overriding MSVC runtime settings (important on Windows)
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+    FetchContent_MakeAvailable(googletest)
+endif ()
