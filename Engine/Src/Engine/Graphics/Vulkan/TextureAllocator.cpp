@@ -15,6 +15,7 @@
 namespace engine::graphics::vulkan {
 
 TextureAllocator::TextureAllocator(Context& context) : context_(context) {}
+
 TextureAllocator::~TextureAllocator() {
   const auto& device = context_.GetDevice();
 
