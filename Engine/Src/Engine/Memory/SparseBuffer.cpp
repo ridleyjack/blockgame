@@ -1,13 +1,13 @@
 #include "SparseBuffer.hpp"
 
-#include "BufferUtil.hpp"
+#include "Alignment.hpp"
 
 #include <cassert>
 #include <ios>
 #include <limits>
 #include <bits/fs_fwd.h>
 
-namespace engine::containers {
+namespace engine::memory {
 
 SparseBuffer::SparseBuffer(const std::uint64_t size) : capacity_(size) {
   freeBlocks_.push_back({.Offset = 0, .Size = size});
@@ -20,7 +20,7 @@ std::uint64_t SparseBuffer::Allocate(const std::uint64_t size, const std::uint64
   for (size_t i = 0; i < freeBlocks_.size(); i++) {
     const auto& freeBlock = freeBlocks_[i];
 
-    const std::uint64_t alignedOffset{graphics::bufferutil::Align(freeBlock.Offset, alignment)};
+    const std::uint64_t alignedOffset{memory::Align(freeBlock.Offset, alignment)};
     const std::uint64_t padding{alignedOffset - freeBlock.Offset};
 
     if (padding > freeBlock.Size)
@@ -98,4 +98,4 @@ std::uint64_t SparseBuffer::FreeCapacity() const noexcept {
   return free;
 }
 
-} // namespace engine::containers
+} // namespace engine::memory

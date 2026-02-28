@@ -4,7 +4,7 @@
 #include <vector>
 #include <map>
 
-namespace engine::containers {
+namespace engine::memory {
 
 struct BufferBlock {
   std::uint64_t Offset{};
@@ -30,4 +30,4 @@ private:
   std::map<std::uint64_t, BufferBlock> allocatedBlocks_{};
 };
 
-} // namespace engine::containers
+} // namespace engine::memory

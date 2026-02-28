@@ -1,8 +1,8 @@
-#include "Engine/Containers/SparseBuffer.hpp"
+#include "../../Src/Engine/Memory/SparseBuffer.hpp"
 
 #include <gtest/gtest.h>
 
-namespace ctn = engine::containers;
+namespace ctn = engine::memory;
 
 TEST(SparseBufferTest, SimpleAllocations) {
   ctn::SparseBuffer buffer{8};

@@ -1,6 +1,6 @@
 add_executable(
         engine_tests
-        Containers/SparseBufferTest.cpp
+        Memory/SparseBufferTest.cpp
 )
 
 target_link_libraries(

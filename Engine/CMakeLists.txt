@@ -17,9 +17,9 @@ add_library(Engine
         Src/Engine/Events/IEventRaiser.hpp
         Src/Engine/Events/Events.hpp
         Src/Engine/Math/Vec3Int.hpp
-        Src/Engine/Containers/SparseBuffer.hpp
-        Src/Engine/Containers/SparseBuffer.cpp
-        Src/Engine/Containers/BufferUtil.hpp
+        Src/Engine/Memory/SparseBuffer.hpp
+        Src/Engine/Memory/SparseBuffer.cpp
+        Src/Engine/Memory/Alignment.hpp
 )
 target_include_directories(Engine
         PUBLIC
