@@ -1,4 +1,4 @@
-#include "../../Src/Engine/Memory/SparseBuffer.hpp"
+#include "Engine/Memory/SparseBuffer.hpp"
 
 #include <gtest/gtest.h>
 

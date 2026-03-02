@@ -14,13 +14,13 @@ SparseBuffer::SparseBuffer(const std::uint64_t size) : capacity_(size) {
 }
 
 std::uint64_t SparseBuffer::Allocate(const std::uint64_t size, const std::uint64_t alignment) {
-  // Alignment must be a power of 2 or 1.
-  assert(std::has_single_bit(alignment));
-
   for (size_t i = 0; i < freeBlocks_.size(); i++) {
     const auto& freeBlock = freeBlocks_[i];
 
-    const std::uint64_t alignedOffset{memory::Align(freeBlock.Offset, alignment)};
+    const std::uint64_t alignedOffset{Align(freeBlock.Offset, alignment)};
+    if (alignedOffset == std::numeric_limits<std::uint64_t>::max())
+      return std::numeric_limits<std::uint64_t>::max();
+
     const std::uint64_t padding{alignedOffset - freeBlock.Offset};
 
     if (padding > freeBlock.Size)

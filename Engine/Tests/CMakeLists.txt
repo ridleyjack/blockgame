@@ -1,6 +1,7 @@
 add_executable(
         engine_tests
         Memory/SparseBufferTest.cpp
+        Memory/RingBufferTest.cpp
 )
 
 target_link_libraries(

@@ -6,14 +6,9 @@
 
 namespace engine::memory {
 
-struct BufferBlock {
-  std::uint64_t Offset{};
-  std::uint64_t Size{};
-};
-
 // SparseBuffer is a first-fit free-list allocator for a fixed-capacity contiguous byte region.
-// Returns std::numeric_limits<uint64_t>::max() on failure.
-// Free adjacent blocks are merged.
+// Returns std::numeric_limits<uint64_t>::max() on failure. (Not enough space or overflow)
+// Free adjacent blocks are merged to reduce fragmentation.
 class SparseBuffer {
 public:
   SparseBuffer(std::uint64_t size);
@@ -25,6 +20,11 @@ public:
   std::uint64_t FreeCapacity() const noexcept;
 
 private:
+  struct BufferBlock {
+    std::uint64_t Offset{};
+    std::uint64_t Size{};
+  };
+
   std::uint64_t capacity_{};
   std::vector<BufferBlock> freeBlocks_{};
   std::map<std::uint64_t, BufferBlock> allocatedBlocks_{};

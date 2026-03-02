@@ -20,6 +20,8 @@ add_library(Engine
         Src/Engine/Memory/SparseBuffer.hpp
         Src/Engine/Memory/SparseBuffer.cpp
         Src/Engine/Memory/Alignment.hpp
+        Src/Engine/Memory/RingBuffer.cpp
+        Src/Engine/Memory/RingBuffer.hpp
 )
 target_include_directories(Engine
         PUBLIC
