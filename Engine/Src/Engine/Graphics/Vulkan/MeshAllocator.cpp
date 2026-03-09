@@ -5,6 +5,8 @@
 #include "Device.hpp"
 #include "MeshGPU.hpp"
 #include "MeshBuffer.hpp"
+#include "StagingBuffer.hpp"
+#include "Uploader.hpp"
 
 #include "Engine/Graphics/Mesh.hpp"
 
@@ -12,8 +14,8 @@
 
 namespace engine::graphics::vulkan {
 
-MeshAllocator::MeshAllocator(Context& context, MeshBuffer& meshBuffer, StagingBuffer& stagingBuffer)
-    : context_(context), meshBuffer_(meshBuffer), stagingBuffer_(stagingBuffer) {}
+MeshAllocator::MeshAllocator(Context& context, Uploader& uploader, MeshBuffer& meshBuffer, StagingBuffer& stagingBuffer)
+    : context_(context), uploader_(uploader), meshBuffer_(meshBuffer), stagingBuffer_(stagingBuffer) {}
 
 MeshAllocator::~MeshAllocator() {
   for (size_t i = 0; i < meshes_.Size(); i++) {
@@ -23,76 +25,63 @@ MeshAllocator::~MeshAllocator() {
 }
 
 uint32_t MeshAllocator::Create(const Mesh& mesh) {
-  const VkDeviceSize vertexOffset = createVertexBuffer_(mesh);
-  const VkDeviceSize indexOffset = createIndexBuffer_(mesh);
+  const auto& cmd = context_.GetCommand();
+  auto vkDevice = context_.GetDevice().Logical();
 
-  MeshGPU gpuMesh{.VertexCount = static_cast<uint32_t>(mesh.Vertices.size()),
-                  .IndexCount = static_cast<uint32_t>(mesh.Indices.size()),
-                  .VertexOffset = vertexOffset,
-                  .IndexOffset = indexOffset};
-
+  MeshGPU gpuMesh{
+      .VertexCount = static_cast<uint32_t>(mesh.Vertices.size()),
+      .IndexCount = static_cast<uint32_t>(mesh.Indices.size()),
+  };
   const uint32_t meshID = meshes_.Create(gpuMesh);
+
+  Uploader::UploadRequest request{};
+  request.Record = [this, &mesh, meshID](VkCommandBuffer cmd, std::uint64_t batchID) noexcept {
+    const auto vertexOffset =
+        uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Vertices)), alignof(Vertex), cmd, batchID);
+    const auto indexOffset =
+        uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Indices)), alignof(std::uint32_t), cmd, batchID);
+
+    auto& gpuMesh = meshes_.Get(meshID);
+    gpuMesh.VertexOffset = vertexOffset;
+    gpuMesh.IndexOffset = indexOffset;
+  };
+  request.OnComplete = [this, meshID]() noexcept {
+    auto& gpuMesh = meshes_.Get(meshID);
+    gpuMesh.Ready = true;
+  };
+
+  uploader_.Queue(std::move(request));
+
   return meshID;
 };
 
-void MeshAllocator::Delete(const uint32_t meshID) noexcept {
-  const auto& device = context_.GetDevice();
-  const MeshGPU& mesh = meshes_.Get(meshID);
-  // Todo: Free the mesh when supported
+void MeshAllocator::Delete(const std::uint32_t meshID) {
+  const auto& mesh = meshes_.Get(meshID);
+  assert(mesh.Ready); // TODO: Can Delete meshes pending upload.
+  meshBuffer_.Free(mesh.VertexOffset);
+  meshBuffer_.Free(mesh.IndexOffset);
   meshes_.Delete(meshID);
 }
 
-MeshGPU& MeshAllocator::Get(const uint32_t meshID) noexcept {
+MeshGPU& MeshAllocator::Get(const std::uint32_t meshID) noexcept {
   assert(meshes_.Contains(meshID));
   return meshes_.Get(meshID);
 }
 
-VkDeviceSize MeshAllocator::createVertexBuffer_(const Mesh& mesh) {
-  const auto& device = context_.GetDevice();
-  auto vkDevice = device.Logical();
-  const auto& cmd = context_.GetCommand();
+VkDeviceSize MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
+                                                const VkDeviceSize alignment,
+                                                VkCommandBuffer cmd,
+                                                const std::uint64_t batchID) const {
+  const VkDeviceSize size = data.size();
 
-  const VkDeviceSize bufferSize = sizeof(mesh.Vertices[0]) * mesh.Vertices.size();
-  // Allocate Staging Buffer.
-  VkDeviceSize stagingOffset =
-      stagingBuffer_.Allocate(bufferSize, std::max<VkDeviceSize>(alignof(Vertex), alignof(std::uint32_t)));
+  // Staging buffer.
+  const VkDeviceSize stagingOffset = stagingBuffer_.Write(data, alignment, batchID);
 
-  // Fill Staging Buffer
-  std::memcpy(static_cast<std::byte*>(stagingBuffer_.Mapping()) + stagingOffset, mesh.Vertices.data(), bufferSize);
-
-  // Allocate Mesh Buffer.
-  VkDeviceSize meshOffset = meshBuffer_.AllocateDeviceLocal(bufferSize);
-
-  // Staging Buffer to Vertex Buffer.
-  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
-  VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = meshOffset, .size = bufferSize};
-  vkCmdCopyBuffer(commandBuffer, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
-  cmd.EndSingleTimeCommands(commandBuffer);
+  // Mesh buffer.
+  const VkDeviceSize meshOffset = meshBuffer_.Allocate(size);
+  const VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = meshOffset, .size = size};
+  vkCmdCopyBuffer(cmd, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
 
   return meshOffset;
-}
-
-VkDeviceSize MeshAllocator::createIndexBuffer_(const Mesh& mesh) {
-  const auto& device = context_.GetDevice();
-  const auto& cmd = context_.GetCommand();
-
-  const VkDeviceSize bufferSize = sizeof(mesh.Indices[0]) * mesh.Indices.size();
-  // Create Staging Buffer.
-  VkDeviceSize stagingOffset =
-      stagingBuffer_.Allocate(bufferSize, std::max<VkDeviceSize>(alignof(Vertex), alignof(std::uint32_t)));
-
-  // Fill Staging Buffer
-  std::memcpy(static_cast<std::byte*>(stagingBuffer_.Mapping()) + stagingOffset, mesh.Indices.data(), bufferSize);
-
-  // Allocate index buffer.
-  VkDeviceSize indexOffset = meshBuffer_.AllocateDeviceLocal(bufferSize);
-
-  // Staging Buffer to Vertex Buffer.
-  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
-  VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = indexOffset, .size = bufferSize};
-  vkCmdCopyBuffer(commandBuffer, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
-  cmd.EndSingleTimeCommands(commandBuffer);
-
-  return indexOffset;
 }
 } // namespace engine::graphics::vulkan

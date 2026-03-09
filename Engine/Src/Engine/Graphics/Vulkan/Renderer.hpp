@@ -9,6 +9,7 @@
 #include "TextureAllocator.hpp"
 #include "PipelineCache.hpp"
 #include "StagingBuffer.hpp"
+#include "Uploader.hpp"
 
 #include <expected>
 
@@ -95,6 +96,7 @@ private:
   DescriptorAllocator descriptorAllocator_;
   TextureAllocator textureAllocator_;
   StagingBuffer stagingBuffer_;
+  Uploader uploader_;
   MeshBuffer meshBuffer_;
   MeshAllocator meshAllocator_;
 

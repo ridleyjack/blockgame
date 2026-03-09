@@ -11,7 +11,7 @@ public:
 
   std::uint64_t Allocate(std::uint64_t size, std::uint64_t alignment);
   std::uint64_t PopFront();
-  std::uint64_t PeekFront();
+  std::uint64_t PeekFront() const noexcept;
 
   std::uint64_t Capacity() const noexcept;
 

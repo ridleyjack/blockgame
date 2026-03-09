@@ -5,7 +5,7 @@
 #include <cassert>
 #include <ios>
 #include <limits>
-#include <bits/fs_fwd.h>
+#include <print>
 
 namespace engine::memory {
 
@@ -49,7 +49,6 @@ void SparseBuffer::Free(const std::uint64_t alignedOffset) {
   const auto it = allocatedBlocks_.find(alignedOffset);
   if (it == allocatedBlocks_.end())
     return;
-
   std::uint64_t offset{it->second.Offset};
   std::uint64_t size{it->second.Size};
   allocatedBlocks_.erase(it);

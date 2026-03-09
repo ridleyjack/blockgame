@@ -38,18 +38,11 @@ void ChunkMeshes::BuildChunk(const math::Vec3Int& mapCoord) {
 }
 
 void ChunkMeshes::Update(vlk::Renderer& renderer) {
-  constexpr std::uint32_t maxUploads = 1;
-  std::uint32_t uploads = 0;
-
   while (auto opt = resultQueue_.TryPop()) {
     auto& result = *opt;
 
     upload_(renderer, result.Mesh);
     meshes_[result.Coord.Z, result.Coord.Y, result.Coord.X] = std::move(result.Mesh);
-
-    if (uploads >= maxUploads)
-      break;
-    uploads++;
   }
 }
 

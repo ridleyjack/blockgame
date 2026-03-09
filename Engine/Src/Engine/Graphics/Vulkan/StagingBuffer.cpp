@@ -3,9 +3,14 @@
 #include "Context.hpp"
 #include "Device.hpp"
 
+#include <cassert>
+#include <cstring>
+#include <print>
+#include <ranges>
+
 namespace engine::graphics::vulkan {
 
-StagingBuffer::StagingBuffer(Context& context) : context_(context) {
+StagingBuffer StagingBuffer::Create(Context& context) {
   const auto& device = context.GetDevice();
   auto vkDevice = device.Logical();
 
@@ -16,12 +21,15 @@ StagingBuffer::StagingBuffer(Context& context) : context_(context) {
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
 
-  if (vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer_) != VK_SUCCESS)
+  VkBuffer buffer{VK_NULL_HANDLE};
+  VkDeviceMemory memory{VK_NULL_HANDLE};
+
+  if (vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
     throw std::runtime_error("failed to create dummy vertex/index buffer!");
 
   VkMemoryRequirements req;
-  vkGetBufferMemoryRequirements(vkDevice, buffer_, &req);
-  capacity_ = req.size;
+  vkGetBufferMemoryRequirements(vkDevice, buffer, &req);
+
   const std::uint32_t memoryType =
       device.FindMemoryType(req.memoryTypeBits,
                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -30,15 +38,21 @@ StagingBuffer::StagingBuffer(Context& context) : context_(context) {
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   allocInfo.allocationSize = req.size;
   allocInfo.memoryTypeIndex = memoryType;
-  if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory_) != VK_SUCCESS) {
-    vkDestroyBuffer(vkDevice, buffer_, nullptr);
+  if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+    vkDestroyBuffer(vkDevice, buffer, nullptr);
     throw std::runtime_error("failed to allocate vertex buffer memory!");
   }
-  vkBindBufferMemory(vkDevice, buffer_, memory_, 0);
 
-  if (vkMapMemory(vkDevice, memory_, 0, capacity_, 0, &mapped_) != VK_SUCCESS) {
+  vkBindBufferMemory(vkDevice, buffer, memory, 0);
+
+  void* memoryMapping{};
+  if (vkMapMemory(vkDevice, memory, 0, req.size, 0, &memoryMapping) != VK_SUCCESS) {
+    vkDestroyBuffer(vkDevice, buffer, nullptr);
+    vkFreeMemory(vkDevice, memory, nullptr);
     throw std::runtime_error("Failed to map staging buffer memory");
   }
+
+  return StagingBuffer(context, buffer, memory, static_cast<std::byte*>(memoryMapping), req.size);
 }
 
 StagingBuffer::~StagingBuffer() {
@@ -48,30 +62,60 @@ StagingBuffer::~StagingBuffer() {
   vkDestroyBuffer(vkDevice, buffer_, nullptr);
 }
 
-void* StagingBuffer::Mapping() const noexcept {
-  return mapped_;
+std::uint64_t StagingBuffer::BeginBatch() {
+  batches_.emplace_back();
+  return nextBatchID++;
 }
 
-VkDeviceMemory StagingBuffer::Memory() const noexcept {
-  return memory_;
+VkDeviceSize
+StagingBuffer::Write(std::span<const std::byte> bytes, const VkDeviceSize alignment, const std::uint64_t batchID) {
+  const std::size_t size{bytes.size()};
+
+  const VkDeviceSize offset = ringBuffer_.Allocate(size, alignment);
+  if (offset == std::numeric_limits<std::uint64_t>::max()) {
+    throw std::runtime_error("failed to reserve memory on ringbuffer!");
+  }
+
+  std::memcpy(mappedMemory_ + offset, bytes.data(), size);
+
+  const std::uint64_t idx = batchID - headBatchID;
+  assert(idx < batches_.size());
+
+  auto& batch = batches_[idx];
+  batch.Offsets.emplace_back(offset);
+  return offset;
+}
+
+void StagingBuffer::Free(const std::uint64_t batchID) {
+  const std::uint64_t idx = batchID - headBatchID;
+  if (idx >= batches_.size())
+    return;
+
+  batches_[idx].Complete = true;
+
+  while (!batches_.empty()) {
+    auto& batch = batches_.front();
+    if (!batch.Complete)
+      break;
+
+    // Offsets are freed in allocation order.
+    for (auto offset : batch.Offsets) {
+      assert(ringBuffer_.PeekFront() == offset);
+      ringBuffer_.PopFront();
+    }
+    batches_.pop_front();
+    headBatchID++;
+  }
 }
 
 VkBuffer StagingBuffer::Handle() const noexcept {
   return buffer_;
 }
 
-VkDeviceSize StagingBuffer::Allocate(VkDeviceSize size, VkDeviceSize alignment) {
-  const VkDeviceSize alignedOffset = align_(offset_, alignment);
-  if (alignedOffset + size > capacity_) {
-    throw std::runtime_error("buffer size exceeds capacity of allocated memory!");
-  }
-
-  offset_ = alignedOffset + size;
-  return alignedOffset;
-}
-
-constexpr VkDeviceSize StagingBuffer::align_(const VkDeviceSize value, const VkDeviceSize alignment) {
-  return (value + alignment - 1) & ~(alignment - 1);
-}
-
+StagingBuffer::StagingBuffer(Context& context,
+                             VkBuffer buffer,
+                             VkDeviceMemory memory,
+                             std::byte* memoryMapping,
+                             VkDeviceSize capacity)
+    : context_(context), buffer_(buffer), memory_(memory), mappedMemory_(memoryMapping), ringBuffer_(capacity) {}
 } // namespace engine::graphics::vulkan

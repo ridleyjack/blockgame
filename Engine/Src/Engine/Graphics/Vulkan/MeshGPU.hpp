@@ -10,6 +10,8 @@ struct MeshGPU {
 
   VkDeviceSize VertexOffset{};
   VkDeviceSize IndexOffset{};
+
+  bool Ready{};
 };
 
 } // namespace engine::graphics::vulkan

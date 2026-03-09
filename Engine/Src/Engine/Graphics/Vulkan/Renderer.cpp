@@ -37,9 +37,10 @@ Renderer::Renderer(GLFWwindow* window)
       pipelineCache_(context_),
       descriptorAllocator_(context_),
       textureAllocator_(context_),
-      stagingBuffer_(context_),
-      meshBuffer_(context_),
-      meshAllocator_(context_, meshBuffer_, stagingBuffer_) {
+      stagingBuffer_(StagingBuffer::Create(context_)),
+      uploader_(context_, stagingBuffer_),
+      meshBuffer_(MeshBuffer::Create(context_)),
+      meshAllocator_(context_, uploader_, meshBuffer_, stagingBuffer_) {
 
   const auto& device = context_.GetDevice();
   frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
@@ -58,6 +59,8 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
   const auto& cmd = context_.GetCommand();
+
+  uploader_.Process();
 
   const VkExtent2D swapChainExtent = swapchain.Extent();
 
@@ -89,7 +92,7 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   memcpy(frameContext_.CameraGPU.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(UniformBufferObject));
 
   // Command Buffer
-  const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
+  const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
   vkResetCommandBuffer(commandBuffer, 0);
 
   VkCommandBufferBeginInfo beginInfo{};
@@ -139,7 +142,7 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   auto& swapchain = context_.GetSwapchain();
 
   const auto& cmd = context_.GetCommand();
-  const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
+  const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
   vkCmdEndRenderPass(commandBuffer);
 
@@ -191,9 +194,12 @@ std::expected<void, RenderError> Renderer::EndFrame() {
 
 void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) {
   const auto& cmd = context_.GetCommand();
-  const auto commandBuffer = cmd.Buffer(frameContext_.CurrentFrame);
+  const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
   const MeshGPU& gpuMesh = meshAllocator_.Get(handle.MeshID);
+  if (!gpuMesh.Ready)
+    return;
+
   const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
   const std::array<VkDeviceSize, 1> offsets = {gpuMesh.VertexOffset};
 

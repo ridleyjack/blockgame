@@ -57,7 +57,7 @@ std::uint64_t RingBuffer::PopFront() {
   return alignedOffset;
 }
 
-std::uint64_t RingBuffer::PeekFront() {
+std::uint64_t RingBuffer::PeekFront() const noexcept {
   if (allocatedBlocks_.empty())
     return std::numeric_limits<std::uint64_t>::max();
 

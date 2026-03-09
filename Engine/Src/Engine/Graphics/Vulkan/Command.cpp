@@ -9,27 +9,28 @@
 namespace engine::graphics::vulkan {
 
 Command::Command(Context& context) : context_{context} {
-  createCommandPool_();
-  createCommandBuffers_();
+  createFramePool_();
+  createFrameBuffers_();
+  createTransientPool_();
 }
 
 Command::~Command() {
   const auto vkDevice = context_.GetDevice().Logical();
-  vkDestroyCommandPool(vkDevice, commandPool_, nullptr);
+  vkDestroyCommandPool(vkDevice, framePool_, nullptr);
+  vkDestroyCommandPool(vkDevice, transientPool_, nullptr);
 }
 
-VkCommandBuffer Command::Buffer(const uint32_t index) const noexcept {
-  return commandBuffers_[index];
+VkCommandBuffer Command::PerFrameBuffer(const uint32_t index) const noexcept {
+  return perFrameBuffers_[index];
 }
 
 VkCommandBuffer Command::BeginSingleTimeCommands() const noexcept {
   const auto vkDevice = context_.GetDevice().Logical();
 
-  // TODO: Command pool for short lived operations allows optimization.
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandPool = commandPool_;
+  allocInfo.commandPool = transientPool_;
   allocInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandBuffer;
@@ -56,10 +57,20 @@ void Command::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const noexcep
   vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
   vkQueueWaitIdle(device.GraphicsQueue());
 
-  vkFreeCommandBuffers(device.Logical(), commandPool_, 1, &commandBuffer);
+  vkFreeCommandBuffers(device.Logical(), transientPool_, 1, &commandBuffer);
 }
 
-void Command::createCommandPool_() {
+VkCommandBuffer Command::BeginTransient() const noexcept {
+  // BeginSingleTimeCommands will likely be removed in the future.
+  return BeginSingleTimeCommands();
+}
+
+void Command::FreeTransient(VkCommandBuffer cmd) const noexcept {
+  const auto& vkDevice = context_.GetDevice().Logical();
+  vkFreeCommandBuffers(vkDevice, transientPool_, 1, &cmd);
+}
+
+void Command::createFramePool_() {
   const auto& device = context_.GetDevice();
   QueueFamilyIndices queueFamilyIndices = device.FindQueueFamilies();
 
@@ -68,24 +79,38 @@ void Command::createCommandPool_() {
   poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
 
-  if (vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &commandPool_) != VK_SUCCESS) {
+  if (vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &framePool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create command pool!");
   }
 }
 
-void Command::createCommandBuffers_() {
+void Command::createFrameBuffers_() {
   const auto& device = context_.GetDevice();
 
-  commandBuffers_.resize(config::MaxFramesInFlight);
+  perFrameBuffers_.resize(config::MaxFramesInFlight);
 
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.commandPool = commandPool_;
+  allocInfo.commandPool = framePool_;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size());
+  allocInfo.commandBufferCount = static_cast<uint32_t>(perFrameBuffers_.size());
 
-  if (vkAllocateCommandBuffers(device.Logical(), &allocInfo, commandBuffers_.data()) != VK_SUCCESS) {
+  if (vkAllocateCommandBuffers(device.Logical(), &allocInfo, perFrameBuffers_.data()) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate command buffers!");
+  }
+}
+
+void Command::createTransientPool_() {
+  const auto& device = context_.GetDevice();
+  QueueFamilyIndices queueFamilyIndices = device.FindQueueFamilies();
+
+  VkCommandPoolCreateInfo poolInfo{};
+  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+  poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
+
+  if (vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &transientPool_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create transient pool!");
   }
 }
 } // namespace engine::graphics::vulkan

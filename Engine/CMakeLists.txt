@@ -85,6 +85,8 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/MeshBuffer.hpp
         Src/Engine/Graphics/Vulkan/StagingBuffer.cpp
         Src/Engine/Graphics/Vulkan/StagingBuffer.hpp
+        Src/Engine/Graphics/Vulkan/Uploader.cpp
+        Src/Engine/Graphics/Vulkan/Uploader.hpp
 )
 
 target_include_directories(Engine_Graphics
