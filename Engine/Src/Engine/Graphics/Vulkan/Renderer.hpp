@@ -94,9 +94,9 @@ private:
   PipelineCache pipelineCache_;
 
   DescriptorAllocator descriptorAllocator_;
-  TextureAllocator textureAllocator_;
   StagingBuffer stagingBuffer_;
   Uploader uploader_;
+  TextureAllocator textureAllocator_;
   MeshBuffer meshBuffer_;
   MeshAllocator meshAllocator_;
 

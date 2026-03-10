@@ -24,19 +24,8 @@ enum class Error;
 }
 
 class Context;
-
-struct TextureGPU {
-  VkImage Image{VK_NULL_HANDLE};
-  VkDeviceMemory ImageMemory{VK_NULL_HANDLE};
-
-  VkImageView ImageView{VK_NULL_HANDLE};
-  VkSampler Sampler{VK_NULL_HANDLE};
-};
-
-struct TextureStaging {
-  AllocatedBuffer Buffer{};
-  void* Data{};
-};
+class Uploader;
+class StagingBuffer;
 
 struct TextureError {
   enum class ErrorCode : std::uint8_t {
@@ -60,56 +49,70 @@ inline std::string_view ToString(const TextureError& e) noexcept {
   return "Unknown TextureError";
 }
 
+enum class TextureState : std::uint8_t {
+  Uploading,
+  Ready,
+  Failed
+};
+
+struct TextureGPU {
+  VkImage Image{VK_NULL_HANDLE};
+  VkDeviceMemory ImageMemory{VK_NULL_HANDLE};
+
+  VkImageView ImageView{VK_NULL_HANDLE};
+  VkSampler Sampler{VK_NULL_HANDLE};
+
+  TextureState State{TextureState::Uploading};
+  std::optional<TextureError> Error{};
+};
+
 class TextureAllocator {
 public:
-  explicit TextureAllocator(Context& context);
+  TextureAllocator(Context& context, Uploader& uploader, StagingBuffer& staging);
   ~TextureAllocator();
 
-  std::expected<uint32_t, TextureError>
-  Create(const std::span<const std::byte>& imageData, uint32_t width, uint32_t height);
-  const TextureGPU& Get(uint32_t textureID) const noexcept;
+  std::uint32_t Create(const std::span<const std::byte>& imageData, std::uint32_t width, std::uint32_t height);
+  const TextureGPU& Get(std::uint32_t textureID) const noexcept;
 
   // BeginArray creates a Texture with multiple layers. A texture can be uploaded to each layer. FinishArray must be
   // called before another array can be started.
-  std::expected<void, TextureError> BeginArray(const TextureArrayInfo& info) noexcept;
+  void BeginArray(const TextureArrayInfo& info) noexcept;
   void UploadLayer(const std::span<const std::byte>& imageData);
-  std::expected<std::uint32_t, TextureError> FinishArray();
+  std::uint32_t FinishArray();
 
 private:
   Context& context_;
+  Uploader& uploader_;
+  StagingBuffer& stagingBuffer_;
 
   std::vector<TextureGPU> textures_;
 
   struct ArrayBuildState {
     TextureGPU Texture{};
-    TextureStaging Staging{};
 
     VkDeviceSize LayerSizeBytes{};
     std::uint32_t Width{}, Height{};
     std::uint32_t NumLayers{};
     std::uint32_t NextLayer{};
   };
-
   std::optional<ArrayBuildState> arrayState_{};
 
   std::expected<TextureGPU, TextureError>
-  createImage_(std::uint32_t width, std::uint32_t height, std::uint32_t numLayers) const noexcept;
-
-  TextureStaging createStaging_(VkDeviceSize layerSizeBytes) const noexcept;
+  createImage_(VkCommandBuffer cmd, std::uint32_t width, std::uint32_t height, std::uint32_t numLayers) const noexcept;
 
   void uploadLayer_(const TextureGPU& texture,
-                    const TextureStaging& staging,
+                    VkCommandBuffer cmd,
+                    std::uint64_t batchID,
                     std::uint32_t width,
                     std::uint32_t height,
-                    VkDeviceSize layerSizeBytes,
                     std::uint32_t layerIndex,
                     const std::span<const std::byte>& bytes) const noexcept;
 
-  // finishTexture_ guarantees that TextureStaging is freed.
-  std::expected<uint32_t, TextureError>
-  finishTexture_(TextureGPU& texture, const TextureStaging& staging, std::uint32_t numLayers) noexcept;
+  std::expected<void, TextureError>
+  finishTexture_(VkCommandBuffer cmd, TextureGPU& texture, std::uint32_t numLayers) noexcept;
 
-  void copyBufferToImage_(VkBuffer buffer,
+  void copyBufferToImage_(VkCommandBuffer cmd,
+                          VkDeviceSize stagingOffset,
                           VkImage image,
                           uint32_t width,
                           uint32_t height,

@@ -36,9 +36,9 @@ Renderer::Renderer(GLFWwindow* window)
       renderPassCache_(context_),
       pipelineCache_(context_),
       descriptorAllocator_(context_),
-      textureAllocator_(context_),
       stagingBuffer_(StagingBuffer::Create(context_)),
       uploader_(context_, stagingBuffer_),
+      textureAllocator_(context_, uploader_, stagingBuffer_),
       meshBuffer_(MeshBuffer::Create(context_)),
       meshAllocator_(context_, uploader_, meshBuffer_, stagingBuffer_) {
 
@@ -262,22 +262,24 @@ void Renderer::DeleteMesh(const MeshHandle& handle) {
 }
 
 TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
-  const auto result = textureAllocator_.Create(data, width, height);
-  if (!result) {
-    throw std::runtime_error(std::string{"Failed to create texture: "} + std::string{ToString(result.error())});
-  }
-  return TextureHandle{.TextureID = *result};
+  return TextureHandle{.TextureID = textureAllocator_.Create(data, width, height)};
 }
 
 std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(const TextureArrayInfo& info) noexcept {
-  if (auto result = textureAllocator_.BeginArray(info); !result)
-    return std::unexpected{result.error()};
-
+  textureAllocator_.BeginArray(info);
   return TextureArrayBuilder{textureAllocator_};
 }
 
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
   const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
+
+  auto& device = context_.GetDevice();
+  if (textureGPU.State != TextureState::Ready) {
+    uploader_.Process();
+    vkQueueWaitIdle(device.GraphicsQueue());
+    uploader_.Process();
+  }
+
   const std::uint32_t descriptorID =
       descriptorAllocator_.CreateDescriptorSet(descriptorAllocator_.DescriptorSetLayout(),
                                                frameContext_.CameraGPU,

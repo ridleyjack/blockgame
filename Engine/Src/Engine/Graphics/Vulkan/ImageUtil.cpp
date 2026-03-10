@@ -71,14 +71,12 @@ std::expected<VkImageView, Error> CreateImageView(const Device& device, const Cr
   return imageView;
 }
 
-std::expected<void, Error> TransitionImageLayout(const Command& command,
+std::expected<void, Error> TransitionImageLayout(VkCommandBuffer cmd,
                                                  VkImage image,
                                                  VkFormat format,
                                                  VkImageLayout oldLayout,
                                                  VkImageLayout newLayout,
                                                  uint32_t numLayers) {
-
-  VkCommandBuffer commandBuffer = command.BeginSingleTimeCommands();
 
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -122,8 +120,7 @@ std::expected<void, Error> TransitionImageLayout(const Command& command,
     return std::unexpected(Error::UnsupportedTransition);
   }
 
-  vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-  command.EndSingleTimeCommands(commandBuffer);
+  vkCmdPipelineBarrier(cmd, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
   return {};
 }
 } // namespace engine::graphics::vulkan::imageutil

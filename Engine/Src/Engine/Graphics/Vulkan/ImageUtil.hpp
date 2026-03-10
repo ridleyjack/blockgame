@@ -59,7 +59,7 @@ std::expected<Image, Error> CreateImage(const Device& device, const CreateImageI
 
 std::expected<VkImageView, Error> CreateImageView(const Device& device, const CreateImageViewInfo& info);
 
-std::expected<void, Error> TransitionImageLayout(const Command& command,
+std::expected<void, Error> TransitionImageLayout(VkCommandBuffer cmd,
                                                  VkImage image,
                                                  VkFormat format,
                                                  VkImageLayout oldLayout,

@@ -25,7 +25,7 @@ public:
   void Upload(std::span<const std::byte> pixels) const noexcept;
 
   // Finalize the array. Must be done before the building of another TextureArray is started.
-  std::expected<TextureHandle, vulkan::TextureError> Finalize() const noexcept;
+  TextureHandle Finalize() const noexcept;
 
 private:
   vulkan::TextureAllocator& allocator_;

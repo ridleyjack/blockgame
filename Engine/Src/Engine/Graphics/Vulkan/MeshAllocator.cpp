@@ -2,7 +2,6 @@
 
 #include "Command.hpp"
 #include "Context.hpp"
-#include "Device.hpp"
 #include "MeshGPU.hpp"
 #include "MeshBuffer.hpp"
 #include "StagingBuffer.hpp"
@@ -25,8 +24,6 @@ MeshAllocator::~MeshAllocator() {
 }
 
 uint32_t MeshAllocator::Create(const Mesh& mesh) {
-  const auto& cmd = context_.GetCommand();
-  auto vkDevice = context_.GetDevice().Logical();
 
   MeshGPU gpuMesh{
       .VertexCount = static_cast<uint32_t>(mesh.Vertices.size()),
