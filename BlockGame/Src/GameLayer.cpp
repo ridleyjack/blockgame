@@ -61,6 +61,10 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
   std::println("Done!");
 
   mapMeshes_.BuildAll();
+
+  renderItem_.RenderPass = renderPass;
+  renderItem_.Pipeline = pipeline;
+  renderItem_.Material = material;
 }
 
 void GameLayer::OnUpdate(const float deltaTime) {
@@ -88,7 +92,7 @@ void GameLayer::OnRender() {
   cameraMatrices.View = camera_.View();
   cameraMatrices.Projection = renderer.MakeProjection();
 
-  if (const auto r = renderer.BeginFrame({0}, {0}, cameraMatrices); !r) {
+  if (const auto r = renderer.BeginFrame(renderItem_.RenderPass, renderItem_.Pipeline, cameraMatrices); !r) {
     if (r.error() != vlk::RenderError::FrameOutOfDate) {
       std::println("Failed to begin rendering frame", 1);
       return;
@@ -100,7 +104,7 @@ void GameLayer::OnRender() {
       for (int x = 0; x < map_.Width(); x++) {
         const ChunkMesh& mesh{mapMeshes_.Mesh({x, y, z})};
         if (mesh.HasVertices())
-          renderer.Submit(mesh.Mesh, {0});
+          renderer.Submit(mesh.Mesh, renderItem_.Material);
       }
 
   if (const auto rv = renderer.EndFrame(); !rv) {

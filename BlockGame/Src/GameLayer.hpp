@@ -17,8 +17,9 @@ namespace events {
 struct KeyPressedEvent;
 struct KeyReleasedEvent;
 } // namespace events
-
 } // namespace engine
+
+namespace gfx = engine::graphics;
 
 struct Movements {
   bool Forward{};
@@ -55,6 +56,13 @@ private:
 
   Map map_;
   ChunkMeshes mapMeshes_;
+
+  struct RenderItem {
+    gfx::RenderPassHandle RenderPass{};
+    gfx::PipelineHandle Pipeline{};
+    gfx::MaterialHandle Material{};
+  };
+  RenderItem renderItem_;
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};
