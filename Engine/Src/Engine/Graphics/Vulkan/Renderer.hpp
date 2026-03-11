@@ -93,12 +93,12 @@ private:
   RenderPassCache renderPassCache_;
   PipelineCache pipelineCache_;
 
-  DescriptorAllocator descriptorAllocator_;
   StagingBuffer stagingBuffer_;
   Uploader uploader_;
   TextureAllocator textureAllocator_;
   MeshBuffer meshBuffer_;
   MeshAllocator meshAllocator_;
+  DescriptorAllocator descriptorAllocator_;
 
   FrameContext frameContext_{};
 };

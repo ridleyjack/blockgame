@@ -3,6 +3,7 @@
 #include "Device.hpp"
 #include "Context.hpp"
 #include "Config.hpp"
+#include "TextureAllocator.hpp"
 #include "UniformBuffer.hpp"
 
 namespace engine::graphics::vulkan {
@@ -23,7 +24,8 @@ UniformBuffer DescriptorAllocator::CreateUniformBuffer(const Device& device) {
   return uniform;
 }
 
-DescriptorAllocator::DescriptorAllocator(Context& context) : context_(context) {
+DescriptorAllocator::DescriptorAllocator(Context& context, TextureAllocator& textureAllocator)
+    : context_(context), textureAllocator_(textureAllocator) {
   const auto& device = context_.GetDevice();
 
   // Init Descriptor Pool.
@@ -53,8 +55,7 @@ DescriptorAllocator::~DescriptorAllocator() {
 
 std::uint32_t DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout,
                                                        const UniformBuffer& uniformGPU,
-                                                       VkImageView imageView,
-                                                       VkSampler sampler) {
+                                                       std::uint32_t textureID) {
 
   const auto& vkDevice = context_.GetDevice().Logical();
 
@@ -67,52 +68,49 @@ std::uint32_t DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout des
   allocInfo.descriptorSetCount = static_cast<uint32_t>(config::MaxFramesInFlight);
   allocInfo.pSetLayouts = layouts.data();
 
-  std::vector<VkDescriptorSet> descriptorSets(config::MaxFramesInFlight, VK_NULL_HANDLE);
-  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+  DescriptorEntry entry{.TextureID = textureID};
+  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, entry.Sets.data()) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate descriptor sets!");
   }
 
   // Update Descriptor Sets.
-  for (size_t i = 0; i < config::MaxFramesInFlight; i++) {
+  for (std::size_t i = 0; i < config::MaxFramesInFlight; i++) {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = uniformGPU.Buffers[i].Buffer;
     bufferInfo.offset = 0;
     bufferInfo.range = sizeof(UniformBufferObject);
 
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = imageView;
-    imageInfo.sampler = sampler;
-
-    std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
 
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = descriptorSets[i];
+    descriptorWrites[0].dstSet = entry.Sets[i];
     descriptorWrites[0].dstBinding = 0;
     descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptorWrites[0].descriptorCount = 1;
     descriptorWrites[0].pBufferInfo = &bufferInfo;
 
-    descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[1].dstSet = descriptorSets[i];
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pImageInfo = &imageInfo;
     vkUpdateDescriptorSets(vkDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
   }
 
-  const DescriptorSetBinding binding{.descriptors_ = descriptorSets};
-  descriptorSets_.push_back(binding);
+  descriptorSets_.push_back(entry);
   return descriptorSets_.size() - 1;
 }
 
-VkDescriptorSet DescriptorAllocator::DescriptorSet(const std::uint32_t setID,
-                                                   const std::uint32_t frame) const noexcept {
+// DescriptorSet returns the requested VKDescriptorSet. VK_NULL_HANDLE is returned if uploading the dependencies is not
+// finished.
+VkDescriptorSet DescriptorAllocator::DescriptorSet(const std::uint32_t setID, const std::uint32_t frame) noexcept {
   assert(setID < descriptorSets_.size());
-  return descriptorSets_[setID].descriptors_[frame];
+
+  auto& entry = descriptorSets_[setID];
+  if (!entry.TextureReady) {
+    const TextureGPU& texture = textureAllocator_.Get(entry.TextureID);
+    if (texture.State != TextureState::Ready)
+      return VK_NULL_HANDLE;
+    writeTexture(entry, texture);
+  }
+
+  return descriptorSets_[setID].Sets[frame];
 }
 VkDescriptorSetLayout DescriptorAllocator::DescriptorSetLayout() const noexcept {
   return descriptorSetLayout_;
@@ -143,6 +141,30 @@ void DescriptorAllocator::createDescriptorSetLayout_() {
   if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor set layout!");
   }
+}
+
+void DescriptorAllocator::writeTexture(DescriptorEntry& entry, const TextureGPU& texture) const noexcept {
+  auto vkDevice = context_.GetDevice().Logical();
+
+  // Update Descriptor Sets.
+  for (std::size_t i = 0; i < config::MaxFramesInFlight; i++) {
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = texture.ImageView;
+    imageInfo.sampler = texture.Sampler;
+
+    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrites[0].dstSet = entry.Sets[i];
+    descriptorWrites[0].dstBinding = 1;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(vkDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+  }
+  entry.TextureReady = true;
 }
 
 } // namespace engine::graphics::vulkan

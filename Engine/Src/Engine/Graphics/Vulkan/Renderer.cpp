@@ -26,21 +26,20 @@
 #include <print>
 
 // Single resources and hardcoded values are used in this stage of development.
-constexpr uint32_t defaultRenderPassID = 0;
 constexpr uint32_t defaultFramebufferID = 0;
-constexpr uint32_t defaultPipelineID = 0;
 
 namespace engine::graphics::vulkan {
+
 Renderer::Renderer(GLFWwindow* window)
     : context_(window),
       renderPassCache_(context_),
       pipelineCache_(context_),
-      descriptorAllocator_(context_),
       stagingBuffer_(StagingBuffer::Create(context_)),
       uploader_(context_, stagingBuffer_),
       textureAllocator_(context_, uploader_, stagingBuffer_),
       meshBuffer_(MeshBuffer::Create(context_)),
-      meshAllocator_(context_, uploader_, meshBuffer_, stagingBuffer_) {
+      meshAllocator_(context_, uploader_, meshBuffer_, stagingBuffer_),
+      descriptorAllocator_(context_, textureAllocator_) {
 
   const auto& device = context_.GetDevice();
   frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
@@ -200,6 +199,10 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
   if (!gpuMesh.Ready)
     return;
 
+  auto descriptor = descriptorAllocator_.DescriptorSet(material.DescriptorSetID, frameContext_.CurrentFrame);
+  if (descriptor == VK_NULL_HANDLE)
+    return;
+
   const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
   const std::array<VkDeviceSize, 1> offsets = {gpuMesh.VertexOffset};
 
@@ -207,7 +210,7 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
   vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), gpuMesh.IndexOffset, VK_INDEX_TYPE_UINT32);
 
   auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
-  auto descriptor = descriptorAllocator_.DescriptorSet(material.DescriptorSetID, frameContext_.CurrentFrame);
+
   vkCmdBindDescriptorSets(commandBuffer,
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline.PipelineLayout(),
@@ -271,20 +274,13 @@ std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(con
 }
 
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
-  const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
-
   auto& device = context_.GetDevice();
-  if (textureGPU.State != TextureState::Ready) {
-    uploader_.Process();
-    vkQueueWaitIdle(device.GraphicsQueue());
-    uploader_.Process();
-  }
+  const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
 
   const std::uint32_t descriptorID =
       descriptorAllocator_.CreateDescriptorSet(descriptorAllocator_.DescriptorSetLayout(),
                                                frameContext_.CameraGPU,
-                                               textureGPU.ImageView,
-                                               textureGPU.Sampler);
+                                               texture.TextureID);
   return MaterialHandle{.TextureID = texture.TextureID, .DescriptorSetID = descriptorID};
 }
 
