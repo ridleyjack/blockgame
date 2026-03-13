@@ -66,7 +66,6 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/RenderPassCache.hpp
         Src/Engine/Graphics/Vulkan/FramebufferSet.cpp
         Src/Engine/Graphics/Vulkan/FramebufferSet.hpp
-        Src/Engine/Graphics/Vulkan/MeshGPU.hpp
         Src/Engine/Graphics/Vulkan/UniformBuffer.hpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.cpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.hpp

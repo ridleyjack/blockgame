@@ -2,7 +2,6 @@
 
 #include "Command.hpp"
 #include "Context.hpp"
-#include "MeshGPU.hpp"
 #include "MeshBuffer.hpp"
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
@@ -23,29 +22,40 @@ MeshAllocator::~MeshAllocator() {
   }
 }
 
-uint32_t MeshAllocator::Create(const Mesh& mesh) {
-
-  MeshGPU gpuMesh{
+std::expected<uint32_t, MeshError> MeshAllocator::Create(const Mesh& mesh) {
+  MeshGPU meshGPU{
       .VertexCount = static_cast<uint32_t>(mesh.Vertices.size()),
       .IndexCount = static_cast<uint32_t>(mesh.Indices.size()),
   };
-  const uint32_t meshID = meshes_.Create(gpuMesh);
+  auto [cmd, batchID] = uploader_.GetCurrent();
 
-  Uploader::UploadRequest request{};
-  request.Record = [this, &mesh, meshID](VkCommandBuffer cmd, std::uint64_t batchID) noexcept {
-    const auto vertexOffset =
-        uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Vertices)), alignof(Vertex), cmd, batchID);
-    const auto indexOffset =
-        uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Indices)), alignof(std::uint32_t), cmd, batchID);
+  // Upload Vertices.
+  if (const std::expected<std::uint32_t, MeshError> result =
+          uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Vertices)), alignof(Vertex), cmd, batchID);
+      !result) {
+    return std::unexpected(result.error());
+  } else {
+    meshGPU.VertexOffset = *result;
+  }
+  // Upload Indices.
+  if (const std::expected<VkDeviceSize, MeshError> result =
+          uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Indices)), alignof(std::uint32_t), cmd, batchID);
+      !result) {
+    meshBuffer_.Free(meshGPU.VertexOffset);
+    return std::unexpected(result.error());
+  } else {
+    meshGPU.IndexOffset = *result;
+  }
 
+  std::uint32_t meshID = meshes_.Create(meshGPU);
+
+  Uploader::UploadRequest request{.OnComplete = [this, meshID]() noexcept {
     auto& gpuMesh = meshes_.Get(meshID);
-    gpuMesh.VertexOffset = vertexOffset;
-    gpuMesh.IndexOffset = indexOffset;
-  };
-  request.OnComplete = [this, meshID]() noexcept {
-    auto& gpuMesh = meshes_.Get(meshID);
-    gpuMesh.Ready = true;
-  };
+    if (gpuMesh.State == MeshState::Deleting)
+      Delete(meshID);
+    else
+      gpuMesh.State = MeshState::Ready;
+  }};
 
   uploader_.Queue(std::move(request));
 
@@ -53,29 +63,38 @@ uint32_t MeshAllocator::Create(const Mesh& mesh) {
 };
 
 void MeshAllocator::Delete(const std::uint32_t meshID) {
-  const auto& mesh = meshes_.Get(meshID);
-  assert(mesh.Ready); // TODO: Can Delete meshes pending upload.
+  assert(meshes_.Contains(meshID));
+  auto& mesh = meshes_.Get(meshID);
+  if (mesh.State == MeshState::Uploading) {
+    mesh.State = MeshState::Deleting;
+    return;
+  }
   meshBuffer_.Free(mesh.VertexOffset);
   meshBuffer_.Free(mesh.IndexOffset);
   meshes_.Delete(meshID);
 }
 
-MeshGPU& MeshAllocator::Get(const std::uint32_t meshID) noexcept {
+MeshAllocator::MeshGPU& MeshAllocator::Get(const std::uint32_t meshID) noexcept {
   assert(meshes_.Contains(meshID));
   return meshes_.Get(meshID);
 }
 
-VkDeviceSize MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
-                                                const VkDeviceSize alignment,
-                                                VkCommandBuffer cmd,
-                                                const std::uint64_t batchID) const {
+std::expected<VkDeviceSize, MeshError> MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
+                                                                          const VkDeviceSize alignment,
+                                                                          VkCommandBuffer cmd,
+                                                                          const std::uint64_t batchID) const {
   const VkDeviceSize size = data.size();
-
   // Staging buffer.
   const VkDeviceSize stagingOffset = stagingBuffer_.Write(data, alignment, batchID);
+  if (stagingOffset == std::numeric_limits<VkDeviceSize>::max())
+    return std::unexpected(MeshError::OutOfStagingMemory);
 
   // Mesh buffer.
   const VkDeviceSize meshOffset = meshBuffer_.Allocate(size);
+  if (meshOffset == std::numeric_limits<VkDeviceSize>::max())
+    return std::unexpected(MeshError::OutOfMeshMemory);
+
+  // Record the copy.
   const VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = meshOffset, .size = size};
   vkCmdCopyBuffer(cmd, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
 

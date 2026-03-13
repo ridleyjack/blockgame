@@ -26,39 +26,33 @@ TextureAllocator::~TextureAllocator() {
   }
 }
 
-std::uint32_t TextureAllocator::Create(const std::span<const std::byte>& imageData,
-                                       const std::uint32_t width,
-                                       const std::uint32_t height) {
+std::expected<std::uint32_t, TextureError> TextureAllocator::Create(const std::span<const std::byte>& imageData,
+                                                                    const std::uint32_t width,
+                                                                    const std::uint32_t height) {
   constexpr std::uint32_t numLayers = 1;
+  auto [cmd, batchID] = uploader_.GetCurrent();
 
-  textures_.emplace_back();
-  std::uint32_t textureID = textures_.size() - 1;
+  TextureGPU texture{};
+  if (auto result = createImage_(cmd, width, height, numLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    texture = *result;
+  }
 
-  Uploader::UploadRequest request;
-  request.Record = [this, textureID, imageData, width, height](VkCommandBuffer cmd, std::uint64_t batchID) noexcept {
-    TextureGPU& texture = textures_[textureID];
+  uploadLayer_(texture, cmd, batchID, width, height, 0, imageData);
 
-    if (auto result = createImage_(cmd, width, height, numLayers); !result) {
-      texture.State = TextureState::Failed;
-      texture.Error = result.error();
-      return;
-    } else {
-      texture = *result;
-    }
+  std::uint32_t textureID{};
+  if (auto result = finishTexture_(cmd, texture, numLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    textureID = *result;
+  }
 
-    uploadLayer_(texture, cmd, batchID, width, height, 0, imageData);
-
-    if (auto result = finishTexture_(cmd, texture, numLayers); !result) {
-      texture.State = TextureState::Failed;
-      texture.Error = result.error();
-    }
-  };
-  request.OnComplete = [this, textureID]() noexcept {
+  Uploader::UploadRequest request{.OnComplete = [this, textureID]() noexcept {
     TextureGPU& texture = textures_[textureID];
     if (texture.State != TextureState::Failed)
       texture.State = TextureState::Ready;
-  };
-
+  }};
   uploader_.Queue(std::move(request));
 
   return textureID;
@@ -69,26 +63,24 @@ const TextureGPU& TextureAllocator::Get(const std::uint32_t textureID) const noe
   return textures_[textureID];
 }
 
-void TextureAllocator::BeginArray(const TextureArrayInfo& info) noexcept {
+std::expected<void, TextureError> TextureAllocator::BeginArray(const TextureArrayInfo& info) noexcept {
   assert(!arrayState_.has_value());
   arrayState_.emplace(ArrayBuildState{.LayerSizeBytes = info.LayerSizeBytes,
                                       .Width = info.Width,
                                       .Height = info.Height,
                                       .NumLayers = info.NumLayers});
 
-  Uploader::UploadRequest request;
-  request.Record = [this, info](VkCommandBuffer cmd, std::uint64_t batchID) noexcept {
-    TextureGPU& texture = arrayState_->Texture;
+  auto [cmd, batchID] = uploader_.GetCurrent();
+  TextureGPU& texture = arrayState_->Texture;
 
-    if (auto result = createImage_(cmd, info.Width, info.Height, info.NumLayers); !result) {
-      texture.State = TextureState::Failed;
-      texture.Error = result.error();
-    } else {
-      texture = *result;
-    }
-  };
-  request.OnComplete = []() noexcept {};
-  uploader_.Queue(std::move(request));
+  if (auto result = createImage_(cmd, info.Width, info.Height, info.NumLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    texture = *result;
+  }
+
+  uploader_.Queue({});
+  return {};
 }
 
 void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) {
@@ -96,43 +88,38 @@ void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) 
   assert(arrayState_->NextLayer < arrayState_->NumLayers);
   assert(imageData.size() == arrayState_->LayerSizeBytes);
 
-  Uploader::UploadRequest request;
-  request.Record = [this, imageData](VkCommandBuffer cmd, std::uint64_t batchID) noexcept {
-    uploadLayer_(arrayState_->Texture,
-                 cmd,
-                 batchID,
-                 arrayState_->Width,
-                 arrayState_->Height,
-                 arrayState_->NextLayer,
-                 imageData);
-  };
-  request.OnComplete = []() noexcept {};
+  auto [cmd, batchID] = uploader_.GetCurrent();
+  uploadLayer_(arrayState_->Texture,
+               cmd,
+               batchID,
+               arrayState_->Width,
+               arrayState_->Height,
+               arrayState_->NextLayer,
+               imageData);
+
+  Uploader::UploadRequest request{.OnComplete = []() noexcept {}};
   uploader_.Queue(std::move(request));
 
   arrayState_->NextLayer++;
 }
 
-std::uint32_t TextureAllocator::FinishArray() {
+std::expected<std::uint32_t, TextureError> TextureAllocator::FinishArray() {
   assert(arrayState_.has_value());
   assert(arrayState_->NextLayer == arrayState_->NumLayers);
 
-  textures_.emplace_back(arrayState_->Texture);
-  std::uint32_t textureID = textures_.size() - 1;
+  std::uint32_t textureID{};
+  auto [cmd, batchID] = uploader_.GetCurrent();
+  if (auto result = finishTexture_(cmd, arrayState_->Texture, arrayState_->NumLayers); !result) {
+    return std::unexpected(result.error());
+  } else {
+    textureID = *result;
+  }
 
-  Uploader::UploadRequest request;
-  request.Record = [this, textureID, numLayers = arrayState_->NumLayers](VkCommandBuffer cmd,
-                                                                         std::uint64_t batchID) noexcept {
-    TextureGPU& texture = textures_[textureID];
-    if (auto result = finishTexture_(cmd, texture, numLayers); !result) {
-      texture.State = TextureState::Failed;
-      texture.Error = result.error();
-    }
-  };
-  request.OnComplete = [this, textureID]() noexcept {
+  Uploader::UploadRequest request{.OnComplete = [this, textureID]() noexcept {
     TextureGPU& texture = textures_[textureID];
     if (texture.State != TextureState::Failed)
       texture.State = TextureState::Ready;
-  };
+  }};
   uploader_.Queue(std::move(request));
 
   arrayState_.reset();
@@ -189,7 +176,7 @@ void TextureAllocator::uploadLayer_(const TextureGPU& texture,
   copyBufferToImage_(cmd, offset, texture.Image, width, height, layerIndex);
 }
 
-std::expected<void, TextureError>
+std::expected<std::uint32_t, TextureError>
 TextureAllocator::finishTexture_(VkCommandBuffer cmd, TextureGPU& texture, const std::uint32_t numLayers) noexcept {
   if (auto result = imageutil::TransitionImageLayout(cmd,
                                                      texture.Image,
@@ -217,7 +204,9 @@ TextureAllocator::finishTexture_(VkCommandBuffer cmd, TextureGPU& texture, const
   } else {
     texture.Sampler = *result;
   }
-  return {};
+
+  textures_.push_back(texture);
+  return textures_.size() - 1;
 }
 
 void TextureAllocator::copyBufferToImage_(VkCommandBuffer cmd,

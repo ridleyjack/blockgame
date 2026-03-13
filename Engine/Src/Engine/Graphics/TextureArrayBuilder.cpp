@@ -10,7 +10,10 @@ void TextureArrayBuilder::Upload(const std::span<const std::byte> pixels) const 
   allocator_.UploadLayer(pixels);
 }
 
-TextureHandle TextureArrayBuilder::Finalize() const noexcept {
-  return TextureHandle{.TextureID = allocator_.FinishArray()};
+std::expected<TextureHandle, vulkan::TextureError> TextureArrayBuilder::Finalize() const noexcept {
+  auto result = allocator_.FinishArray();
+  if (!result)
+    return std::unexpected(result.error());
+  return TextureHandle{.TextureID = *result};
 }
 } // namespace engine::graphics

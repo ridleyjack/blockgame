@@ -71,14 +71,16 @@ public:
   TextureAllocator(Context& context, Uploader& uploader, StagingBuffer& staging);
   ~TextureAllocator();
 
-  std::uint32_t Create(const std::span<const std::byte>& imageData, std::uint32_t width, std::uint32_t height);
+  std::expected<std::uint32_t, TextureError>
+  Create(const std::span<const std::byte>& imageData, std::uint32_t width, std::uint32_t height);
+
   const TextureGPU& Get(std::uint32_t textureID) const noexcept;
 
   // BeginArray creates a Texture with multiple layers. A texture can be uploaded to each layer. FinishArray must be
   // called before another array can be started.
-  void BeginArray(const TextureArrayInfo& info) noexcept;
+  std::expected<void, TextureError> BeginArray(const TextureArrayInfo& info) noexcept;
   void UploadLayer(const std::span<const std::byte>& imageData);
-  std::uint32_t FinishArray();
+  std::expected<std::uint32_t, TextureError> FinishArray();
 
 private:
   Context& context_;
@@ -108,7 +110,7 @@ private:
                     std::uint32_t layerIndex,
                     const std::span<const std::byte>& bytes) const noexcept;
 
-  std::expected<void, TextureError>
+  std::expected<std::uint32_t, TextureError>
   finishTexture_(VkCommandBuffer cmd, TextureGPU& texture, std::uint32_t numLayers) noexcept;
 
   void copyBufferToImage_(VkCommandBuffer cmd,

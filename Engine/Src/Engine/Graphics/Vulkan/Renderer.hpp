@@ -25,17 +25,15 @@ struct MeshHandle;
 struct Mesh;
 struct MeshCreateInfo;
 
+struct RenderPassHandle;
 struct PipelineHandle;
 struct PipelineCreateInfo;
 
 struct TextureHandle;
-
-struct RenderPassHandle;
+struct MaterialHandle;
 
 namespace vulkan {
 class PipelineCache;
-struct MeshGPU;
-
 struct TextureError;
 
 enum class RenderError : uint8_t {

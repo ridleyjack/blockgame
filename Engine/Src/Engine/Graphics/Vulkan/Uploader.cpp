@@ -26,25 +26,19 @@ Uploader::~Uploader() {
   }
 }
 
+Uploader::UploadContext Uploader::GetCurrent() {
+  if (!pending_)
+    createBatch_();
+
+  return UploadContext{.Command = pending_->Command, .BatchID = pending_->BatchID};
+}
+
 void Uploader::Queue(UploadRequest request) {
-  const auto& cmd = context_.GetCommand();
-  auto vkDevice = context_.GetDevice().Logical();
+  if (!pending_)
+    createBatch_();
 
-  if (!pending_.has_value()) {
-    VkFenceCreateInfo fenceInfo{
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-    };
-
-    VkFence fence{VK_NULL_HANDLE};
-    if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create uploader fence!");
-    }
-
-    pending_.emplace(
-        UploadBatch{.Fence = fence, .Command = cmd.BeginTransient(), .BatchID = stagingBuffer_.BeginBatch()});
-  }
-  request.Record(pending_->Command, pending_->BatchID);
-  pending_->OnComplete.emplace_back(std::move(request.OnComplete));
+  if (request.OnComplete)
+    pending_->OnComplete.emplace_back(std::move(request.OnComplete));
 }
 
 void Uploader::Process() {
@@ -54,13 +48,12 @@ void Uploader::Process() {
 
   // Process completed uploads
   for (auto it = submitted_.begin(); it != submitted_.end();) {
-    if (vkGetFenceStatus(vkDevice, it->Fence) == VK_NOT_READY) {
-      ++it;
-      continue;
-    }
+    if (vkGetFenceStatus(vkDevice, it->Fence) == VK_NOT_READY)
+      break; // Submitted FIFO should complete in roughly that order.
 
     for (auto& callback : it->OnComplete) {
-      callback();
+      if (callback)
+        callback();
     }
 
     vkDestroyFence(vkDevice, it->Fence, nullptr);
@@ -70,7 +63,7 @@ void Uploader::Process() {
   }
 
   // Submit pending uploads.
-  if (!pending_.has_value())
+  if (!pending_)
     return;
 
   const VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -81,6 +74,23 @@ void Uploader::Process() {
 
   submitted_.push_back(std::move(*pending_));
   pending_.reset();
+}
+
+void Uploader::createBatch_() {
+  const auto& cmd = context_.GetCommand();
+  auto vkDevice = context_.GetDevice().Logical();
+
+  VkFenceCreateInfo fenceInfo{
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+  };
+
+  VkFence fence{VK_NULL_HANDLE};
+  if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create uploader fence!");
+  }
+
+  pending_.emplace(
+      UploadBatch{.Fence = fence, .Command = cmd.BeginTransient(), .BatchID = stagingBuffer_.BeginBatch()});
 }
 
 } // namespace engine::graphics::vulkan

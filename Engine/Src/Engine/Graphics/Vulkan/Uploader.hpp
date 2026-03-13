@@ -14,14 +14,18 @@ class StagingBuffer;
 
 class Uploader {
 public:
+  struct UploadRequest {
+    std::move_only_function<void() noexcept> OnComplete;
+  };
+  struct UploadContext {
+    VkCommandBuffer Command{VK_NULL_HANDLE};
+    std::uint64_t BatchID{};
+  };
+
   Uploader(Context& context, StagingBuffer& stagingBuffer);
   ~Uploader();
 
-  struct UploadRequest {
-    std::move_only_function<void(VkCommandBuffer, std::uint64_t batchID)> Record;
-    std::move_only_function<void() noexcept> OnComplete;
-  };
-
+  UploadContext GetCurrent();
   void Queue(UploadRequest request);
   void Process();
 
@@ -39,6 +43,8 @@ private:
 
   std::optional<UploadBatch> pending_{};
   std::vector<UploadBatch> submitted_{};
+
+  void createBatch_();
 };
 
 } // namespace engine::graphics::vulkan

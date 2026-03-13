@@ -25,10 +25,10 @@
 #include <array>
 #include <print>
 
+namespace engine::graphics::vulkan {
+
 // Single resources and hardcoded values are used in this stage of development.
 constexpr uint32_t defaultFramebufferID = 0;
-
-namespace engine::graphics::vulkan {
 
 Renderer::Renderer(GLFWwindow* window)
     : context_(window),
@@ -195,8 +195,8 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
-  const MeshGPU& gpuMesh = meshAllocator_.Get(handle.MeshID);
-  if (!gpuMesh.Ready)
+  const MeshAllocator::MeshGPU& meshGPU = meshAllocator_.Get(handle.MeshID);
+  if (meshGPU.State != MeshState::Ready)
     return;
 
   auto descriptor = descriptorAllocator_.DescriptorSet(material.DescriptorSetID, frameContext_.CurrentFrame);
@@ -204,10 +204,10 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
     return;
 
   const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
-  const std::array<VkDeviceSize, 1> offsets = {gpuMesh.VertexOffset};
+  const std::array<VkDeviceSize, 1> offsets = {meshGPU.VertexOffset};
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
-  vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), gpuMesh.IndexOffset, VK_INDEX_TYPE_UINT32);
+  vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), meshGPU.IndexOffset, VK_INDEX_TYPE_UINT32);
 
   auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
 
@@ -219,7 +219,7 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
                           &descriptor,
                           0,
                           nullptr);
-  vkCmdDrawIndexed(commandBuffer, gpuMesh.IndexCount, 1, 0, 0, 0);
+  vkCmdDrawIndexed(commandBuffer, meshGPU.IndexCount, 1, 0, 0, 0);
 }
 
 bool Renderer::ShouldClose() const noexcept {
@@ -256,8 +256,11 @@ void Renderer::DeletePipeline(const PipelineHandle& handle) {
 }
 
 MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
-  const uint32_t meshID = meshAllocator_.Create(mesh);
-  return MeshHandle{.MeshID = meshID};
+  auto result = meshAllocator_.Create(mesh);
+  if (!result) {
+    throw std::runtime_error(std::format("Failed to create mesh: {}", ToString(result.error())));
+  }
+  return MeshHandle{.MeshID = *result};
 }
 
 void Renderer::DeleteMesh(const MeshHandle& handle) {
@@ -265,11 +268,17 @@ void Renderer::DeleteMesh(const MeshHandle& handle) {
 }
 
 TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
-  return TextureHandle{.TextureID = textureAllocator_.Create(data, width, height)};
+  const auto result = textureAllocator_.Create(data, width, height);
+  if (!result) {
+    throw std::runtime_error(std::string{"Failed to create texture: "} + std::string{ToString(result.error())});
+  }
+  return TextureHandle{.TextureID = *result};
 }
 
 std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(const TextureArrayInfo& info) noexcept {
-  textureAllocator_.BeginArray(info);
+  if (auto result = textureAllocator_.BeginArray(info); !result)
+    return std::unexpected{result.error()};
+
   return TextureArrayBuilder{textureAllocator_};
 }
 

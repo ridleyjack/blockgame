@@ -56,7 +56,12 @@ GameLayer::GameLayer(engine::Application& application) : application_(applicatio
   upload("Textures/Tiles/snow.png");
 
   engine::graphics::TextureHandle texture{};
-  texture = builder.Finalize();
+  if (const auto result = builder.Finalize(); !result) {
+    const auto msg = std::format("Failed to finalize texture array: {}", vlk::ToString(arrayBuilderResult.error()));
+    throw std::runtime_error(msg);
+  } else {
+    texture = *result;
+  }
   const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
   std::println("Done!");
 

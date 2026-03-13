@@ -2,7 +2,6 @@
 
 #include "Command.hpp"
 #include "Device.hpp"
-#include "PipelineCache.hpp"
 #include "SwapChain.hpp"
 #include "Sync.hpp"
 #include "Config.hpp"
