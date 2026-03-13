@@ -3,7 +3,8 @@
 #include "Events/Events.hpp"
 #include "Events/IEventRaiser.hpp"
 
-#include <cassert>
+#include <GLFW/glfw3.h>
+
 #include <iostream>
 
 namespace engine {

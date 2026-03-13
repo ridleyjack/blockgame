@@ -3,6 +3,7 @@
 #include "Context.hpp"
 #include "Device.hpp"
 #include "RenderPassCache.hpp"
+#include "VertexLayout.hpp"
 
 #include "Engine/Assets/File.hpp"
 #include "Engine/Graphics/Mesh.hpp"
@@ -128,8 +129,8 @@ std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context
 
   std::array shaderStages = {vertShaderStageInfo, fragShaderStageInfo};
 
-  auto bindingDescription = Vertex::GetBindingDescription();
-  auto attributeDescriptions = Vertex::GetAttributeDescriptions();
+  auto bindingDescription = VertexLayout::GetBindingDescription();
+  auto attributeDescriptions = VertexLayout::GetAttributeDescriptions();
 
   VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
   vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

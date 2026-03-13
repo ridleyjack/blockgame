@@ -34,13 +34,13 @@ if (ENABLE_TESTS)
 endif ()
 
 target_link_libraries(Engine
-        PUBLIC Vulkan::Vulkan
-        PRIVATE glfw
+        PUBLIC
+        Vulkan::Vulkan # TODO: Hide vulkan renderer under interface.
+        PRIVATE
+        glfw
 )
 
-
 target_compile_features(Engine PUBLIC cxx_std_23)
-
 
 add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/Command.cpp
@@ -87,6 +87,7 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/StagingBuffer.hpp
         Src/Engine/Graphics/Vulkan/Uploader.cpp
         Src/Engine/Graphics/Vulkan/Uploader.hpp
+        Src/Engine/Graphics/Vulkan/VertexLayout.hpp
 )
 
 target_include_directories(Engine_Graphics
@@ -97,8 +98,8 @@ target_include_directories(Engine_Graphics
 target_link_libraries(Engine_Graphics
         PUBLIC
         Engine
-        Vulkan::Vulkan
         PRIVATE
+        Vulkan::Vulkan
         glfw
 )
 
