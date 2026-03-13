@@ -18,7 +18,7 @@ Uploader::~Uploader() {
     cmd.FreeTransient(batch.Command);
   };
 
-  if (pending_.has_value()) {
+  if (pending_) {
     freeBatch(*pending_);
   }
   for (auto& batch : submitted_) {
@@ -48,8 +48,10 @@ void Uploader::Process() {
 
   // Process completed uploads
   for (auto it = submitted_.begin(); it != submitted_.end();) {
-    if (vkGetFenceStatus(vkDevice, it->Fence) == VK_NOT_READY)
-      break; // Submitted FIFO should complete in roughly that order.
+    if (vkGetFenceStatus(vkDevice, it->Fence) == VK_NOT_READY) {
+      ++it;
+      continue;
+    }
 
     for (auto& callback : it->OnComplete) {
       if (callback)
@@ -69,8 +71,10 @@ void Uploader::Process() {
   const VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                 .commandBufferCount = 1,
                                 .pCommandBuffers = &pending_->Command};
-  vkEndCommandBuffer(pending_->Command);
-  vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, pending_->Fence);
+  if (vkEndCommandBuffer(pending_->Command) != VK_SUCCESS)
+    throw std::runtime_error("failed to end uploader command!");
+  if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, pending_->Fence) != VK_SUCCESS)
+    throw std::runtime_error("failed to submit uploader command!");
 
   submitted_.push_back(std::move(*pending_));
   pending_.reset();

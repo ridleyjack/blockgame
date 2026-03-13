@@ -28,9 +28,11 @@ std::expected<uint32_t, MeshError> MeshAllocator::Create(const Mesh& mesh) {
       .IndexCount = static_cast<uint32_t>(mesh.Indices.size()),
   };
   auto [cmd, batchID] = uploader_.GetCurrent();
+  // TODO: If mesh creation encounters an error we still record copy commands on now freed buffers. We need to cancel
+  // the whole command or not free the buffers until execution is complete.
 
   // Upload Vertices.
-  if (const std::expected<std::uint32_t, MeshError> result =
+  if (const std::expected<VkDeviceSize, MeshError> result =
           uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Vertices)), alignof(Vertex), cmd, batchID);
       !result) {
     return std::unexpected(result.error());

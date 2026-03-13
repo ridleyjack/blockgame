@@ -31,6 +31,8 @@ std::expected<std::uint32_t, TextureError> TextureAllocator::Create(const std::s
                                                                     const std::uint32_t height) {
   constexpr std::uint32_t numLayers = 1;
   auto [cmd, batchID] = uploader_.GetCurrent();
+  // TODO: If texture creation encounters an error we still record copy commands on now freed buffers. We need to cancel
+  // the whole command or not free the buffers until execution is complete.
 
   TextureGPU texture{};
   if (auto result = createImage_(cmd, width, height, numLayers); !result) {
