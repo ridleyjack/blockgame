@@ -6,6 +6,8 @@
 
 #include "Graphics/Vulkan/Renderer.hpp"
 
+#include <GLFW/glfw3.h>
+
 #include <algorithm>
 #include <cassert>
 #include <ranges>

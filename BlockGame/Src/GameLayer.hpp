@@ -10,7 +10,7 @@ namespace engine {
 class Application;
 
 namespace graphics {
-class Vertex;
+struct Vertex;
 }
 
 namespace events {

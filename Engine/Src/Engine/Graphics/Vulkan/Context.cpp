@@ -11,6 +11,9 @@
 #include <stdexcept>
 #include <vector>
 
+#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
+
 namespace engine::graphics::vulkan {
 namespace debug {
 VkResult CreateUtilsMessengerEXT(const VkInstance instance,

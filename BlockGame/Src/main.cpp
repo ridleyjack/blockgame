@@ -1,7 +1,6 @@
 #include "GameLayer.hpp"
 
 #include "Engine/Application.hpp"
-#include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 int main() {
 

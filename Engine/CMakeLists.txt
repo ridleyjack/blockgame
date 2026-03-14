@@ -1,7 +1,6 @@
 # Engine/CMakeLists.txt
 
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
 
 add_library(Engine
         vendor/stb/stb_image.cpp
@@ -35,12 +34,11 @@ endif ()
 
 target_link_libraries(Engine
         PUBLIC
-        Vulkan::Vulkan # TODO: Hide vulkan renderer under interface.
+        glm::glm
         PRIVATE
+        Vulkan::Vulkan
         glfw
 )
-
-target_compile_features(Engine PUBLIC cxx_std_23)
 
 add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/Command.cpp
@@ -97,11 +95,7 @@ target_include_directories(Engine_Graphics
 target_link_libraries(Engine_Graphics
         PUBLIC
         Engine
-        PRIVATE
         Vulkan::Vulkan
+        PRIVATE
         glfw
 )
-
-target_compile_features(Engine_Graphics PUBLIC cxx_std_23)
-
-

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
 
 #include <memory>
+
+struct GLFWwindow;
 
 namespace engine::graphics::vulkan {
 

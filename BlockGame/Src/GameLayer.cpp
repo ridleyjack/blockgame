@@ -10,6 +10,8 @@
 #include "Engine/Graphics/TextureArrayInfo.hpp"
 #include "Engine/Graphics/TextureArrayBuilder.hpp"
 
+#include <GLFW/glfw3.h>
+
 #include <print>
 
 namespace gfx = engine::graphics;
@@ -88,7 +90,7 @@ void GameLayer::OnUpdate(const float deltaTime) {
 
   auto& renderer = application_.GetRenderer();
   mapMeshes_.Update(renderer);
-};
+}
 
 void GameLayer::OnRender() {
   auto& renderer = application_.GetRenderer();
@@ -116,11 +118,11 @@ void GameLayer::OnRender() {
     std::println("Failed to render frame");
     return;
   }
-};
+}
 
 void GameLayer::OnKeyReleased(const engine::events::KeyReleasedEvent& event) {
   handleKeyInput(event.Keycode, false);
-};
+}
 
 void GameLayer::OnKeyPressed(const engine::events::KeyPressedEvent& event) {
   handleKeyInput(event.Keycode, true);
@@ -143,7 +145,7 @@ void GameLayer::OnMouseMoved(const engine::events::MouseMovedEvent& event) {
 
   constexpr float sensitivity = 0.1f;
   camera_.Rotate(deltaX * sensitivity, deltaY * sensitivity);
-};
+}
 
 void GameLayer::handleKeyInput(const int keycode, const bool state) {
   switch (keycode) {
@@ -163,6 +165,6 @@ void GameLayer::handleKeyInput(const int keycode, const bool state) {
     input_.Exit = true;
     break;
   default:
-    // Do nothing.
+    break;
   }
 }

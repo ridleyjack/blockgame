@@ -13,11 +13,11 @@ add_executable(Blockgame
 )
 
 target_link_libraries(Blockgame
-        PRIVATE Engine
-        PRIVATE Engine_Graphics
+        PRIVATE
+        Engine
+        Engine_Graphics
+        glfw
 )
-
-target_compile_features(Blockgame PRIVATE cxx_std_23)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Textures
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

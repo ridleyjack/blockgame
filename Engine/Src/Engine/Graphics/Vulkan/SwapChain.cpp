@@ -6,6 +6,8 @@
 #include "Sync.hpp"
 #include "RenderPassCache.hpp"
 
+#include <GLFW/glfw3.h>
+
 #include <algorithm>
 #include <cassert>
 #include <limits>
