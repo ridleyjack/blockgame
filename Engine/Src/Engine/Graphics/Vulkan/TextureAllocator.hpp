@@ -19,9 +19,10 @@ struct TextureArrayInfo;
 
 namespace vulkan {
 
-namespace imageutil {
-enum class Error;
-}
+namespace image {
+enum class Error : uint8_t;
+struct ImageViewSpec;
+} // namespace image
 
 class Context;
 class Uploader;
@@ -34,7 +35,7 @@ struct TextureError {
   };
   ErrorCode Code;
 
-  std::variant<std::monostate, imageutil::Error> Cause{};
+  std::variant<std::monostate, image::Error> Cause{};
 };
 
 inline std::string_view ToString(const TextureError& e) noexcept {
@@ -64,6 +65,10 @@ struct TextureGPU {
 
   TextureState State{TextureState::Uploading};
   std::optional<TextureError> Error{};
+
+  std::uint32_t Width{};
+  std::uint32_t Height{};
+  std::uint32_t MipLevels{};
 };
 
 class TextureAllocator {
@@ -93,7 +98,6 @@ private:
     TextureGPU Texture{};
 
     VkDeviceSize LayerSizeBytes{};
-    std::uint32_t Width{}, Height{};
     std::uint32_t NumLayers{};
     std::uint32_t NextLayer{};
   };
@@ -105,8 +109,6 @@ private:
   void uploadLayer_(const TextureGPU& texture,
                     VkCommandBuffer cmd,
                     std::uint64_t batchID,
-                    std::uint32_t width,
-                    std::uint32_t height,
                     std::uint32_t layerIndex,
                     const std::span<const std::byte>& bytes) const noexcept;
 
@@ -116,13 +118,20 @@ private:
   void copyBufferToImage_(VkCommandBuffer cmd,
                           VkDeviceSize stagingOffset,
                           VkImage image,
-                          uint32_t width,
-                          uint32_t height,
-                          uint32_t layerIndex) const noexcept;
+                          std::uint32_t width,
+                          std::uint32_t height,
+                          std::uint32_t layerIndex) const noexcept;
 
-  std::expected<VkImageView, TextureError>
-  createTextureImageView_(VkImage image, VkFormat format, uint32_t arrayLayers) const noexcept;
+  std::expected<VkImageView, TextureError> createTextureImageView_(VkImage image,
+                                                                   const image::ImageViewSpec& spec) const noexcept;
   std::expected<VkSampler, TextureError> createSampler_() const noexcept;
+
+  void generateMipmaps_(VkCommandBuffer cmd,
+                        VkImage image,
+                        std::uint32_t width,
+                        std::uint32_t height,
+                        std::uint32_t layerIndex,
+                        std::uint32_t mipLevels) const noexcept;
 
   void cleanupGPUTexture_(TextureGPU& texture) const noexcept;
 };

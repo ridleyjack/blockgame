@@ -2,7 +2,7 @@
 
 #include "Context.hpp"
 #include "Device.hpp"
-#include "ImageUtil.hpp"
+#include "Image.hpp"
 #include "Sync.hpp"
 #include "RenderPassCache.hpp"
 
@@ -145,9 +145,9 @@ void SwapChain::create_() {
   // Create image views
   imageViews_.resize(images_.size());
   for (uint32_t i = 0; i < images_.size(); i++) {
-    if (auto result = imageutil::CreateImageView(
-            device,
-            {.Format = imageFormat_, .AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT, .Image = images_[i]});
+    if (auto result = image::CreateImageView(device,
+                                             images_[i],
+                                             {.Format = imageFormat_, .AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT});
         result)
       imageViews_[i] = *result;
     else
@@ -201,15 +201,15 @@ void SwapChain::createDepthResources_() {
   const auto& device = context_.GetDevice();
   VkFormat depthFormat = findDepthFormat_();
 
-  if (auto result = imageutil::CreateImage(device,
-                                           {
-                                               .Width = this->extent_.width,
-                                               .Height = this->extent_.height,
-                                               .Format = depthFormat,
-                                               .Tiling = VK_IMAGE_TILING_OPTIMAL,
-                                               .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                               .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                           });
+  if (auto result = image::CreateImage(device,
+                                       {
+                                           .Width = this->extent_.width,
+                                           .Height = this->extent_.height,
+                                           .Format = depthFormat,
+                                           .Tiling = VK_IMAGE_TILING_OPTIMAL,
+                                           .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                           .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                       });
       !result) {
     throw std::runtime_error("failed to create depth depth texture image!");
   } else {
@@ -217,9 +217,8 @@ void SwapChain::createDepthResources_() {
     depthImageMemory_ = result->Memory;
   }
 
-  const auto result = imageutil::CreateImageView(
-      device,
-      {.Format = depthFormat, .AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT, .Image = depthImage_});
+  const auto result =
+      image::CreateImageView(device, depthImage_, {.Format = depthFormat, .AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT});
   if (!result)
     throw std::runtime_error("failed to create depth image views!");
   depthImageView_ = *result;

@@ -1,32 +1,31 @@
-#include "ImageUtil.hpp"
+#include "Image.hpp"
 
 #include "Command.hpp"
 #include "Device.hpp"
 
-#include <stdexcept>
+#include <cassert>
 
-namespace engine::graphics::vulkan::imageutil {
+namespace engine::graphics::vulkan::image {
 
-std::expected<Image, Error> CreateImage(const Device& device, const CreateImageInfo& info) {
+std::expected<Image, Error> CreateImage(const Device& device, const ImageSpec& spec) noexcept {
   auto vkDevice = device.Logical();
 
   Image result{};
 
   // Create VKImage
-  VkImageCreateInfo imageInfo{};
-  imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  imageInfo.imageType = VK_IMAGE_TYPE_2D;
-  imageInfo.extent.width = info.Width;
-  imageInfo.extent.height = info.Height;
-  imageInfo.extent.depth = 1;
-  imageInfo.mipLevels = 1;
-  imageInfo.arrayLayers = info.ArrayLayers;
-  imageInfo.format = info.Format;
-  imageInfo.tiling = info.Tiling;
-  imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  imageInfo.usage = info.Usage;
-  imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+  VkImageCreateInfo imageInfo{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .imageType = VK_IMAGE_TYPE_2D,
+      .format = spec.Format,
+      .extent = {.width = spec.Width, .height = spec.Height, .depth = 1},
+      .mipLevels = spec.MipLevels,
+      .arrayLayers = spec.ArrayLayers,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .tiling = spec.Tiling,
+      .usage = spec.Usage,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+  };
 
   if (vkCreateImage(vkDevice, &imageInfo, nullptr, &result.Handle) != VK_SUCCESS) {
     return std::unexpected(Error::ImageCreationFailed);
@@ -36,10 +35,11 @@ std::expected<Image, Error> CreateImage(const Device& device, const CreateImageI
   VkMemoryRequirements memRequirements;
   vkGetImageMemoryRequirements(vkDevice, result.Handle, &memRequirements);
 
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = device.FindMemoryType(memRequirements.memoryTypeBits, info.Properties);
+  VkMemoryAllocateInfo allocInfo{
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .allocationSize = memRequirements.size,
+      .memoryTypeIndex = device.FindMemoryType(memRequirements.memoryTypeBits, spec.Properties),
+  };
 
   if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &result.Memory) != VK_SUCCESS) {
     vkDestroyImage(vkDevice, result.Handle, nullptr);
@@ -51,33 +51,35 @@ std::expected<Image, Error> CreateImage(const Device& device, const CreateImageI
   return result;
 }
 
-std::expected<VkImageView, Error> CreateImageView(const Device& device, const CreateImageViewInfo& info) {
-  VkImageViewCreateInfo viewInfo{};
-  viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  viewInfo.image = info.Image;
-  viewInfo.viewType = info.ArrayLayers == 1 ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-  viewInfo.format = info.Format;
-  viewInfo.subresourceRange.aspectMask = info.AspectFlags;
-  viewInfo.subresourceRange.baseMipLevel = 0;
-  viewInfo.subresourceRange.levelCount = 1;
-  viewInfo.subresourceRange.baseArrayLayer = 0;
-  viewInfo.subresourceRange.layerCount = info.ArrayLayers;
+std::expected<VkImageView, Error>
+CreateImageView(const Device& device, VkImage image, const ImageViewSpec& spec) noexcept {
+  VkImageViewCreateInfo viewInfo{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image = image,
+      .viewType = spec.ViewType,
+      .format = spec.Format,
+      .subresourceRange = {
+                           .aspectMask = spec.AspectFlags,
+                           .baseMipLevel = 0,
+                           .levelCount = spec.MipLevels,
+                           .baseArrayLayer = 0,
+                           .layerCount = spec.ArrayLayers,
+                           }
+  };
 
   VkImageView imageView;
   if (vkCreateImageView(device.Logical(), &viewInfo, nullptr, &imageView) != VK_SUCCESS) {
     return std::unexpected(Error::ImageViewCreationFailed);
   }
-
+  assert(viewInfo.subresourceRange.levelCount != 0);
   return imageView;
 }
 
 std::expected<void, Error> TransitionImageLayout(VkCommandBuffer cmd,
                                                  VkImage image,
-                                                 VkFormat format,
-                                                 VkImageLayout oldLayout,
-                                                 VkImageLayout newLayout,
-                                                 uint32_t numLayers) {
-
+                                                 const ImageSpec& spec,
+                                                 const VkImageLayout oldLayout,
+                                                 const VkImageLayout newLayout) noexcept {
   VkImageMemoryBarrier barrier{};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.oldLayout = oldLayout;
@@ -88,9 +90,9 @@ std::expected<void, Error> TransitionImageLayout(VkCommandBuffer cmd,
   barrier.image = image;
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.baseMipLevel = 0;
-  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.levelCount = spec.MipLevels;
   barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount = numLayers;
+  barrier.subresourceRange.layerCount = spec.ArrayLayers;
 
   VkPipelineStageFlags sourceStage;
   VkPipelineStageFlags destinationStage;
@@ -123,4 +125,4 @@ std::expected<void, Error> TransitionImageLayout(VkCommandBuffer cmd,
   vkCmdPipelineBarrier(cmd, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
   return {};
 }
-} // namespace engine::graphics::vulkan::imageutil
+} // namespace engine::graphics::vulkan::image
