@@ -1,9 +1,9 @@
 #include "TextureArrayBuilder.hpp"
 
-#include "Handles.hpp"
-#include "Vulkan/TextureAllocator.hpp"
+#include "Engine/Graphics/Handles.hpp"
+#include "Engine/Graphics/Vulkan/TextureAllocator.hpp"
 
-namespace engine::graphics {
+namespace engine::graphics::resources {
 TextureArrayBuilder::TextureArrayBuilder(vulkan::TextureAllocator& allocator) : allocator_(allocator) {}
 
 void TextureArrayBuilder::Upload(const std::span<const std::byte> pixels) const noexcept {
@@ -16,4 +16,4 @@ std::expected<TextureHandle, vulkan::TextureError> TextureArrayBuilder::Finalize
     return std::unexpected(result.error());
   return TextureHandle{.TextureID = *result};
 }
-} // namespace engine::graphics
+} // namespace engine::graphics::resources

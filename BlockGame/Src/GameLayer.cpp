@@ -7,8 +7,7 @@
 #include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Graphics/CameraMatrices.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
-#include "Engine/Graphics/TextureArrayInfo.hpp"
-#include "Engine/Graphics/TextureArrayBuilder.hpp"
+#include "Engine/Graphics/Resources/TextureLoader.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -20,7 +19,6 @@ namespace assets = engine::assets;
 
 GameLayer::GameLayer(engine::Application& application)
     : application_(application), camera_({0.0f, 0.0f, 10 * 16 + 1}), map_(10, 10, 10), mapMeshes_(map_) {
-
   auto& renderer = application_.GetRenderer();
 
   const gfx::RenderPassHandle renderPass = renderer.CreateRenderPass();
@@ -29,44 +27,17 @@ GameLayer::GameLayer(engine::Application& application)
                                                       .VertexShaderFile = "Shaders/vert.spv",
                                                       .FragmentShaderFile = "Shaders/frag.spv"});
 
-  constexpr gfx::TextureArrayInfo info{
-      .Height = 128,
-      .Width = 128,
-      .NumLayers = 4,
-      .LayerSizeBytes = static_cast<std::size_t>(128) * 128 * 4,
-  };
+  gfx::resources::TextureLoader loader(renderer);
+  std::array paths{std::string_view{"Textures/Tiles/dirt.png"},
+                   std::string_view{"Textures/Tiles/stone.png"},
+                   std::string_view{"Textures/Tiles/sand.png"},
+                   std::string_view{"Textures/Tiles/snow.png"}};
 
-  auto arrayBuilderResult = renderer.BeginTextureArray(info);
-  if (!arrayBuilderResult) {
-    const auto msg = std::format("Failed to build texture array: {}", vlk::ToString(arrayBuilderResult.error()));
-    throw std::runtime_error(msg);
-  }
-  const gfx::TextureArrayBuilder& builder = *arrayBuilderResult;
+  auto texture = loader.LoadArray(paths);
+  if (!texture)
+    throw std::runtime_error("Failed to load texture " + texture.error().Detail);
 
-  auto loader = assets::ImageLoader{};
-  auto upload = [&](std::string_view path) {
-    if (auto r = loader.Load(path); !r) {
-      const auto msg = std::format("Failed to load texture {}: {}", path, r.error());
-      throw std::runtime_error(msg);
-    }
-    builder.Upload(loader.Data());
-  };
-
-  std::println("Loading Textures..");
-  upload("Textures/Tiles/dirt.png");
-  upload("Textures/Tiles/stone.png");
-  upload("Textures/Tiles/sand.png");
-  upload("Textures/Tiles/snow.png");
-
-  engine::graphics::TextureHandle texture{};
-  if (const auto result = builder.Finalize(); !result) {
-    const auto msg = std::format("Failed to finalize texture array: {}", vlk::ToString(arrayBuilderResult.error()));
-    throw std::runtime_error(msg);
-  } else {
-    texture = *result;
-  }
-  const gfx::MaterialHandle material = renderer.CreateMaterial(texture);
-  std::println("Done!");
+  const gfx::MaterialHandle material = renderer.CreateMaterial(*texture);
 
   mapMeshes_.BuildAll();
 

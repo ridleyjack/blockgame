@@ -75,9 +75,6 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/Image.cpp
         Src/Engine/Graphics/Vulkan/Image.hpp
         Src/Engine/Graphics/CameraMatrices.hpp
-        Src/Engine/Graphics/TextureArrayBuilder.cpp
-        Src/Engine/Graphics/TextureArrayBuilder.hpp
-        Src/Engine/Graphics/TextureArrayInfo.hpp
         Src/Engine/Graphics/Vulkan/MeshBuffer.cpp
         Src/Engine/Graphics/Vulkan/MeshBuffer.hpp
         Src/Engine/Graphics/Vulkan/StagingBuffer.cpp
@@ -85,6 +82,11 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Vulkan/Uploader.cpp
         Src/Engine/Graphics/Vulkan/Uploader.hpp
         Src/Engine/Graphics/Vulkan/VertexLayout.hpp
+        Src/Engine/Graphics/Resources/TextureArrayBuilder.cpp
+        Src/Engine/Graphics/Resources/TextureArrayBuilder.hpp
+        Src/Engine/Graphics/Resources/TextureArrayInfo.hpp
+        Src/Engine/Graphics/Resources/TextureLoader.cpp
+        Src/Engine/Graphics/Resources/TextureLoader.hpp
 )
 
 target_include_directories(Engine_Graphics

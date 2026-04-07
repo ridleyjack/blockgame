@@ -11,6 +11,7 @@ class TextureAllocator;
 struct TextureError;
 } // namespace vulkan
 
+namespace resources {
 class TextureArrayBuilder {
 public:
   explicit TextureArrayBuilder(vulkan::TextureAllocator& allocator);
@@ -31,4 +32,5 @@ private:
   vulkan::TextureAllocator& allocator_;
 };
 
+} // namespace resources
 } // namespace engine::graphics

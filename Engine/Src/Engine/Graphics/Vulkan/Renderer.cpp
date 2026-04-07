@@ -11,7 +11,7 @@
 
 #include "Engine/Graphics/CameraMatrices.hpp"
 #include "Engine/Graphics/Handles.hpp"
-#include "Engine/Graphics/TextureArrayBuilder.hpp"
+#include "../Resources/TextureArrayBuilder.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
 
@@ -267,19 +267,21 @@ void Renderer::DeleteMesh(const MeshHandle& handle) {
   meshAllocator_.Delete(handle.MeshID);
 }
 
-TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
+std::expected<TextureHandle, TextureError>
+Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
   const auto result = textureAllocator_.Create(data, width, height);
   if (!result) {
-    throw std::runtime_error(std::string{"Failed to create texture: "} + std::string{ToString(result.error())});
+    return std::unexpected(result.error());
   }
   return TextureHandle{.TextureID = *result};
 }
 
-std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(const TextureArrayInfo& info) noexcept {
+std::expected<resources::TextureArrayBuilder, TextureError>
+Renderer::BeginTextureArray(const resources::TextureArrayInfo& info) noexcept {
   if (auto result = textureAllocator_.BeginArray(info); !result)
     return std::unexpected{result.error()};
 
-  return TextureArrayBuilder{textureAllocator_};
+  return resources::TextureArrayBuilder{textureAllocator_};
 }
 
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {

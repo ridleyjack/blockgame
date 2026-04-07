@@ -15,7 +15,9 @@
 
 namespace engine::graphics {
 
+namespace resources {
 struct TextureArrayInfo;
+}
 
 namespace vulkan {
 
@@ -83,7 +85,7 @@ public:
 
   // BeginArray creates a Texture with multiple layers. A texture can be uploaded to each layer. FinishArray must be
   // called before another array can be started.
-  std::expected<void, TextureError> BeginArray(const TextureArrayInfo& info) noexcept;
+  std::expected<void, TextureError> BeginArray(const resources::TextureArrayInfo& info) noexcept;
   void UploadLayer(const std::span<const std::byte>& imageData);
   std::expected<std::uint32_t, TextureError> FinishArray();
 

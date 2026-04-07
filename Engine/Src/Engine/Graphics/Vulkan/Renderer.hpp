@@ -18,9 +18,6 @@ struct GLFWwindow;
 namespace engine::graphics {
 class CameraMatrices;
 
-struct TextureArrayInfo;
-class TextureArrayBuilder;
-
 struct MeshHandle;
 struct Mesh;
 struct MeshCreateInfo;
@@ -31,6 +28,11 @@ struct PipelineCreateInfo;
 
 struct TextureHandle;
 struct MaterialHandle;
+
+namespace resources {
+class TextureArrayBuilder;
+struct TextureArrayInfo;
+} // namespace resources
 
 namespace vulkan {
 class PipelineCache;
@@ -78,8 +80,10 @@ public:
   MeshHandle CreateMesh(const Mesh& mesh);
   void DeleteMesh(const MeshHandle& handle);
 
-  TextureHandle CreateTexture(const std::span<const std::byte>& data, int width, int height);
-  std::expected<TextureArrayBuilder, TextureError> BeginTextureArray(const TextureArrayInfo& info) noexcept;
+  std::expected<TextureHandle, TextureError>
+  CreateTexture(const std::span<const std::byte>& data, int width, int height);
+  std::expected<resources::TextureArrayBuilder, TextureError>
+  BeginTextureArray(const resources::TextureArrayInfo& info) noexcept;
 
   MaterialHandle CreateMaterial(const TextureHandle& texture);
 

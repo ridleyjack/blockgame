@@ -6,7 +6,7 @@
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
-#include "Engine/Graphics/TextureArrayInfo.hpp"
+#include "../Resources/TextureArrayInfo.hpp"
 
 #include <cassert>
 
@@ -77,7 +77,7 @@ const TextureGPU& TextureAllocator::Get(const std::uint32_t textureID) const noe
   return textures_[textureID];
 }
 
-std::expected<void, TextureError> TextureAllocator::BeginArray(const TextureArrayInfo& info) noexcept {
+std::expected<void, TextureError> TextureAllocator::BeginArray(const resources::TextureArrayInfo& info) noexcept {
   assert(!arrayState_.has_value());
   arrayState_.emplace(ArrayBuildState{.LayerSizeBytes = info.LayerSizeBytes, .NumLayers = info.NumLayers});
 
