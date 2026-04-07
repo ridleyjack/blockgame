@@ -8,35 +8,22 @@ constexpr int outputChannels{STBI_rgb_alpha};
 
 namespace engine::assets {
 
-std::expected<void, std::string> ImageLoader::Load(const std::filesystem::path& path) {
-  int channels;
+std::expected<ImageData, std::string> LoadImage(const std::filesystem::path& path) {
+  ImageData result{};
+  int channels{};
+
   stbi_set_flip_vertically_on_load(true);
-  stbi_uc* data = stbi_load(path.c_str(), &width_, &height_, &channels, outputChannels);
+  stbi_uc* data = stbi_load(path.c_str(), &result.Width, &result.Height, &channels, outputChannels);
   if (!data) {
     return std::unexpected{"Failed to load image: " + path.string() + ": " + stbi_failure_reason()};
   }
 
-  const size_t size = static_cast<size_t>(width_) * height_ * outputChannels;
-  pixels_.resize(size);
-  std::memcpy(pixels_.data(), data, size);
-
+  const size_t size = static_cast<size_t>(result.Width) * result.Height * outputChannels;
+  result.Pixels.resize(size);
+  std::memcpy(result.Pixels.data(), data, size);
   stbi_image_free(data);
-  return {};
+
+  return result;
 }
 
-std::span<const std::byte> ImageLoader::Data() const noexcept {
-  return pixels_;
-}
-
-int ImageLoader::Width() const noexcept {
-  return width_;
-}
-
-int ImageLoader::Height() const noexcept {
-  return height_;
-}
-
-int ImageLoader::Channels() const noexcept {
-  return outputChannels;
-}
 } // namespace engine::assets
