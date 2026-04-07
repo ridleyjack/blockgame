@@ -52,6 +52,8 @@ public:
                                VkImageTiling tiling,
                                VkFormatFeatureFlags features) const;
 
+  VkSampleCountFlagBits MsaaSamples() const noexcept;
+
   AllocatedBuffer CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties) const;
   void DestroyBuffer(const AllocatedBuffer& buffer) const noexcept;
   void CopyBuffer(VkBuffer src, VkBuffer dst, VkDeviceSize size) const;
@@ -70,6 +72,10 @@ private:
   VkQueue graphicsQueue_{VK_NULL_HANDLE};
   VkQueue presentQueue_{VK_NULL_HANDLE};
 
+  VkSampleCountFlagBits msaaSamples_{VK_SAMPLE_COUNT_1_BIT};
+
   void pickPhysicalDevice_();
+
+  VkSampleCountFlagBits getMaxUsableSampleCount_() const noexcept;
 };
 } // namespace engine::graphics::vulkan

@@ -40,6 +40,8 @@ struct ImageSpec {
   std::uint32_t MipLevels{1};
   std::uint32_t ArrayLayers{1};
 
+  VkSampleCountFlagBits Samples{VK_SAMPLE_COUNT_1_BIT};
+
   VkFormat Format{};
   VkImageTiling Tiling{};
   VkImageUsageFlags Usage{};

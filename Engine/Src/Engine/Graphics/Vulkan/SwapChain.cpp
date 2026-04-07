@@ -33,6 +33,10 @@ void SwapChain::Cleanup() {
     vkDestroyImageView(vkDevice, imageView, nullptr);
   }
 
+  vkDestroyImageView(vkDevice, colorImageView_, nullptr);
+  vkDestroyImage(vkDevice, colorImage_, nullptr);
+  vkFreeMemory(vkDevice, colorImageMemory_, nullptr);
+
   vkDestroyImageView(vkDevice, depthImageView_, nullptr);
   vkDestroyImage(vkDevice, depthImage_, nullptr);
   vkFreeMemory(vkDevice, depthImageMemory_, nullptr);
@@ -87,6 +91,9 @@ std::vector<VkImageView> SwapChain::ImageViews() const noexcept {
 VkImageView SwapChain::DepthImageView() const noexcept {
   return depthImageView_;
 }
+VkImageView SwapChain::ColorImageView() const noexcept {
+  return colorImageView_;
+}
 
 void SwapChain::create_() {
   const auto& device = context_.GetDevice();
@@ -104,15 +111,16 @@ void SwapChain::create_() {
     imageCount = swapChainSupport.capabilities.maxImageCount;
   }
 
-  VkSwapchainCreateInfoKHR createInfo{};
-  createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  createInfo.surface = surface;
-  createInfo.minImageCount = imageCount;
-  createInfo.imageFormat = surfaceFormat.format;
-  createInfo.imageColorSpace = surfaceFormat.colorSpace;
-  createInfo.imageExtent = extent;
-  createInfo.imageArrayLayers = 1;
-  createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  VkSwapchainCreateInfoKHR createInfo{
+      .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+      .surface = surface,
+      .minImageCount = imageCount,
+      .imageFormat = surfaceFormat.format,
+      .imageColorSpace = surfaceFormat.colorSpace,
+      .imageExtent = extent,
+      .imageArrayLayers = 1,
+      .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+  };
 
   QueueFamilyIndices indices = device.FindQueueFamilies();
   std::array queueFamilyIndices = {indices.GraphicsFamily.value(), indices.PresentFamily.value()};
@@ -158,6 +166,7 @@ void SwapChain::create_() {
     framebuffers_.emplace_back(context_, *this, *renderPass);
   }
 
+  createColorResources_();
   createDepthResources_();
 }
 
@@ -197,6 +206,34 @@ VkExtent2D SwapChain::chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities
   return actualExtent;
 }
 
+void SwapChain::createColorResources_() {
+  const auto& device = context_.GetDevice();
+
+  if (const auto result =
+          image::CreateImage(device,
+                             {
+                                 .Width = this->extent_.width,
+                                 .Height = this->extent_.height,
+                                 .Samples = device.MsaaSamples(),
+                                 .Format = imageFormat_,
+                                 .Tiling = VK_IMAGE_TILING_OPTIMAL,
+                                 .Usage = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                 .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                             });
+      !result) {
+    throw std::runtime_error("failed to create msaa image!");
+  } else {
+    colorImage_ = result->Handle;
+    colorImageMemory_ = result->Memory;
+  }
+
+  const auto result =
+      image::CreateImageView(device, colorImage_, {.Format = imageFormat_, .AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT});
+  if (!result)
+    throw std::runtime_error("failed to create msaa image view!");
+  colorImageView_ = *result;
+}
+
 void SwapChain::createDepthResources_() {
   const auto& device = context_.GetDevice();
   VkFormat depthFormat = findDepthFormat_();
@@ -205,13 +242,14 @@ void SwapChain::createDepthResources_() {
                                        {
                                            .Width = this->extent_.width,
                                            .Height = this->extent_.height,
+                                           .Samples = device.MsaaSamples(),
                                            .Format = depthFormat,
                                            .Tiling = VK_IMAGE_TILING_OPTIMAL,
                                            .Usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                            .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                        });
       !result) {
-    throw std::runtime_error("failed to create depth depth texture image!");
+    throw std::runtime_error("failed to create depth texture image!");
   } else {
     depthImage_ = result->Handle;
     depthImageMemory_ = result->Memory;
@@ -220,18 +258,18 @@ void SwapChain::createDepthResources_() {
   const auto result =
       image::CreateImageView(device, depthImage_, {.Format = depthFormat, .AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT});
   if (!result)
-    throw std::runtime_error("failed to create depth image views!");
+    throw std::runtime_error("failed to create depth image view!");
   depthImageView_ = *result;
 }
 
-VkFormat SwapChain::findDepthFormat_() {
+VkFormat SwapChain::findDepthFormat_() const noexcept {
   return context_.GetDevice().FindSupportedFormat(
       {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
       VK_IMAGE_TILING_OPTIMAL,
       VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 }
 
-bool SwapChain::hasStencilComponent_(const VkFormat format) {
+bool SwapChain::hasStencilComponent_(const VkFormat format) const noexcept {
   return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 } // namespace engine::graphics::vulkan

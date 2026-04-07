@@ -283,9 +283,6 @@ std::expected<TextureArrayBuilder, TextureError> Renderer::BeginTextureArray(con
 }
 
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
-  auto& device = context_.GetDevice();
-  const auto& textureGPU = textureAllocator_.Get(texture.TextureID);
-
   const std::uint32_t descriptorID =
       descriptorAllocator_.CreateDescriptorSet(descriptorAllocator_.DescriptorSetLayout(),
                                                frameContext_.CameraGPU,

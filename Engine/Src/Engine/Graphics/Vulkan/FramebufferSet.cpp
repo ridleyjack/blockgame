@@ -17,7 +17,7 @@ FramebufferSet::FramebufferSet(Context& context, const SwapChain& swapChain, con
 
   framebuffers_.resize(imageViews.size());
   for (size_t i = 0; i < imageViews.size(); i++) {
-    const std::array attachments = {imageViews[i], swapChain.DepthImageView()};
+    const std::array attachments = {swapChain.ColorImageView(), swapChain.DepthImageView(), imageViews[i]};
 
     VkFramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

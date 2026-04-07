@@ -128,6 +128,9 @@ VkFormat Device::FindSupportedFormat(const std::vector<VkFormat>& candidates,
   }
   throw std::runtime_error("failed to find supported format!");
 }
+VkSampleCountFlagBits Device::MsaaSamples() const noexcept {
+  return msaaSamples_;
+}
 
 AllocatedBuffer Device::CreateBuffer(const VkDeviceSize size,
                                      const VkBufferUsageFlags usage,
@@ -273,23 +276,44 @@ void Device::pickPhysicalDevice_() {
   std::vector<VkPhysicalDevice> devices(deviceCount);
   vkEnumeratePhysicalDevices(context_.Instance(), &deviceCount, devices.data());
 
-  std::vector<VkPhysicalDevice> suitableDevices{};
   for (const auto& device : devices) {
     if (isDeviceSuitable_(device, context_.Surface())) {
-      suitableDevices.push_back(device);
+      physicalDevice_ = device;
+      msaaSamples_ = getMaxUsableSampleCount_();
+      break;
     }
-  }
-
-  VkSurfaceCapabilitiesKHR caps;
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(suitableDevices[0], context_.Surface(), &caps);
-
-  if (!suitableDevices.empty()) {
-    physicalDevice_ = suitableDevices[0];
   }
 
   if (physicalDevice_ == VK_NULL_HANDLE) {
     throw std::runtime_error("failed to find a suitable GPU!");
   }
+}
+
+VkSampleCountFlagBits Device::getMaxUsableSampleCount_() const noexcept {
+  VkPhysicalDeviceProperties physicalDeviceProperties;
+  vkGetPhysicalDeviceProperties(physicalDevice_, &physicalDeviceProperties);
+
+  const VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts &
+                                    physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+  if (counts & VK_SAMPLE_COUNT_64_BIT) {
+    return VK_SAMPLE_COUNT_64_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_32_BIT) {
+    return VK_SAMPLE_COUNT_32_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_16_BIT) {
+    return VK_SAMPLE_COUNT_16_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_8_BIT) {
+    return VK_SAMPLE_COUNT_8_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_4_BIT) {
+    return VK_SAMPLE_COUNT_4_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_2_BIT) {
+    return VK_SAMPLE_COUNT_2_BIT;
+  }
+  return VK_SAMPLE_COUNT_1_BIT;
 }
 
 } // namespace engine::graphics::vulkan

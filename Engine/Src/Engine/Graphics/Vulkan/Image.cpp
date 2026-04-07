@@ -20,7 +20,7 @@ std::expected<Image, Error> CreateImage(const Device& device, const ImageSpec& s
       .extent = {.width = spec.Width, .height = spec.Height, .depth = 1},
       .mipLevels = spec.MipLevels,
       .arrayLayers = spec.ArrayLayers,
-      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .samples = spec.Samples,
       .tiling = spec.Tiling,
       .usage = spec.Usage,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,

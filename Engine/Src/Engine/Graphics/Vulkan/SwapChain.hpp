@@ -32,6 +32,7 @@ public:
   std::vector<VkImageView> ImageViews() const noexcept;
 
   VkImageView DepthImageView() const noexcept;
+  VkImageView ColorImageView() const noexcept;
 
 private:
   Context& context_;
@@ -51,12 +52,18 @@ private:
   VkPresentModeKHR choosePresentMode_(const std::vector<VkPresentModeKHR>& availablePresentModes) const;
   VkExtent2D chooseExtent_(const VkSurfaceCapabilitiesKHR& capabilities) const;
 
+  VkImage colorImage_{VK_NULL_HANDLE};
+  VkDeviceMemory colorImageMemory_{VK_NULL_HANDLE};
+  VkImageView colorImageView_{VK_NULL_HANDLE};
+
   VkImage depthImage_{VK_NULL_HANDLE};
   VkDeviceMemory depthImageMemory_{VK_NULL_HANDLE};
   VkImageView depthImageView_{VK_NULL_HANDLE};
 
+  void createColorResources_();
   void createDepthResources_();
-  VkFormat findDepthFormat_();
-  bool hasStencilComponent_(VkFormat format);
+
+  VkFormat findDepthFormat_() const noexcept;
+  bool hasStencilComponent_(VkFormat format) const noexcept;
 };
 } // namespace engine::graphics::vulkan
