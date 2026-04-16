@@ -15,6 +15,7 @@ class Renderer;
 }
 
 class Map;
+class BlockRegistry;
 
 struct ChunkMesh {
   engine::graphics::MeshHandle Mesh{};
@@ -50,7 +51,7 @@ struct ChunkBuildResult {
 
 class ChunkMeshes {
 public:
-  explicit ChunkMeshes(Map& map);
+  ChunkMeshes(Map& map, BlockRegistry& blockRegistry);
   ~ChunkMeshes();
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
@@ -68,6 +69,8 @@ private:
   std::atomic<bool> stop_{};
   ThreadSafeQueue<ChunkBuildJob> buildQueue_{};
   ThreadSafeQueue<ChunkBuildResult> resultQueue_{};
+
+  BlockRegistry& blockRegistry_;
 
   void startWorkers_(std::uint32_t count);
   void stopWorkers_();

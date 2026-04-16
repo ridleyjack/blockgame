@@ -1,18 +1,18 @@
 #include "ChunkMeshes.hpp"
 
+#include "BlockRegistry.hpp"
 #include "Grid3D.hpp"
 #include "Map.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <cstddef>
-#include <map>
 #include <print>
 
-ChunkMeshes::ChunkMeshes(Map& map) : map_(map), meshes_(map.Depth(), map.Height(), map.Width(), {}) {
+ChunkMeshes::ChunkMeshes(Map& map, BlockRegistry& blockRegistry)
+    : map_(map), meshes_(map.Depth(), map.Height(), map.Width(), {}), blockRegistry_(blockRegistry) {
   std::uint32_t threadNum = std::thread::hardware_concurrency();
-  std::println("Thread num is {}", threadNum);
-  threadNum = threadNum < 2 ? 8 : threadNum - 1;
+  threadNum = threadNum < 2 ? 1 : threadNum - 1;
   startWorkers_(threadNum);
 }
 ChunkMeshes::~ChunkMeshes() {
@@ -71,11 +71,8 @@ void ChunkMeshes::workerLoop_() {
     if (!job) {
       return; // Stop requested.
     }
-
-    // std::println("started chunk at X:{} Y:{} Z:{}", job->Coord.X, job->Coord.Y, job->Coord.Z);
     ChunkMesh mesh = buildChunk_(job->Coord);
     resultQueue_.Push({job->Coord, std::move(mesh)});
-    // std::println("finished chunk at X:{} Y:{} Z:{}", job->Coord.X, job->Coord.Y, job->Coord.Z);
   }
 }
 
@@ -170,69 +167,76 @@ void ChunkMeshes::buildVertices_(ChunkMesh& mesh,
   std::vector<gfx::Vertex>& vertices = mesh.Vertices;
   vertices.reserve(vertices.size() + verticesPerFace * faces.NumEnabled());
 
+  const auto& textures = blockRegistry_.GetBlockDef(static_cast<BlockType>(blockType)).FaceTextures;
   if (faces.Front) {
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Front]);
     // +Z (Front)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = blockType},
+                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Back) {
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Back]);
     // -Z (Back)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = blockType},
+                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Right) {
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Back]);
     // +X (Right)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = blockType},
+                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Left) {
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Left]);
     // -X (Left)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = blockType},
+                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Top) {
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Top]);
     // +Y (Top)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z}, .TexCoord = {0, 1}, .TextureIndex = blockType},
+                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Bottom) {
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Bottom]);
     // -Y (Bottom)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = blockType},
-                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = blockType},
-                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = blockType},
+                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 }

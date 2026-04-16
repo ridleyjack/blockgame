@@ -1,8 +1,10 @@
 #pragma once
 
+#include "BlockRegistry.hpp"
 #include "Camera.hpp"
 #include "ChunkMeshes.hpp"
 #include "Map.hpp"
+#include "TextureRegistry.hpp"
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
 
@@ -51,18 +53,14 @@ public:
 private:
   engine::Application& application_;
 
+  TextureRegistry textures_;
+  BlockRegistry blocks_{};
+
   Camera camera_{};
   KeyInput input_{};
 
   Map map_;
   ChunkMeshes mapMeshes_;
-
-  struct RenderItem {
-    gfx::RenderPassHandle RenderPass{};
-    gfx::PipelineHandle Pipeline{};
-    gfx::MaterialHandle Material{};
-  };
-  RenderItem renderItem_;
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};

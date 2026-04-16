@@ -10,6 +10,10 @@ add_executable(Blockgame
         Src/Map.cpp
         Src/Map.hpp
         Src/Containers/ThreadSafeQueue.hpp
+        Src/BlockRegistry.cpp
+        Src/BlockRegistry.hpp
+        Src/TextureRegistry.cpp
+        Src/TextureRegistry.hpp
 )
 
 target_link_libraries(Blockgame
