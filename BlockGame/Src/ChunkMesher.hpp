@@ -49,10 +49,10 @@ struct ChunkBuildResult {
   ChunkMesh Mesh{};
 };
 
-class ChunkMeshes {
+class ChunkMesher {
 public:
-  ChunkMeshes(Map& map, BlockRegistry& blockRegistry);
-  ~ChunkMeshes();
+  ChunkMesher(Map& map, BlockRegistry& blockRegistry);
+  ~ChunkMesher();
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
 

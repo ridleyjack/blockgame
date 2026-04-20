@@ -1,4 +1,4 @@
-#include "ChunkMeshes.hpp"
+#include "ChunkMesher.hpp"
 
 #include "BlockRegistry.hpp"
 #include "Grid3D.hpp"
@@ -9,22 +9,22 @@
 #include <cstddef>
 #include <print>
 
-ChunkMeshes::ChunkMeshes(Map& map, BlockRegistry& blockRegistry)
+ChunkMesher::ChunkMesher(Map& map, BlockRegistry& blockRegistry)
     : map_(map), meshes_(map.Depth(), map.Height(), map.Width(), {}), blockRegistry_(blockRegistry) {
   std::uint32_t threadNum = std::thread::hardware_concurrency();
   threadNum = threadNum < 2 ? 1 : threadNum - 1;
   startWorkers_(threadNum);
 }
-ChunkMeshes::~ChunkMeshes() {
+ChunkMesher::~ChunkMesher() {
   stopWorkers_();
 }
 
-const ChunkMesh& ChunkMeshes::Mesh(const math::Vec3Int& mapCoord) const {
+const ChunkMesh& ChunkMesher::Mesh(const math::Vec3Int& mapCoord) const {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
   return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
 }
 
-void ChunkMeshes::BuildAll() {
+void ChunkMesher::BuildAll() {
   for (std::int32_t z = 0; z < map_.Depth(); z++)
     for (std::int32_t y = 0; y < map_.Height(); y++)
       for (std::int32_t x = 0; x < map_.Width(); x++)
@@ -33,11 +33,11 @@ void ChunkMeshes::BuildAll() {
         });
 }
 
-void ChunkMeshes::BuildChunk(const math::Vec3Int& mapCoord) {
+void ChunkMesher::BuildChunk(const math::Vec3Int& mapCoord) {
   buildQueue_.Push({mapCoord});
 }
 
-void ChunkMeshes::Update(vlk::Renderer& renderer) {
+void ChunkMesher::Update(vlk::Renderer& renderer) {
   while (auto opt = resultQueue_.TryPop()) {
     auto& result = *opt;
 
@@ -46,14 +46,14 @@ void ChunkMeshes::Update(vlk::Renderer& renderer) {
   }
 }
 
-void ChunkMeshes::startWorkers_(std::uint32_t count) {
+void ChunkMesher::startWorkers_(std::uint32_t count) {
   stop_ = false;
   for (std::uint32_t i = 0; i < count; i++) {
-    workers_.emplace_back(&ChunkMeshes::workerLoop_, this);
+    workers_.emplace_back(&ChunkMesher::workerLoop_, this);
   }
 }
 
-void ChunkMeshes::stopWorkers_() {
+void ChunkMesher::stopWorkers_() {
   stop_.store(true);
   buildQueue_.NotifyAll();
 
@@ -65,7 +65,7 @@ void ChunkMeshes::stopWorkers_() {
   workers_.clear();
 }
 
-void ChunkMeshes::workerLoop_() {
+void ChunkMesher::workerLoop_() {
   while (true) {
     auto job = buildQueue_.WaitPop(stop_);
     if (!job) {
@@ -76,7 +76,7 @@ void ChunkMeshes::workerLoop_() {
   }
 }
 
-ChunkMesh ChunkMeshes::buildChunk_(const math::Vec3Int& mapCoord) {
+ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
   const auto& chunk = map_.GetChunk(mapCoord.Z, mapCoord.Y, mapCoord.X).Blocks;
 
   ChunkMesh mesh{};
@@ -147,7 +147,7 @@ ChunkMesh ChunkMeshes::buildChunk_(const math::Vec3Int& mapCoord) {
   return mesh;
 }
 
-void ChunkMeshes::buildVertices_(ChunkMesh& mesh,
+void ChunkMesher::buildVertices_(ChunkMesh& mesh,
                                  const BlockFaces& faces,
                                  std::uint32_t blockType,
                                  float z,
@@ -241,7 +241,7 @@ void ChunkMeshes::buildVertices_(ChunkMesh& mesh,
   }
 }
 
-void ChunkMeshes::buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, const std::uint32_t numFaces) {
+void ChunkMesher::buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, const std::uint32_t numFaces) {
   constexpr std::size_t indicesPerFace = 6;
   constexpr std::uint32_t verticesPerFace = 4;
   static constexpr std::array<std::uint32_t, indicesPerFace> faceIndices{
@@ -258,7 +258,7 @@ void ChunkMeshes::buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, const
   }
 }
 
-void ChunkMeshes::upload_(vlk::Renderer& renderer, ChunkMesh& mesh) {
+void ChunkMesher::upload_(vlk::Renderer& renderer, ChunkMesh& mesh) {
   if (!mesh.HasVertices())
     return;
 

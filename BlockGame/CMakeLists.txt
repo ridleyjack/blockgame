@@ -5,8 +5,8 @@ add_executable(Blockgame
         Src/Camera.cpp
         Src/Camera.hpp
         Src/Grid3D.hpp
-        Src/ChunkMeshes.cpp
-        Src/ChunkMeshes.hpp
+        Src/ChunkMesher.cpp
+        Src/ChunkMesher.hpp
         Src/Map.cpp
         Src/Map.hpp
         Src/Containers/ThreadSafeQueue.hpp

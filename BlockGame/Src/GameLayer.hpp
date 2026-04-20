@@ -2,7 +2,7 @@
 
 #include "BlockRegistry.hpp"
 #include "Camera.hpp"
-#include "ChunkMeshes.hpp"
+#include "ChunkMesher.hpp"
 #include "Map.hpp"
 #include "TextureRegistry.hpp"
 #include "Engine/ILayer.hpp"
@@ -60,7 +60,7 @@ private:
   KeyInput input_{};
 
   Map map_;
-  ChunkMeshes mapMeshes_;
+  ChunkMesher mapMeshes_;
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};
