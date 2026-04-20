@@ -18,35 +18,39 @@ class DescriptorAllocator {
 public:
   static UniformBuffer CreateUniformBuffer(const Device& device);
 
+  static constexpr std::uint32_t MaxTextures = 256;
+
   DescriptorAllocator(Context& context, TextureAllocator& textureAllocator);
   ~DescriptorAllocator();
 
-  std::uint32_t CreateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout,
-                                    const UniformBuffer& uniformGPU,
-                                    std::uint32_t textureID);
+  void CreateGlobalDescriptorSets(const UniformBuffer& uniformGPU);
+  std::uint32_t CreateTextureDescriptorSet(std::uint32_t textureID);
 
-  VkDescriptorSet DescriptorSet(std::uint32_t setID, std::uint32_t frame) noexcept;
+  VkDescriptorSet GlobalDescriptorSet(std::uint32_t frame) const noexcept;
+  VkDescriptorSet TextureDescriptorSet(std::uint32_t setID) noexcept;
 
-  // DescriptorSetLayout returns the default layout that is used by all rendering components at this stage of
-  // development.
-  VkDescriptorSetLayout DescriptorSetLayout() const noexcept;
+  // DescriptorSetLayout returns the layout used for the per frame global UBO and the
+  std::array<VkDescriptorSetLayout, 2> DescriptorSetLayouts() const noexcept;
 
 private:
   struct DescriptorEntry {
-    std::array<VkDescriptorSet, config::MaxFramesInFlight> Sets{};
     std::uint32_t TextureID{};
+    VkDescriptorSet DescriptorSet{VK_NULL_HANDLE};
     bool TextureReady{};
   };
 
   Context& context_;
   TextureAllocator& textureAllocator_;
 
-  VkDescriptorSetLayout descriptorSetLayout_{VK_NULL_HANDLE};
+  VkDescriptorSetLayout globalSetLayout_{VK_NULL_HANDLE};
+  VkDescriptorSetLayout textureSetLayout_{VK_NULL_HANDLE};
+
   VkDescriptorPool descriptorPool_{VK_NULL_HANDLE};
 
-  std::vector<DescriptorEntry> descriptorSets_{};
+  std::array<VkDescriptorSet, config::MaxFramesInFlight> globalSets_{};
+  std::vector<DescriptorEntry> textureSets_{};
 
-  void createDescriptorSetLayout_();
+  void createDescriptorSetLayouts_();
   void writeTexture(DescriptorEntry& entry, const TextureGPU& texture) const noexcept;
 };
 

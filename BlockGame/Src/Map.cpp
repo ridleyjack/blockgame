@@ -1,5 +1,7 @@
 #include "Map.hpp"
 
+#include "BlockRegistry.hpp"
+
 Map::Map(std::uint32_t width, std::uint32_t height, std::uint32_t depth)
     : width_(width), height_(height), depth_(depth), chunks_(depth, height, width, {}) {
 
@@ -30,7 +32,7 @@ std::uint32_t Map::Height() const noexcept {
 void Map::fillChunk_(const std::uint32_t mapZ, const std::uint32_t mapY, const std::uint32_t mapX) noexcept {
   Grid3D<std::uint8_t>& blocks = chunks_[mapZ, mapY, mapX].Blocks;
 
-  const std::uint32_t blockVal = mapZ % 4 + 1;
+  const std::uint32_t blockVal = (mapZ + mapY + mapX) % BlockTypeCount + 1;
   for (std::uint32_t z = 0; z < blocks.Depth(); z++)
     for (std::uint32_t y = 0; y < blocks.Height(); y++)
       for (std::uint32_t x = 0; x < blocks.Width(); x++) {

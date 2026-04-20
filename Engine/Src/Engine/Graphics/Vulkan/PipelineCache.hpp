@@ -22,9 +22,10 @@ public:
   PipelineCache(const PipelineCache&) = delete;
   PipelineCache& operator=(const PipelineCache&) = delete;
 
-  std::expected<std::uint32_t, PipelineError> CreatePipeline(const PipelineCreateInfo& info,
-                                                             const RenderPass& renderPass,
-                                                             VkDescriptorSetLayout descriptorSetLayout) noexcept;
+  std::expected<std::uint32_t, PipelineError>
+  CreatePipeline(const PipelineCreateInfo& info,
+                 const RenderPass& renderPass,
+                 std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) noexcept;
   Pipeline& GetPipeline(std::uint32_t pipelineID) noexcept;
   void DestroyPipeline(std::uint32_t pipelineID) noexcept;
 

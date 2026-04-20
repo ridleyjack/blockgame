@@ -15,12 +15,12 @@ namespace engine::graphics::vulkan {
 std::expected<Pipeline, PipelineError> Pipeline::Create(Context& context,
                                                         const RenderPass& renderPass,
                                                         const PipelineCreateInfo& info,
-                                                        VkDescriptorSetLayout descriptorSetLayout) {
+                                                        std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) {
   auto vkDevice = context.GetDevice().Logical();
   VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
   VkPipeline pipeline{VK_NULL_HANDLE};
 
-  if (auto result = createPipelineLayout_(context, descriptorSetLayout); !result) {
+  if (auto result = createPipelineLayout_(context, descriptorSetLayouts); !result) {
     return std::unexpected(result.error());
   } else {
     pipelineLayout = *result;
@@ -61,12 +61,13 @@ VkPipeline Pipeline::Handle() const noexcept {
 }
 
 std::expected<VkPipelineLayout, PipelineError>
-Pipeline::createPipelineLayout_(const Context& context, VkDescriptorSetLayout descriptorLayout) noexcept {
+Pipeline::createPipelineLayout_(const Context& context,
+                                std::array<VkDescriptorSetLayout, 2> descriptorLayouts) noexcept {
   const auto vkDevice = context.GetDevice().Logical();
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptorLayout,
+      .setLayoutCount = descriptorLayouts.size(),
+      .pSetLayouts = descriptorLayouts.data(),
       .pushConstantRangeCount = 0,
   };
 

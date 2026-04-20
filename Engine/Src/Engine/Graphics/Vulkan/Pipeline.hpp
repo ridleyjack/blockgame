@@ -39,8 +39,10 @@ constexpr std::string_view ToString(const PipelineError e) noexcept {
 
 class Pipeline {
 public:
-  static std::expected<Pipeline, PipelineError>
-  Create(Context& context, const RenderPass& renderPass, const PipelineCreateInfo& info, VkDescriptorSetLayout layout);
+  static std::expected<Pipeline, PipelineError> Create(Context& context,
+                                                       const RenderPass& renderPass,
+                                                       const PipelineCreateInfo& info,
+                                                       std::array<VkDescriptorSetLayout, 2> layouts);
 
   Pipeline(Context& context, VkPipelineLayout pipelineLayout, VkPipeline pipeline);
   ~Pipeline();
@@ -55,7 +57,7 @@ public:
 
 private:
   static std::expected<VkPipelineLayout, PipelineError>
-  createPipelineLayout_(const Context& context, VkDescriptorSetLayout descriptorSetLayout) noexcept;
+  createPipelineLayout_(const Context& context, std::array<VkDescriptorSetLayout, 2> layouts) noexcept;
 
   static std::expected<VkPipeline, PipelineError> createPipeline_(const Context& context,
                                                                   const PipelineCreateInfo& info,

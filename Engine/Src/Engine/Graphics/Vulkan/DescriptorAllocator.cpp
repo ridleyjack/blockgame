@@ -33,113 +33,149 @@ DescriptorAllocator::DescriptorAllocator(Context& context, TextureAllocator& tex
   poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   poolSizes[0].descriptorCount = config::MaxFramesInFlight;
   poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  poolSizes[1].descriptorCount = config::MaxFramesInFlight;
+  poolSizes[1].descriptorCount = MaxTextures;
 
-  VkDescriptorPoolCreateInfo poolInfo{};
-  poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  poolInfo.poolSizeCount = poolSizes.size();
-  poolInfo.pPoolSizes = poolSizes.data();
-  poolInfo.maxSets = config::MaxFramesInFlight;
+  VkDescriptorPoolCreateInfo poolInfo{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .maxSets = config::MaxFramesInFlight + MaxTextures,
+      .poolSizeCount = poolSizes.size(),
+      .pPoolSizes = poolSizes.data(),
+  };
+
   if (vkCreateDescriptorPool(device.Logical(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create descriptor pool!");
   }
 
-  createDescriptorSetLayout_();
+  createDescriptorSetLayouts_();
 }
 
 DescriptorAllocator::~DescriptorAllocator() {
   const auto& device = context_.GetDevice();
   vkDestroyDescriptorPool(device.Logical(), descriptorPool_, nullptr);
-  vkDestroyDescriptorSetLayout(device.Logical(), descriptorSetLayout_, nullptr);
+  vkDestroyDescriptorSetLayout(device.Logical(), globalSetLayout_, nullptr);
+  vkDestroyDescriptorSetLayout(device.Logical(), textureSetLayout_, nullptr);
 }
 
-std::uint32_t DescriptorAllocator::CreateDescriptorSet(VkDescriptorSetLayout descriptorSetLayout,
-                                                       const UniformBuffer& uniformGPU,
-                                                       std::uint32_t textureID) {
-
+void DescriptorAllocator::CreateGlobalDescriptorSets(const UniformBuffer& uniformGPU) {
   const auto& vkDevice = context_.GetDevice().Logical();
 
   std::array<VkDescriptorSetLayout, config::MaxFramesInFlight> layouts{};
-  layouts.fill(descriptorSetLayout);
+  layouts.fill(globalSetLayout_);
 
-  VkDescriptorSetAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocInfo.descriptorPool = descriptorPool_;
-  allocInfo.descriptorSetCount = static_cast<uint32_t>(config::MaxFramesInFlight);
-  allocInfo.pSetLayouts = layouts.data();
-
-  DescriptorEntry entry{.TextureID = textureID};
-  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, entry.Sets.data()) != VK_SUCCESS) {
+  VkDescriptorSetAllocateInfo allocInfo{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .descriptorPool = descriptorPool_,
+      .descriptorSetCount = static_cast<uint32_t>(config::MaxFramesInFlight),
+      .pSetLayouts = layouts.data(),
+  };
+  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, globalSets_.data()) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate descriptor sets!");
   }
 
   // Update Descriptor Sets.
   for (std::size_t i = 0; i < config::MaxFramesInFlight; i++) {
-    VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = uniformGPU.Buffers[i].Buffer;
-    bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(UniformBufferObject);
+    VkDescriptorBufferInfo bufferInfo{
+        .buffer = uniformGPU.Buffers[i].Buffer,
+        .offset = 0,
+        .range = sizeof(UniformBufferObject),
+    };
 
-    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
-
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = entry.Sets[i];
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &bufferInfo;
-
+    std::array<VkWriteDescriptorSet, 1> descriptorWrites{
+        VkWriteDescriptorSet{
+                             .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                             .dstSet = globalSets_[i],
+                             .dstBinding = 0,
+                             .dstArrayElement = 0,
+                             .descriptorCount = 1,
+                             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                             .pBufferInfo = &bufferInfo,
+                             }
+    };
     vkUpdateDescriptorSets(vkDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
   }
-
-  descriptorSets_.push_back(entry);
-  return descriptorSets_.size() - 1;
 }
 
-// DescriptorSet returns the requested VKDescriptorSet. VK_NULL_HANDLE is returned if uploading the dependencies is not
-// finished.
-VkDescriptorSet DescriptorAllocator::DescriptorSet(const std::uint32_t setID, const std::uint32_t frame) noexcept {
-  assert(setID < descriptorSets_.size());
+std::uint32_t DescriptorAllocator::CreateTextureDescriptorSet(std::uint32_t textureID) {
+  const auto& vkDevice = context_.GetDevice().Logical();
+  DescriptorEntry entry{.TextureID = textureID};
 
-  auto& entry = descriptorSets_[setID];
+  VkDescriptorSetAllocateInfo allocInfo{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .descriptorPool = descriptorPool_,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &textureSetLayout_,
+  };
+  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, &entry.DescriptorSet) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate descriptor sets!");
+  }
+
+  textureSets_.emplace_back(entry);
+  return textureSets_.size() - 1;
+}
+
+// GlobalDescriptorSet returns the requested VKDescriptorSet. VK_NULL_HANDLE is returned if uploading the dependencies
+// is not finished.
+VkDescriptorSet DescriptorAllocator::GlobalDescriptorSet(const std::uint32_t frame) const noexcept {
+  assert(globalSets_[frame] != VK_NULL_HANDLE);
+  return globalSets_[frame];
+}
+
+VkDescriptorSet DescriptorAllocator::TextureDescriptorSet(const std::uint32_t textureSetID) noexcept {
+  assert(textureSetID < textureSets_.size());
+
+  auto& entry = textureSets_[textureSetID];
   if (!entry.TextureReady) {
     const TextureGPU& texture = textureAllocator_.Get(entry.TextureID);
     if (texture.State != TextureState::Ready)
       return VK_NULL_HANDLE;
     writeTexture(entry, texture);
   }
-
-  return descriptorSets_[setID].Sets[frame];
-}
-VkDescriptorSetLayout DescriptorAllocator::DescriptorSetLayout() const noexcept {
-  return descriptorSetLayout_;
+  return entry.DescriptorSet;
 }
 
-void DescriptorAllocator::createDescriptorSetLayout_() {
+std::array<VkDescriptorSetLayout, 2> DescriptorAllocator::DescriptorSetLayouts() const noexcept {
+  return std::array<VkDescriptorSetLayout, 2>{globalSetLayout_, textureSetLayout_};
+}
+
+void DescriptorAllocator::createDescriptorSetLayouts_() {
   const auto& device = context_.GetDevice().Logical();
 
-  VkDescriptorSetLayoutBinding uboLayoutBinding{};
-  uboLayoutBinding.binding = 0;
-  uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  uboLayoutBinding.descriptorCount = 1;
-  uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  // UBO Layout
+  constexpr VkDescriptorSetLayoutBinding uboLayoutBinding{
+      .binding = 0,
+      .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      .descriptorCount = 1,
+      .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+  };
 
-  VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-  samplerLayoutBinding.binding = 1;
-  samplerLayoutBinding.descriptorCount = 1;
-  samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  constexpr std::array<VkDescriptorSetLayoutBinding, 1> uboBinding{uboLayoutBinding};
+  const VkDescriptorSetLayoutCreateInfo uboLayoutInfo{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = uboBinding.size(),
+      .pBindings = uboBinding.data(),
+  };
 
-  const std::array<VkDescriptorSetLayoutBinding, 2> bindings{uboLayoutBinding, samplerLayoutBinding};
+  if (vkCreateDescriptorSetLayout(device, &uboLayoutInfo, nullptr, &globalSetLayout_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create UBO descriptor set layout!");
+  }
 
-  VkDescriptorSetLayoutCreateInfo layoutInfo{};
-  layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layoutInfo.bindingCount = bindings.size();
-  layoutInfo.pBindings = bindings.data();
+  // Texture Layout
+  constexpr VkDescriptorSetLayoutBinding samplerLayoutBinding{
+      .binding = 0,
+      .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      .descriptorCount = 1,
+      .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+  };
 
-  if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create descriptor set layout!");
+  constexpr std::array<VkDescriptorSetLayoutBinding, 1> textureBinding{samplerLayoutBinding};
+  const VkDescriptorSetLayoutCreateInfo textureLayoutInfo{
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = textureBinding.size(),
+      .pBindings = textureBinding.data(),
+  };
+
+  if (vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr, &textureSetLayout_) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create texture descriptor set layout!");
   }
 }
 
@@ -155,8 +191,8 @@ void DescriptorAllocator::writeTexture(DescriptorEntry& entry, const TextureGPU&
 
     std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
     descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = entry.Sets[i];
-    descriptorWrites[0].dstBinding = 1;
+    descriptorWrites[0].dstSet = entry.DescriptorSet;
+    descriptorWrites[0].dstBinding = 0;
     descriptorWrites[0].dstArrayElement = 0;
     descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     descriptorWrites[0].descriptorCount = 1;

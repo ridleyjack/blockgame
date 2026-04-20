@@ -43,6 +43,7 @@ Renderer::Renderer(GLFWwindow* window)
 
   const auto& device = context_.GetDevice();
   frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
+  descriptorAllocator_.CreateGlobalDescriptorSets(frameContext_.CameraGPU);
 }
 
 Renderer::~Renderer() {
@@ -199,8 +200,9 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
   if (meshGPU.State != MeshState::Ready)
     return;
 
-  auto descriptor = descriptorAllocator_.DescriptorSet(material.DescriptorSetID, frameContext_.CurrentFrame);
-  if (descriptor == VK_NULL_HANDLE)
+  auto globalDescriptor = descriptorAllocator_.GlobalDescriptorSet(frameContext_.CurrentFrame);
+  auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(material.DescriptorSetID);
+  if (texDescriptor == VK_NULL_HANDLE)
     return;
 
   const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
@@ -211,12 +213,13 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
 
   auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
 
+  std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, texDescriptor};
   vkCmdBindDescriptorSets(commandBuffer,
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline.PipelineLayout(),
                           0,
-                          1,
-                          &descriptor,
+                          descriptors.size(),
+                          descriptors.data(),
                           0,
                           nullptr);
   vkCmdDrawIndexed(commandBuffer, meshGPU.IndexCount, 1, 0, 0, 0);
@@ -242,7 +245,7 @@ RenderPassHandle Renderer::CreateRenderPass() {
 
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
   const RenderPass& pass = renderPassCache_.GetRenderPass(info.RenderPass.RenderPassID);
-  auto pipeline = pipelineCache_.CreatePipeline(info, pass, descriptorAllocator_.DescriptorSetLayout());
+  auto pipeline = pipelineCache_.CreatePipeline(info, pass, descriptorAllocator_.DescriptorSetLayouts());
   if (!pipeline) {
     const std::string msg = std::format("Failed to create render pass: {}", ToString(pipeline.error()));
     throw std::runtime_error(msg);
@@ -285,10 +288,7 @@ Renderer::BeginTextureArray(const resources::TextureArrayInfo& info) noexcept {
 }
 
 MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
-  const std::uint32_t descriptorID =
-      descriptorAllocator_.CreateDescriptorSet(descriptorAllocator_.DescriptorSetLayout(),
-                                               frameContext_.CameraGPU,
-                                               texture.TextureID);
+  const std::uint32_t descriptorID = descriptorAllocator_.CreateTextureDescriptorSet(texture.TextureID);
   return MaterialHandle{.TextureID = texture.TextureID, .DescriptorSetID = descriptorID};
 }
 
