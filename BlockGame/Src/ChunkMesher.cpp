@@ -9,40 +9,73 @@
 #include <cstddef>
 #include <print>
 
-ChunkMesher::ChunkMesher(Map& map, BlockRegistry& blockRegistry)
-    : map_(map), meshes_(map.Depth(), map.Height(), map.Width(), {}), blockRegistry_(blockRegistry) {
+ChunkMesher::ChunkMesher(vlk::Renderer& renderer, Map& map, BlockRegistry& blockRegistry)
+    : renderer_(renderer),
+      map_(map),
+      meshes_(map.Depth(), map.Height(), map.Width(), {}),
+      blockRegistry_(blockRegistry) {
   std::uint32_t threadNum = std::thread::hardware_concurrency();
   threadNum = threadNum < 2 ? 1 : threadNum - 1;
   startWorkers_(threadNum);
 }
+
 ChunkMesher::~ChunkMesher() {
   stopWorkers_();
 }
 
 const ChunkMesh& ChunkMesher::Mesh(const math::Vec3Int& mapCoord) const {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
-  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
+  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Mesh;
 }
 
-void ChunkMesher::BuildAll() {
+void ChunkMesher::RequestLoadAll() {
   for (std::int32_t z = 0; z < map_.Depth(); z++)
     for (std::int32_t y = 0; y < map_.Height(); y++)
-      for (std::int32_t x = 0; x < map_.Width(); x++)
-        buildQueue_.Push({
-            .Coord = {.X = x, .Y = y, .Z = z}
-        });
+      for (std::int32_t x = 0; x < map_.Width(); x++) {
+        enqueueBuild_({.X = x, .Y = y, .Z = z});
+      }
 }
 
-void ChunkMesher::BuildChunk(const math::Vec3Int& mapCoord) {
-  buildQueue_.Push({mapCoord});
+void ChunkMesher::RequestLoad(const math::Vec3Int& mapCoord) {
+  enqueueBuild_(mapCoord);
 }
 
-void ChunkMesher::Update(vlk::Renderer& renderer) {
+void ChunkMesher::RequestUnload(const math::Vec3Int& mapCoord) {
+  auto& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
+  auto& mesh = meshSlot.Mesh;
+
+  meshSlot.Wanted = false;
+  if (meshSlot.Status == ChunkMeshStatus::Uploaded) {
+    if (mesh.HasVertices())
+      renderer_.DeleteMesh(mesh.Mesh);
+    meshSlot.Status = ChunkMeshStatus::Unloaded;
+    mesh = {};
+  }
+}
+
+ChunkMeshStatus ChunkMesher::ChunkStatus(const math::Vec3Int& mapCoord) {
+  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Status;
+}
+
+void ChunkMesher::Update() {
   while (auto opt = resultQueue_.TryPop()) {
     auto& result = *opt;
 
-    upload_(renderer, result.Mesh);
-    meshes_[result.Coord.Z, result.Coord.Y, result.Coord.X] = std::move(result.Mesh);
+    auto& meshSlot = meshes_[result.Coord.Z, result.Coord.Y, result.Coord.X];
+    if (meshSlot.Wanted) {
+      if (result.Mesh.HasVertices()) {
+        const auto handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
+        meshSlot.Mesh = std::move(result.Mesh);
+        meshSlot.Mesh.Mesh = handle;
+      } else {
+        meshSlot.Mesh = {};
+      }
+      meshSlot.Status = ChunkMeshStatus::Uploaded;
+
+    } else {
+      meshSlot.Mesh = {};
+      meshSlot.Status = ChunkMeshStatus::Unloaded;
+    }
   }
 }
 
@@ -74,6 +107,16 @@ void ChunkMesher::workerLoop_() {
     ChunkMesh mesh = buildChunk_(job->Coord);
     resultQueue_.Push({job->Coord, std::move(mesh)});
   }
+}
+
+void ChunkMesher::enqueueBuild_(const math::Vec3Int& mapCoord) {
+  ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
+  meshSlot.Wanted = true;
+  if (meshSlot.Status == ChunkMeshStatus::Building || meshSlot.Status == ChunkMeshStatus::Uploaded)
+    return;
+
+  meshSlot.Status = ChunkMeshStatus::Building;
+  buildQueue_.Push({mapCoord});
 }
 
 ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
@@ -256,12 +299,4 @@ void ChunkMesher::buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, const
       indices.push_back(idx + baseVertex + i * verticesPerFace);
     };
   }
-}
-
-void ChunkMesher::upload_(vlk::Renderer& renderer, ChunkMesh& mesh) {
-  if (!mesh.HasVertices())
-    return;
-
-  auto handle = renderer.CreateMesh({.Vertices = mesh.Vertices, .Indices = mesh.Indices});
-  mesh.Mesh = handle;
 }

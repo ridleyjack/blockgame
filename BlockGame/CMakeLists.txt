@@ -14,6 +14,8 @@ add_executable(Blockgame
         Src/BlockRegistry.hpp
         Src/TextureRegistry.cpp
         Src/TextureRegistry.hpp
+        Src/ChunkStreamer.cpp
+        Src/ChunkStreamer.hpp
 )
 
 target_link_libraries(Blockgame

@@ -8,6 +8,10 @@ Camera::Camera(const glm::vec3& position) : position_(position) {
   updateVectors_();
 }
 
+glm::vec3 Camera::Position() const noexcept {
+  return position_;
+}
+
 glm::vec3 Camera::Forward() const noexcept {
   return front_;
 }

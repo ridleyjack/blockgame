@@ -2,7 +2,9 @@
 
 #include "BlockRegistry.hpp"
 
-Map::Map(std::uint32_t width, std::uint32_t height, std::uint32_t depth)
+#include <random>
+
+Map::Map(const std::uint32_t width, const std::uint32_t height, const std::uint32_t depth)
     : width_(width), height_(height), depth_(depth), chunks_(depth, height, width, {}) {
 
   for (std::uint32_t z = 0; z < depth; z++) {
@@ -36,7 +38,8 @@ void Map::fillChunk_(const std::uint32_t mapZ, const std::uint32_t mapY, const s
   for (std::uint32_t z = 0; z < blocks.Depth(); z++)
     for (std::uint32_t y = 0; y < blocks.Height(); y++)
       for (std::uint32_t x = 0; x < blocks.Width(); x++) {
-        blocks[z, y, x] = blockVal;
+        if (rand() & 1)
+          blocks[z, y, x] = blockVal;
       }
   blocks[0, 0, 0] = 0;
 }

@@ -10,6 +10,7 @@
 #include <GLFW/glfw3.h>
 
 #include <print>
+#include <cmath>
 
 namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
@@ -19,9 +20,10 @@ GameLayer::GameLayer(engine::Application& application)
     : application_(application),
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
-      map_(3, 3, 3),
-      mapMeshes_(map_, blocks_) {
-  mapMeshes_.BuildAll();
+      map_(60, 3, 60),
+      mapMeshes_(application.GetRenderer(), map_, blocks_),
+      streamer_(map_, mapMeshes_) {
+  streamer_.Update({1, 1, 1});
 }
 
 void GameLayer::OnUpdate(const float deltaTime) {
@@ -38,8 +40,11 @@ void GameLayer::OnUpdate(const float deltaTime) {
   if (input_.Exit)
     application_.Stop();
 
-  auto& renderer = application_.GetRenderer();
-  mapMeshes_.Update(renderer);
+  const int playerX = static_cast<int>(std::floor(camera_.Position().x / ChunkWidth));
+  const int playerZ = static_cast<int>(std::floor(camera_.Position().z / ChunkDepth));
+
+  streamer_.Update({playerX, 1, playerZ});
+  mapMeshes_.Update();
 }
 
 void GameLayer::OnRender() {
@@ -57,13 +62,14 @@ void GameLayer::OnRender() {
     }
   }
 
-  for (int z = 0; z < map_.Depth(); z++)
-    for (int y = 0; y < map_.Height(); y++)
-      for (int x = 0; x < map_.Width(); x++) {
-        const ChunkMesh& mesh{mapMeshes_.Mesh({x, y, z})};
-        if (mesh.HasVertices())
-          renderer.Submit(mesh.Mesh, renderItem.Material);
-      }
+  for (const auto& meshCoords : streamer_.LoadedChunks()) {
+    if (!meshCoords)
+      continue;
+
+    const ChunkMesh& mesh{mapMeshes_.Mesh(*meshCoords)};
+    if (mesh.HasVertices())
+      renderer.Submit(mesh.Mesh, renderItem.Material);
+  }
 
   if (const auto rv = renderer.EndFrame(); !rv) {
     std::println("Failed to render frame");

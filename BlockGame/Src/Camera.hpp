@@ -8,6 +8,7 @@ public:
   Camera();
   explicit Camera(const glm::vec3& position);
 
+  glm::vec3 Position() const noexcept;
   glm::vec3 Forward() const noexcept;
   glm::vec3 Right() const noexcept;
 
