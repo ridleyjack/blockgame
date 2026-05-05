@@ -47,12 +47,13 @@ enum class RenderError : uint8_t {
 };
 
 struct FrameContext {
-  uint32_t CurrentFrame{};
-  uint32_t ImageIndex{};
-  uint32_t RenderPassID{};
-  uint32_t PipelineID{};
+  std::uint32_t CurrentFrame{};
+  std::uint32_t ImageIndex{};
+  std::uint32_t RenderPassID{};
+  std::uint32_t PipelineID{};
 
   UniformBuffer CameraGPU{};
+  bool FrameActive{};
 };
 
 class Renderer {

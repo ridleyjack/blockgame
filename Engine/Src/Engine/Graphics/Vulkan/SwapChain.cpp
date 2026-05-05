@@ -120,6 +120,8 @@ void SwapChain::create_() {
       .imageExtent = extent,
       .imageArrayLayers = 1,
       .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+      .preTransform = swapChainSupport.capabilities.currentTransform,
+      .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
   };
 
   QueueFamilyIndices indices = device.FindQueueFamilies();
@@ -133,8 +135,6 @@ void SwapChain::create_() {
     createInfo.queueFamilyIndexCount = 0;     // Optional
     createInfo.pQueueFamilyIndices = nullptr; // Optional
   }
-  createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-  createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   createInfo.presentMode = presentMode;
   createInfo.clipped = VK_TRUE;
   createInfo.oldSwapchain = VK_NULL_HANDLE;
@@ -162,12 +162,12 @@ void SwapChain::create_() {
       throw std::runtime_error("failed to create image views!");
   }
 
+  createColorResources_();
+  createDepthResources_();
+
   for (const auto& renderPass : renderPasses_) {
     framebuffers_.emplace_back(context_, *this, *renderPass);
   }
-
-  createColorResources_();
-  createDepthResources_();
 }
 
 VkSurfaceFormatKHR SwapChain::chooseSurfaceFormat_(const std::vector<VkSurfaceFormatKHR>& availableFormats) const {

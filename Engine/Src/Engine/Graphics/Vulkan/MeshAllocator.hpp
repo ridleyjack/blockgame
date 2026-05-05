@@ -4,10 +4,10 @@
 
 #include <vulkan/vulkan.h>
 
-#include <cstdint>
 #include <expected>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace engine::graphics {
 struct Mesh;
@@ -61,11 +61,18 @@ public:
   MeshAllocator& operator=(const MeshAllocator&) = delete;
 
   std::expected<uint32_t, MeshError> Create(const Mesh& mesh);
-  void Delete(std::uint32_t meshID);
+
+  void DeleteDeferred(std::uint32_t meshID, std::uint32_t retireFrame);
+  void ProcessDeferredDeletions(std::uint32_t currentframe);
 
   MeshGPU& Get(std::uint32_t meshID) noexcept;
 
 private:
+  struct PendingDelete {
+    std::uint32_t MeshID{};
+    std::uint32_t RetireFrame{};
+  };
+
   Context& context_;
   Uploader& uploader_;
 
@@ -73,10 +80,13 @@ private:
   StagingBuffer& stagingBuffer_;
   containers::HandlePool<MeshGPU> meshes_{};
 
+  std::vector<PendingDelete> pendingDeletes_{};
+
   std::expected<VkDeviceSize, MeshError> uploadToMeshBuffer_(std::span<const std::byte> data,
                                                              VkDeviceSize alignment,
                                                              VkCommandBuffer cmd,
                                                              std::uint64_t batchID) const;
+  void deleteMesh(std::uint32_t meshID);
 };
 
 } // namespace engine::graphics::vulkan

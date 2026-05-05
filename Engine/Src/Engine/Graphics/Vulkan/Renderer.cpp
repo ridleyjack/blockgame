@@ -11,7 +11,7 @@
 
 #include "Engine/Graphics/CameraMatrices.hpp"
 #include "Engine/Graphics/Handles.hpp"
-#include "../Resources/TextureArrayBuilder.hpp"
+#include "Engine/Graphics/Resources/TextureArrayBuilder.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
 
@@ -23,7 +23,6 @@
 
 #include <cstring>
 #include <array>
-#include <print>
 
 namespace engine::graphics::vulkan {
 
@@ -47,6 +46,7 @@ Renderer::Renderer(GLFWwindow* window)
 }
 
 Renderer::~Renderer() {
+  context_.WaitUntilIdle();
   const auto& device = context_.GetDevice();
   for (const auto buffer : frameContext_.CameraGPU.Buffers)
     device.DestroyBuffer(buffer);
@@ -71,6 +71,8 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   VkPipeline pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID).Handle();
 
   vkWaitForFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame), VK_TRUE, UINT64_MAX);
+  meshAllocator_.ProcessDeferredDeletions(frameContext_.CurrentFrame);
+
   const VkResult result = vkAcquireNextImageKHR(device.Logical(),
                                                 swapchain.Handle(),
                                                 UINT64_MAX,
@@ -85,7 +87,6 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     return std::unexpected(RenderError::FrameAcquireFailed);
   }
-  vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame));
 
   // Camera
   const UniformBufferObject ubo{.Model = glm::mat4(1.0f), .View = camera.View, .Projection = camera.Projection};
@@ -95,11 +96,14 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
   vkResetCommandBuffer(commandBuffer, 0);
 
-  VkCommandBufferBeginInfo beginInfo{};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  VkCommandBufferBeginInfo beginInfo{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+  };
   if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
     return std::unexpected(RenderError::RecordCommandFailed);
   }
+
+  frameContext_.FrameActive = true;
 
   // Render Pass
   VkRenderPassBeginInfo renderPassInfo{};
@@ -145,6 +149,7 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
   vkCmdEndRenderPass(commandBuffer);
+  frameContext_.FrameActive = false;
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
     return std::unexpected(RenderError::RecordCommandFailed);
@@ -165,8 +170,10 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = signalSemaphores.data();
 
+  vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame));
   if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)) !=
       VK_SUCCESS) {
+    // TODO: Fence is never signalled on this path. Fence needs to be recreated or error simply treated as fatal.
     return std::unexpected(RenderError::SubmitCommandFailed);
   }
 
@@ -187,8 +194,8 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   } else if (result != VK_SUCCESS) {
     return std::unexpected(RenderError::PresentFailed);
   }
-  frameContext_.CurrentFrame = (frameContext_.CurrentFrame + 1) % config::MaxFramesInFlight;
 
+  frameContext_.CurrentFrame = (frameContext_.CurrentFrame + 1) % config::MaxFramesInFlight;
   return {};
 }
 
@@ -267,7 +274,11 @@ MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
 }
 
 void Renderer::DeleteMesh(const MeshHandle& handle) {
-  meshAllocator_.Delete(handle.MeshID);
+  std::uint32_t retireFrame = frameContext_.CurrentFrame;
+  if (!frameContext_.FrameActive) // Retire after last frame is done.
+    retireFrame = (frameContext_.CurrentFrame + config::MaxFramesInFlight - 1) % config::MaxFramesInFlight;
+
+  meshAllocator_.DeleteDeferred(handle.MeshID, retireFrame);
 }
 
 std::expected<TextureHandle, TextureError>

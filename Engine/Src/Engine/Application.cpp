@@ -54,7 +54,6 @@ void Application::Run() {
     for (ILayer* layer : layerStack_)
       layer->OnRender();
   }
-  renderer_->WaitUntilIdle();
 }
 
 void Application::Stop() {

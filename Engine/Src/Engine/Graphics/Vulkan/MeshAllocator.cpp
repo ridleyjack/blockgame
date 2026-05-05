@@ -1,14 +1,10 @@
 #include "MeshAllocator.hpp"
 
-#include "Command.hpp"
-#include "Context.hpp"
 #include "MeshBuffer.hpp"
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
 #include "Engine/Graphics/Mesh.hpp"
-
-#include <cstring>
 
 namespace engine::graphics::vulkan {
 
@@ -18,7 +14,7 @@ MeshAllocator::MeshAllocator(Context& context, Uploader& uploader, MeshBuffer& m
 MeshAllocator::~MeshAllocator() {
   for (size_t i = 0; i < meshes_.Size(); i++) {
     if (meshes_.Contains(i))
-      this->Delete(i);
+      deleteMesh(i);
   }
 }
 
@@ -54,7 +50,7 @@ std::expected<uint32_t, MeshError> MeshAllocator::Create(const Mesh& mesh) {
   Uploader::UploadRequest request{.OnComplete = [this, meshID]() noexcept {
     auto& gpuMesh = meshes_.Get(meshID);
     if (gpuMesh.State == MeshState::Deleting)
-      Delete(meshID);
+      deleteMesh(meshID);
     else
       gpuMesh.State = MeshState::Ready;
   }};
@@ -64,16 +60,26 @@ std::expected<uint32_t, MeshError> MeshAllocator::Create(const Mesh& mesh) {
   return meshID;
 };
 
-void MeshAllocator::Delete(const std::uint32_t meshID) {
+void MeshAllocator::DeleteDeferred(const std::uint32_t meshID, const std::uint32_t retireFrame) {
   assert(meshes_.Contains(meshID));
   auto& mesh = meshes_.Get(meshID);
-  if (mesh.State == MeshState::Uploading) {
-    mesh.State = MeshState::Deleting;
+
+  if (mesh.State == MeshState::Deleting)
     return;
-  }
-  meshBuffer_.Free(mesh.VertexOffset);
-  meshBuffer_.Free(mesh.IndexOffset);
-  meshes_.Delete(meshID);
+  if (mesh.State == MeshState::Ready)
+    pendingDeletes_.push_back({.MeshID = meshID, .RetireFrame = retireFrame});
+
+  mesh.State = MeshState::Deleting;
+}
+
+void MeshAllocator::ProcessDeferredDeletions(std::uint32_t currentframe) {
+  std::erase_if(pendingDeletes_, [&](const PendingDelete& pending) {
+    if (pending.RetireFrame != currentframe)
+      return false;
+
+    deleteMesh(pending.MeshID);
+    return true;
+  });
 }
 
 MeshAllocator::MeshGPU& MeshAllocator::Get(const std::uint32_t meshID) noexcept {
@@ -102,4 +108,12 @@ std::expected<VkDeviceSize, MeshError> MeshAllocator::uploadToMeshBuffer_(std::s
 
   return meshOffset;
 }
+
+void MeshAllocator::deleteMesh(const std::uint32_t meshID) {
+  const auto& mesh = meshes_.Get(meshID);
+  meshBuffer_.Free(mesh.VertexOffset);
+  meshBuffer_.Free(mesh.IndexOffset);
+  meshes_.Delete(meshID);
+}
+
 } // namespace engine::graphics::vulkan
