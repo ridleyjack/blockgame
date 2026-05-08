@@ -1,7 +1,6 @@
 #include "WorldGenerator.hpp"
 
 #include "BlockRegistry.hpp"
-#include "Map.hpp"
 
 #include <cmath>
 
@@ -77,7 +76,8 @@ BlockType WorldGenerator::BlockAt(math::Vec3Int worldCoord) {
   return BlockType::Stone;
 }
 
-void WorldGenerator::GenerateChunk(Chunk& chunk, const math::Vec3Int chunkCoord) {
+Chunk WorldGenerator::GenerateChunk(const math::Vec3Int chunkCoord) {
+  Chunk chunk{};
   for (int z = 0; z < chunk.Blocks.Depth(); z++)
     for (int y = 0; y < chunk.Blocks.Depth(); y++)
       for (int x = 0; x < chunk.Blocks.Depth(); x++) {
@@ -88,4 +88,5 @@ void WorldGenerator::GenerateChunk(Chunk& chunk, const math::Vec3Int chunkCoord)
         BlockType block = BlockAt(worldCoord);
         chunk.Blocks[z, y, x] = static_cast<std::uint8_t>(block);
       }
+  return chunk;
 }

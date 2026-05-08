@@ -303,10 +303,10 @@ MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
   return MaterialHandle{.TextureID = texture.TextureID, .DescriptorSetID = descriptorID};
 }
 
-glm::mat4 Renderer::MakeProjection() const noexcept {
+glm::mat4 Renderer::MakeProjection(const ProjectionSettings& settings) const noexcept {
   const auto extent = context_.GetSwapchain().Extent();
   const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
-  auto proj = glm::perspectiveRH_ZO(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+  auto proj = glm::perspectiveRH_ZO(glm::radians(settings.FOV), aspect, settings.NearPlane, settings.FarPlane);
   proj[1][1] *= -1;
   return proj;
 }

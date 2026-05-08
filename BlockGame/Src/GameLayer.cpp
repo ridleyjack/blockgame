@@ -1,6 +1,5 @@
 #include "GameLayer.hpp"
 
-#include "Map.hpp"
 #include "Engine/Application.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Events/Events.hpp"
@@ -20,9 +19,8 @@ GameLayer::GameLayer(engine::Application& application)
     : application_(application),
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
-      map_(60, 3, 60),
-      mapMeshes_(application.GetRenderer(), map_, blocks_),
-      streamer_(map_, mapMeshes_) {
+      chunkMesher_(application.GetRenderer(), worldGenerator_, blocks_),
+      streamer_(worldGenerator_, chunkMesher_) {
   streamer_.Update({1, 1, 1});
 }
 
@@ -44,16 +42,19 @@ void GameLayer::OnUpdate(const float deltaTime) {
   const int playerZ = static_cast<int>(std::floor(camera_.Position().z / ChunkDepth));
 
   streamer_.Update({playerX, 1, playerZ});
-  mapMeshes_.Update();
+  chunkMesher_.Update();
 }
 
 void GameLayer::OnRender() {
   auto& renderer = application_.GetRenderer();
   const auto& renderItem = textures_.GetRenderItem();
 
-  engine::graphics::CameraMatrices cameraMatrices{};
-  cameraMatrices.View = camera_.View();
-  cameraMatrices.Projection = renderer.MakeProjection();
+  float drawDistance = static_cast<float>(streamer_.LoadRadius * (ChunkWidth + 1));
+  engine::graphics::CameraMatrices cameraMatrices{.Projection =
+                                                      renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
+                                                          .FarPlane = drawDistance,
+                                                      }),
+                                                  .View = camera_.View()};
 
   if (const auto r = renderer.BeginFrame(renderItem.RenderPass, renderItem.Pipeline, cameraMatrices); !r) {
     if (r.error() != vlk::RenderError::FrameOutOfDate) {
@@ -66,7 +67,7 @@ void GameLayer::OnRender() {
     if (!meshCoords)
       continue;
 
-    const ChunkMesh& mesh{mapMeshes_.Mesh(*meshCoords)};
+    const ChunkMesh& mesh{chunkMesher_.Mesh(*meshCoords)};
     if (mesh.HasVertices())
       renderer.Submit(mesh.Mesh, renderItem.Material);
   }

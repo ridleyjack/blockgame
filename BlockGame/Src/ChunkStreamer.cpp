@@ -1,12 +1,12 @@
 #include "ChunkStreamer.hpp"
 
 #include "ChunkMesher.hpp"
-#include "Map.hpp"
 
 #include <ranges>
 
-ChunkStreamer::ChunkStreamer(Map& map, ChunkMesher& mesher) : map_(map), mesher_(mesher) {
-  const std::size_t size = (2 * LoadRadius + 1) * (2 * LoadRadius + 1) * map.Height();
+ChunkStreamer::ChunkStreamer(WorldGenerator& generator, ChunkMesher& mesher)
+    : worldGenerator_(generator), mesher_(mesher) {
+  const std::size_t size = (2 * LoadRadius + 1) * (2 * LoadRadius + 1) * worldGenerator_.WorldHeight;
   loadedChunks_.resize(size);
 }
 
@@ -18,13 +18,12 @@ void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
   constexpr int radius = LoadRadius;
   for (int dZ = -radius; dZ <= radius; dZ++)
     for (int dX = -radius; dX <= radius; dX++) {
-      // TODO: Potential overflow.
       const int chunkZ = playerChunk.Z + dZ;
       const int chunkX = playerChunk.X + dX;
-      if (chunkZ < 0 || chunkZ >= map_.Depth() || chunkX < 0 || chunkX >= map_.Width())
+      if (chunkZ < 0 || chunkZ >= worldGenerator_.WorldDepth || chunkX < 0 || chunkX >= worldGenerator_.WorldWidth)
         continue;
 
-      for (std::int32_t y = 0; y < map_.Height(); y++) {
+      for (std::int32_t y = 0; y < worldGenerator_.WorldHeight; y++) {
         needed.push_back({
             {chunkX, y, chunkZ}
         });

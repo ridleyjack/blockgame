@@ -15,7 +15,6 @@ namespace engine::graphics::vulkan {
 class Renderer;
 }
 
-class Map;
 class BlockRegistry;
 
 enum class ChunkMeshStatus : std::uint8_t {
@@ -58,7 +57,7 @@ struct ChunkBuildResult {
 
 class ChunkMesher {
 public:
-  ChunkMesher(vlk::Renderer& renderer, Map& map, BlockRegistry& blockRegistry);
+  ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator_, BlockRegistry& blockRegistry);
   ~ChunkMesher();
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
@@ -78,8 +77,7 @@ private:
   };
 
   vlk::Renderer& renderer_;
-  Map& map_;
-  WorldGenerator worldGenerator_{};
+  WorldGenerator& worldGenerator_;
   Grid3D<ChunkMeshSlot> meshes_{0, 0, 0, {}};
 
   std::vector<std::thread> workers_{};

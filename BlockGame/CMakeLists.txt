@@ -7,8 +7,6 @@ add_executable(Blockgame
         Src/Grid3D.hpp
         Src/ChunkMesher.cpp
         Src/ChunkMesher.hpp
-        Src/Map.cpp
-        Src/Map.hpp
         Src/Containers/ThreadSafeQueue.hpp
         Src/BlockRegistry.cpp
         Src/BlockRegistry.hpp

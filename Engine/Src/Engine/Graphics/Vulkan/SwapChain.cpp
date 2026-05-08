@@ -60,6 +60,7 @@ void SwapChain::Recreate() {
   create_();
   context_.GetSync().RecreatePerImageSemaphores();
 }
+
 void SwapChain::CreateFramebuffers(RenderPass& renderPass) {
   renderPasses_.push_back(&renderPass);
   framebuffers_.emplace_back(context_, *this, renderPass);

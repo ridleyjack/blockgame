@@ -4,7 +4,6 @@
 #include "Camera.hpp"
 #include "ChunkMesher.hpp"
 #include "ChunkStreamer.hpp"
-#include "Map.hpp"
 #include "TextureRegistry.hpp"
 
 #include "Engine/ILayer.hpp"
@@ -61,8 +60,8 @@ private:
   Camera camera_{};
   KeyInput input_{};
 
-  Map map_;
-  ChunkMesher mapMeshes_;
+  WorldGenerator worldGenerator_{};
+  ChunkMesher chunkMesher_;
   ChunkStreamer streamer_;
 
   bool firstMouse_{true};

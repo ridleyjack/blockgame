@@ -58,6 +58,12 @@ struct FrameContext {
 
 class Renderer {
 public:
+  struct ProjectionSettings {
+    float FOV{45.0f};
+    float NearPlane{0.1f};
+    float FarPlane{512.0f};
+  };
+
   explicit Renderer(GLFWwindow* window);
   ~Renderer();
 
@@ -88,7 +94,7 @@ public:
 
   MaterialHandle CreateMaterial(const TextureHandle& texture);
 
-  glm::mat4 MakeProjection() const noexcept;
+  glm::mat4 MakeProjection(const ProjectionSettings& settings) const noexcept;
 
 private:
   Context context_;

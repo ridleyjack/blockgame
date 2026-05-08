@@ -2,17 +2,16 @@
 
 #include "BlockRegistry.hpp"
 #include "Grid3D.hpp"
-#include "Map.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <cstddef>
 #include <print>
 
-ChunkMesher::ChunkMesher(vlk::Renderer& renderer, Map& map, BlockRegistry& blockRegistry)
+ChunkMesher::ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator, BlockRegistry& blockRegistry)
     : renderer_(renderer),
-      map_(map),
-      meshes_(map.Depth(), map.Height(), map.Width(), {}),
+      worldGenerator_(worldGenerator),
+      meshes_(worldGenerator_.WorldDepth, worldGenerator_.WorldHeight, worldGenerator_.WorldWidth, {}),
       blockRegistry_(blockRegistry) {
   std::uint32_t threadNum = std::thread::hardware_concurrency();
   threadNum = threadNum < 2 ? 1 : threadNum - 1;
@@ -112,37 +111,37 @@ void ChunkMesher::enqueueBuild_(const math::Vec3Int& mapCoord) {
 }
 
 ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
-  Chunk chunkStruct{};
-  worldGenerator_.GenerateChunk(chunkStruct, mapCoord);
-  const auto& chunk = chunkStruct.Blocks;
+  Chunk chunk = worldGenerator_.GenerateChunk(mapCoord);
+  const auto& blocks = chunk.Blocks;
 
   ChunkMesh mesh{};
-  for (std::int32_t z = 0; z < chunk.Depth(); z++) {
-    for (std::int32_t y = 0; y < chunk.Height(); y++) {
-      for (std::int32_t x = 0; x < chunk.Width(); x++) {
+  for (std::int32_t z = 0; z < blocks.Depth(); z++) {
+    for (std::int32_t y = 0; y < blocks.Height(); y++) {
+      for (std::int32_t x = 0; x < blocks.Width(); x++) {
 
-        if (chunk[z, y, x] == 0)
+        if (blocks[z, y, x] == 0)
           continue;
 
         auto getBlock = [&](const int deltaZ, const int deltaY, const int deltaX) -> std::uint32_t {
-          math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(mapCoord.X * chunk.Width()) + x,
-                                   .Y = static_cast<std::int32_t>(mapCoord.Y * chunk.Height()) + y,
-                                   .Z = static_cast<std::int32_t>(mapCoord.Z * chunk.Depth()) + z};
+          math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(mapCoord.X * blocks.Width()) + x,
+                                   .Y = static_cast<std::int32_t>(mapCoord.Y * blocks.Height()) + y,
+                                   .Z = static_cast<std::int32_t>(mapCoord.Z * blocks.Depth()) + z};
 
           const int targetZ = z + deltaZ;
           const int targetY = y + deltaY;
           const int targetX = x + deltaX;
 
-          if (targetZ >= 0 && targetZ < chunk.Depth() && targetY >= 0 && targetY < chunk.Height() && targetX >= 0 &&
-              targetX < chunk.Width())
-            return chunk[targetZ, targetY, targetX];
+          if (targetZ >= 0 && targetZ < blocks.Depth() && targetY >= 0 && targetY < blocks.Height() && targetX >= 0 &&
+              targetX < blocks.Width())
+            return blocks[targetZ, targetY, targetX];
 
           worldCoord.Z += deltaZ;
           worldCoord.Y += deltaY;
           worldCoord.X += deltaX;
 
-          if (worldCoord.Z < 0 || worldCoord.Z >= map_.Depth() * 16 || worldCoord.Y < 0 ||
-              worldCoord.Y >= map_.Height() * 16 || worldCoord.X < 0 || worldCoord.X >= map_.Width() * 16)
+          if (worldCoord.Z < 0 || worldCoord.Z >= worldGenerator_.WorldDepth * 16 || worldCoord.Y < 0 ||
+              worldCoord.Y >= worldGenerator_.WorldHeight * 16 || worldCoord.X < 0 ||
+              worldCoord.X >= worldGenerator_.WorldWidth * 16)
             return 0;
 
           return static_cast<std::uint32_t>(worldGenerator_.BlockAt(worldCoord));
@@ -165,12 +164,12 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
         if (getBlock(0, 0, 1) == 0)
           faces.Right = true;
 
-        const auto worldZ = static_cast<float>(chunk.Depth() * mapCoord.Z + z);
-        const auto worldY = static_cast<float>(chunk.Height() * mapCoord.Y + y);
-        const auto worldX = static_cast<float>(chunk.Width() * mapCoord.X + x);
+        const auto worldZ = static_cast<float>(blocks.Depth() * mapCoord.Z + z);
+        const auto worldY = static_cast<float>(blocks.Height() * mapCoord.Y + y);
+        const auto worldX = static_cast<float>(blocks.Width() * mapCoord.X + x);
 
         const std::uint32_t baseVertex = mesh.Vertices.size();
-        buildVertices_(mesh, faces, chunk[z, y, x], worldZ, worldY, worldX);
+        buildVertices_(mesh, faces, blocks[z, y, x], worldZ, worldY, worldX);
         buildIndices_(mesh, baseVertex, faces.NumEnabled());
       }
     }
