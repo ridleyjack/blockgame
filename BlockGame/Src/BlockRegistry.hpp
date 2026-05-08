@@ -7,7 +7,8 @@ enum class BlockTexture : std::uint8_t;
 
 // Temporary: BlockType enum values used to index blockDef in array.
 enum class BlockType : std::uint8_t {
-  Dirt = 0,
+  Air = 0,
+  Dirt,
   Grass,
   Sand,
   Snow,

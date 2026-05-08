@@ -28,14 +28,6 @@ const ChunkMesh& ChunkMesher::Mesh(const math::Vec3Int& mapCoord) const {
   return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Mesh;
 }
 
-void ChunkMesher::RequestLoadAll() {
-  for (std::int32_t z = 0; z < map_.Depth(); z++)
-    for (std::int32_t y = 0; y < map_.Height(); y++)
-      for (std::int32_t x = 0; x < map_.Width(); x++) {
-        enqueueBuild_({.X = x, .Y = y, .Z = z});
-      }
-}
-
 void ChunkMesher::RequestLoad(const math::Vec3Int& mapCoord) {
   enqueueBuild_(mapCoord);
 }
@@ -120,7 +112,9 @@ void ChunkMesher::enqueueBuild_(const math::Vec3Int& mapCoord) {
 }
 
 ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
-  const auto& chunk = map_.GetChunk(mapCoord.Z, mapCoord.Y, mapCoord.X).Blocks;
+  Chunk chunkStruct{};
+  worldGenerator_.GenerateChunk(chunkStruct, mapCoord);
+  const auto& chunk = chunkStruct.Blocks;
 
   ChunkMesh mesh{};
   for (std::int32_t z = 0; z < chunk.Depth(); z++) {
@@ -131,6 +125,10 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
           continue;
 
         auto getBlock = [&](const int deltaZ, const int deltaY, const int deltaX) -> std::uint32_t {
+          math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(mapCoord.X * chunk.Width()) + x,
+                                   .Y = static_cast<std::int32_t>(mapCoord.Y * chunk.Height()) + y,
+                                   .Z = static_cast<std::int32_t>(mapCoord.Z * chunk.Depth()) + z};
+
           const int targetZ = z + deltaZ;
           const int targetY = y + deltaY;
           const int targetX = x + deltaX;
@@ -138,25 +136,16 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
           if (targetZ >= 0 && targetZ < chunk.Depth() && targetY >= 0 && targetY < chunk.Height() && targetX >= 0 &&
               targetX < chunk.Width())
             return chunk[targetZ, targetY, targetX];
-          // Z Axis
-          if (deltaZ == -1 && z == 0 && mapCoord.Z > 0) // Backwards (-z)
-            return map_.GetChunk(mapCoord.Z - 1, mapCoord.Y, mapCoord.X).Blocks[chunk.Depth() - 1, y, x];
-          if (deltaZ == +1 && z == chunk.Depth() - 1 && mapCoord.Z < map_.Depth() - 1) // Forwards (+z);
-            return map_.GetChunk(mapCoord.Z + 1, mapCoord.Y, mapCoord.X).Blocks[0, y, x];
 
-          // Y Axis
-          if (deltaY == -1 && y == 0 && mapCoord.Y > 0) // Downwards (-y)
-            return map_.GetChunk(mapCoord.Z, mapCoord.Y - 1, mapCoord.X).Blocks[z, chunk.Height() - 1, x];
-          if (deltaY == 1 && y == chunk.Height() - 1 && mapCoord.Y < map_.Height() - 1) // Upwards (+y)
-            return map_.GetChunk(mapCoord.Z, mapCoord.Y + 1, mapCoord.X).Blocks[z, 0, x];
+          worldCoord.Z += deltaZ;
+          worldCoord.Y += deltaY;
+          worldCoord.X += deltaX;
 
-          // X Axis
-          if (deltaX == -1 && x == 0 && mapCoord.X > 0) // Left (-x)
-            return map_.GetChunk(mapCoord.Z, mapCoord.Y, mapCoord.X - 1).Blocks[z, y, chunk.Width() - 1];
-          if (deltaX == +1 && x == chunk.Width() - 1 && mapCoord.X < map_.Width() - 1) // Right (+x)
-            return map_.GetChunk(mapCoord.Z, mapCoord.Y, mapCoord.X + 1).Blocks[z, y, 0];
+          if (worldCoord.Z < 0 || worldCoord.Z >= map_.Depth() * 16 || worldCoord.Y < 0 ||
+              worldCoord.Y >= map_.Height() * 16 || worldCoord.X < 0 || worldCoord.X >= map_.Width() * 16)
+            return 0;
 
-          return 0; // Air if out of bounds.
+          return static_cast<std::uint32_t>(worldGenerator_.BlockAt(worldCoord));
         };
 
         BlockFaces faces{};
@@ -202,10 +191,6 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
   x *= blockWidth;
 
   constexpr size_t verticesPerFace = 4;
-
-  // BlockType 0 represents air (no texture).
-  // Texture array layers start at 0, so non-air block types are shifted down by 1.
-  blockType -= 1;
 
   std::vector<gfx::Vertex>& vertices = mesh.Vertices;
   vertices.reserve(vertices.size() + verticesPerFace * faces.NumEnabled());

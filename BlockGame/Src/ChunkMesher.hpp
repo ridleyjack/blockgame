@@ -1,5 +1,6 @@
 #pragma once
 #include "Grid3D.hpp"
+#include "WorldGenerator.hpp"
 #include "Containers/ThreadSafeQueue.hpp"
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/Mesh.hpp"
@@ -62,7 +63,6 @@ public:
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
 
-  void RequestLoadAll();
   void RequestLoad(const math::Vec3Int& mapCoord);
   void RequestUnload(const math::Vec3Int& mapCoord);
 
@@ -79,6 +79,7 @@ private:
 
   vlk::Renderer& renderer_;
   Map& map_;
+  WorldGenerator worldGenerator_{};
   Grid3D<ChunkMeshSlot> meshes_{0, 0, 0, {}};
 
   std::vector<std::thread> workers_{};

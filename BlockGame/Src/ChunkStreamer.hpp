@@ -12,7 +12,7 @@ class Map;
 
 class ChunkStreamer {
 public:
-  static constexpr std::size_t LoadRadius = 1;
+  static constexpr std::size_t LoadRadius = 12;
   ChunkStreamer(Map& map, ChunkMesher& mesher);
 
   void Update(math::Vec3Int playerChunk);
