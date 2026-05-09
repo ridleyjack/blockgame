@@ -1,7 +1,5 @@
 #include "BlockRegistry.hpp"
 
-#include "TextureRegistry.hpp"
-
 BlockRegistry::BlockRegistry() {
   constexpr auto toIndex = [](BlockType value) noexcept -> std::size_t { return static_cast<std::size_t>(value); };
 

@@ -1,18 +1,20 @@
 #include "ChunkMesher.hpp"
 
 #include "BlockRegistry.hpp"
-#include "Grid3D.hpp"
+#include "Containers/Grid3D.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <cstddef>
 #include <print>
+#include <thread>
 
 ChunkMesher::ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator, BlockRegistry& blockRegistry)
     : renderer_(renderer),
       worldGenerator_(worldGenerator),
-      meshes_(worldGenerator_.WorldDepth, worldGenerator_.WorldHeight, worldGenerator_.WorldWidth, {}),
+      meshes_(WorldGenerator::WorldDepth, WorldGenerator::WorldHeight, WorldGenerator::WorldWidth, {}),
       blockRegistry_(blockRegistry) {
+
   std::uint32_t threadNum = std::thread::hardware_concurrency();
   threadNum = threadNum < 2 ? 1 : threadNum - 1;
   startWorkers_(threadNum);
@@ -139,9 +141,9 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
           worldCoord.Y += deltaY;
           worldCoord.X += deltaX;
 
-          if (worldCoord.Z < 0 || worldCoord.Z >= worldGenerator_.WorldDepth * 16 || worldCoord.Y < 0 ||
-              worldCoord.Y >= worldGenerator_.WorldHeight * 16 || worldCoord.X < 0 ||
-              worldCoord.X >= worldGenerator_.WorldWidth * 16)
+          if (worldCoord.Z < 0 || worldCoord.Z >= WorldGenerator::WorldDepth * ChunkDepth || worldCoord.Y < 0 ||
+              worldCoord.Y >= WorldGenerator::WorldHeight * ChunkHeight || worldCoord.X < 0 ||
+              worldCoord.X >= WorldGenerator::WorldWidth * ChunkWidth)
             return 0;
 
           return static_cast<std::uint32_t>(worldGenerator_.BlockAt(worldCoord));

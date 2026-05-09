@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <vector>
+#include <span>
 
 namespace math = engine::math;
 
@@ -17,7 +18,7 @@ public:
 
   void Update(math::Vec3Int playerChunk);
 
-  const std::vector<std::optional<math::Vec3Int>>& LoadedChunks() const noexcept;
+  std::span<const std::optional<math::Vec3Int>> LoadedChunks() const noexcept;
 
 private:
   WorldGenerator& worldGenerator_;

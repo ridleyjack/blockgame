@@ -19,9 +19,8 @@ GameLayer::GameLayer(engine::Application& application)
     : application_(application),
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
-      chunkMesher_(application.GetRenderer(), worldGenerator_, blocks_),
-      streamer_(worldGenerator_, chunkMesher_) {
-  streamer_.Update({1, 1, 1});
+      world_(application.GetRenderer()) {
+  world_.Update({1, 1, 1});
 }
 
 void GameLayer::OnUpdate(const float deltaTime) {
@@ -41,15 +40,14 @@ void GameLayer::OnUpdate(const float deltaTime) {
   const int playerX = static_cast<int>(std::floor(camera_.Position().x / ChunkWidth));
   const int playerZ = static_cast<int>(std::floor(camera_.Position().z / ChunkDepth));
 
-  streamer_.Update({playerX, 1, playerZ});
-  chunkMesher_.Update();
+  world_.Update({playerX, 1, playerZ});
 }
 
 void GameLayer::OnRender() {
   auto& renderer = application_.GetRenderer();
   const auto& renderItem = textures_.GetRenderItem();
 
-  float drawDistance = static_cast<float>(streamer_.LoadRadius * (ChunkWidth + 1));
+  float drawDistance = static_cast<float>(ChunkStreamer::LoadRadius * (ChunkWidth + 1));
   engine::graphics::CameraMatrices cameraMatrices{.Projection =
                                                       renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
                                                           .FarPlane = drawDistance,
@@ -63,11 +61,11 @@ void GameLayer::OnRender() {
     }
   }
 
-  for (const auto& meshCoords : streamer_.LoadedChunks()) {
+  for (const auto& meshCoords : world_.LoadedChunks()) {
     if (!meshCoords)
       continue;
 
-    const ChunkMesh& mesh{chunkMesher_.Mesh(*meshCoords)};
+    const ChunkMesh& mesh{world_.Mesh(*meshCoords)};
     if (mesh.HasVertices())
       renderer.Submit(mesh.Mesh, renderItem.Material);
   }

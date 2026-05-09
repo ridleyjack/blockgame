@@ -1,5 +1,5 @@
 #pragma once
-#include "Grid3D.hpp"
+#include "Containers/Grid3D.hpp"
 #include "WorldGenerator.hpp"
 #include "Containers/ThreadSafeQueue.hpp"
 #include "Engine/Graphics/Handles.hpp"
@@ -57,7 +57,7 @@ struct ChunkBuildResult {
 
 class ChunkMesher {
 public:
-  ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator_, BlockRegistry& blockRegistry);
+  ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator, BlockRegistry& blockRegistry);
   ~ChunkMesher();
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;

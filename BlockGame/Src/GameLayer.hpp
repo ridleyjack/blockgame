@@ -1,11 +1,10 @@
 #pragma once
 
-#include "BlockRegistry.hpp"
 #include "Camera.hpp"
-#include "ChunkMesher.hpp"
-#include "ChunkStreamer.hpp"
 #include "TextureRegistry.hpp"
+#include "Engine/Application.hpp"
 
+#include "World/World.hpp"
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
 
@@ -55,14 +54,11 @@ private:
   engine::Application& application_;
 
   TextureRegistry textures_;
-  BlockRegistry blocks_{};
 
   Camera camera_{};
   KeyInput input_{};
 
-  WorldGenerator worldGenerator_{};
-  ChunkMesher chunkMesher_;
-  ChunkStreamer streamer_;
+  World world_;
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};

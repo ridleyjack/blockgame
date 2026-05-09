@@ -60,6 +60,6 @@ void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
   }
 }
 
-const std::vector<std::optional<math::Vec3Int>>& ChunkStreamer::LoadedChunks() const noexcept {
+std::span<const std::optional<math::Vec3Int>> ChunkStreamer::LoadedChunks() const noexcept {
   return loadedChunks_;
 }

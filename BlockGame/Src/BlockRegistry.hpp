@@ -1,22 +1,9 @@
 #pragma once
 
+#include "BlockTypes.hpp"
+
 #include <array>
 #include <cstdint>
-
-enum class BlockTexture : std::uint8_t;
-
-// Temporary: BlockType enum values used to index blockDef in array.
-enum class BlockType : std::uint8_t {
-  Air = 0,
-  Dirt,
-  Grass,
-  Sand,
-  Snow,
-  Ice,
-  Stone,
-  Count,
-};
-constexpr std::size_t BlockTypeCount = static_cast<std::size_t>(BlockType::Count);
 
 enum BlockFace : std::uint8_t {
   Front = 0,
