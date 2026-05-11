@@ -310,4 +310,8 @@ glm::mat4 Renderer::MakeProjection(const ProjectionSettings& settings) const noe
   proj[1][1] *= -1;
   return proj;
 }
+
+void Renderer::SetFramebufferResized(const bool hasResized) noexcept {
+  context_.SetFramebufferHasResized(hasResized);
+}
 } // namespace engine::graphics::vulkan

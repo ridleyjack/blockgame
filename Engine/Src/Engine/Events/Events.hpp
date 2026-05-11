@@ -3,6 +3,11 @@
 
 namespace engine::events {
 
+struct FramebufferResizedEvent {
+  int Width{};
+  int Height{};
+};
+
 struct KeyPressedEvent {
   int Keycode{};
   bool IsRepeat{};
@@ -17,6 +22,6 @@ struct MouseMovedEvent {
   double Y{};
 };
 
-using Event = std::variant<KeyPressedEvent, KeyReleasedEvent, MouseMovedEvent>;
+using Event = std::variant<FramebufferResizedEvent, KeyPressedEvent, KeyReleasedEvent, MouseMovedEvent>;
 
 } // namespace engine::events

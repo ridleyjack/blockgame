@@ -1,8 +1,28 @@
 #pragma once
 
 namespace engine::events {
+
+struct FramebufferResizedEvent;
 struct KeyPressedEvent;
 struct KeyReleasedEvent;
+struct MouseMovedEvent;
+
+class IWindowEventHandler {
+public:
+  virtual ~IWindowEventHandler() = default;
+
+  virtual void OnFramebufferResized(const FramebufferResizedEvent& event) = 0;
+};
+
+struct WindowEventDispatch {
+  IWindowEventHandler& Handler;
+
+  void operator()(const FramebufferResizedEvent& e) const {
+    Handler.OnFramebufferResized(e);
+  }
+
+  template <typename T> void operator()(const T&) const {}
+};
 
 class IKeyEventHandler {
 public:

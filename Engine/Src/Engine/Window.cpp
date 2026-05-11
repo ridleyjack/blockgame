@@ -28,7 +28,14 @@ void Window::Create() {
   glfwMakeContextCurrent(handle_);
   glfwSetWindowUserPointer(handle_, this);
 
-  // Keyboard Input
+  // Framebuffer Resize.
+  glfwSetFramebufferSizeCallback(handle_, [](GLFWwindow* handle, const int width, const int height) {
+    events::FramebufferResizedEvent event{width, height};
+    const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));
+    window.eventRaiser_.RaiseEvent(event);
+  });
+
+  // Keyboard Input.
   glfwSetKeyCallback(handle_,
                      [](GLFWwindow* handle, const int key, const int scancode, const int action, const int mods) {
                        const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));
@@ -49,7 +56,7 @@ void Window::Create() {
                        }
                      });
 
-  // Mouse Input
+  // Mouse Input.
   glfwSetInputMode(handle_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
   glfwSetCursorPosCallback(handle_, [](GLFWwindow* handle, const double x, const double y) {
     const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));

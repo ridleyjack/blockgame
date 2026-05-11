@@ -96,6 +96,8 @@ public:
 
   glm::mat4 MakeProjection(const ProjectionSettings& settings) const noexcept;
 
+  void SetFramebufferResized(bool hasResized) noexcept;
+
 private:
   Context context_;
 

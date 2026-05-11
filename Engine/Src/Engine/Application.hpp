@@ -2,6 +2,7 @@
 
 #include "Window.hpp"
 #include "Events/Events.hpp"
+#include "Events/IEventHandler.hpp"
 #include "Events/IEventRaiser.hpp"
 
 #include <memory>
@@ -21,7 +22,7 @@ struct ApplicationConfig {
   WindowConfig Window{};
 };
 
-class Application : public events::IEventRaiser {
+class Application : public events::IEventRaiser, public events::IWindowEventHandler {
 public:
   explicit Application(const ApplicationConfig& config);
   ~Application() override;
@@ -38,6 +39,8 @@ public:
   graphics::vulkan::Renderer& GetRenderer() const;
 
   void RaiseEvent(const events::Event& event) override;
+
+  void OnFramebufferResized(const events::FramebufferResizedEvent& event) override;
 
 private:
   ApplicationConfig config_{};

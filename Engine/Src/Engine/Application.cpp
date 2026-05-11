@@ -1,9 +1,7 @@
 #include "Application.hpp"
 
 #include "ILayer.hpp"
-
 #include "Events/IEventHandler.hpp"
-
 #include "Graphics/Vulkan/Renderer.hpp"
 
 #include <GLFW/glfw3.h>
@@ -85,7 +83,12 @@ graphics::vulkan::Renderer& Application::GetRenderer() const {
 }
 
 void Application::RaiseEvent(const events::Event& event) {
+  std::visit(events::WindowEventDispatch{.Handler = *this}, event);
+
   for (const auto& layer : std::views::reverse(layerStack_)) {
+    if (auto* handler = dynamic_cast<events::IWindowEventHandler*>(layer)) {
+      std::visit(events::WindowEventDispatch{.Handler = *handler}, event);
+    }
     if (auto* handler = dynamic_cast<events::IKeyEventHandler*>(layer)) {
       std::visit(events::KeyEventDispatch{.Handler = *handler}, event);
     }
@@ -93,6 +96,11 @@ void Application::RaiseEvent(const events::Event& event) {
       std::visit(events::MouseEventDispatch{.Handler = *handler}, event);
     }
   }
+}
+
+void Application::OnFramebufferResized(const events::FramebufferResizedEvent& event) {
+  (void)event;
+  renderer_->SetFramebufferResized(true);
 }
 
 } // namespace engine
