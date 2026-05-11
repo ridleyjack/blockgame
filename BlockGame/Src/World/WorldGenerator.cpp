@@ -1,6 +1,7 @@
 #include "WorldGenerator.hpp"
 
 #include "BlockRegistry.hpp"
+#include "Chunk.hpp"
 
 #include <cmath>
 
@@ -81,9 +82,9 @@ Chunk WorldGenerator::GenerateChunk(const math::Vec3Int chunkCoord) {
   for (int z = 0; z < chunk.Blocks.Depth(); z++)
     for (int y = 0; y < chunk.Blocks.Depth(); y++)
       for (int x = 0; x < chunk.Blocks.Depth(); x++) {
-        const math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(chunkCoord.X * ChunkWidth + x),
-                                       .Y = static_cast<std::int32_t>(chunkCoord.Y * ChunkHeight + y),
-                                       .Z = static_cast<std::int32_t>(chunkCoord.Z * ChunkDepth + z)};
+        const math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(chunkCoord.X * Chunk::ChunkWidth + x),
+                                       .Y = static_cast<std::int32_t>(chunkCoord.Y * Chunk::ChunkHeight + y),
+                                       .Z = static_cast<std::int32_t>(chunkCoord.Z * Chunk::ChunkDepth + z)};
 
         BlockType block = BlockAt(worldCoord);
         chunk.Blocks[z, y, x] = static_cast<std::uint8_t>(block);

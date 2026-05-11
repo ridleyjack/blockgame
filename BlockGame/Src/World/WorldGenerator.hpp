@@ -1,21 +1,12 @@
 #pragma once
 
-#include "Containers/Grid3D.hpp"
+#include "Chunk.hpp"
+#include "Engine/Math/Vec3Int.hpp"
 
 #include <cstdint>
 
-#include "Engine/Math/Vec3Int.hpp"
-
 enum class BlockType : std::uint8_t;
 namespace math = engine::math;
-
-constexpr std::uint32_t ChunkWidth{16};
-constexpr std::uint32_t ChunkHeight{16};
-constexpr std::uint32_t ChunkDepth{16};
-
-struct Chunk {
-  Grid3D<std::uint8_t> Blocks{ChunkDepth, ChunkHeight, ChunkWidth, 0};
-};
 
 class WorldGenerator {
 public:

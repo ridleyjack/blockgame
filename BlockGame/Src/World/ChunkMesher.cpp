@@ -141,9 +141,9 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
           worldCoord.Y += deltaY;
           worldCoord.X += deltaX;
 
-          if (worldCoord.Z < 0 || worldCoord.Z >= WorldGenerator::WorldDepth * ChunkDepth || worldCoord.Y < 0 ||
-              worldCoord.Y >= WorldGenerator::WorldHeight * ChunkHeight || worldCoord.X < 0 ||
-              worldCoord.X >= WorldGenerator::WorldWidth * ChunkWidth)
+          if (worldCoord.Z < 0 || worldCoord.Z >= WorldGenerator::WorldDepth * Chunk::ChunkDepth || worldCoord.Y < 0 ||
+              worldCoord.Y >= WorldGenerator::WorldHeight * Chunk::ChunkHeight || worldCoord.X < 0 ||
+              worldCoord.X >= WorldGenerator::WorldWidth * Chunk::ChunkWidth)
             return 0;
 
           return static_cast<std::uint32_t>(worldGenerator_.BlockAt(worldCoord));

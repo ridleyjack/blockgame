@@ -19,6 +19,7 @@ add_executable(Blockgame
         Src/World/World.cpp
         Src/World/World.hpp
         Src/BlockTypes.hpp
+        Src/World/Chunk.hpp
 )
 
 target_include_directories(Blockgame

@@ -37,8 +37,8 @@ void GameLayer::OnUpdate(const float deltaTime) {
   if (input_.Exit)
     application_.Stop();
 
-  const int playerX = static_cast<int>(std::floor(camera_.Position().x / ChunkWidth));
-  const int playerZ = static_cast<int>(std::floor(camera_.Position().z / ChunkDepth));
+  const int playerX = static_cast<int>(std::floor(camera_.Position().x / Chunk::ChunkWidth));
+  const int playerZ = static_cast<int>(std::floor(camera_.Position().z / Chunk::ChunkDepth));
 
   world_.Update({playerX, 1, playerZ});
 }
@@ -47,7 +47,7 @@ void GameLayer::OnRender() {
   auto& renderer = application_.GetRenderer();
   const auto& renderItem = textures_.GetRenderItem();
 
-  float drawDistance = static_cast<float>(ChunkStreamer::LoadRadius * (ChunkWidth + 1));
+  float drawDistance = static_cast<float>(ChunkStreamer::LoadRadius * (Chunk::ChunkWidth + 1));
   engine::graphics::CameraMatrices cameraMatrices{.Projection =
                                                       renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
                                                           .FarPlane = drawDistance,
