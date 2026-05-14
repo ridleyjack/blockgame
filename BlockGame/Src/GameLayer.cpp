@@ -62,10 +62,7 @@ void GameLayer::OnRender() {
   }
 
   for (const auto& meshCoords : world_.LoadedChunks()) {
-    if (!meshCoords)
-      continue;
-
-    const ChunkMesh& mesh{world_.Mesh(*meshCoords)};
+    const ChunkMesh& mesh{world_.Mesh(meshCoords)};
     if (mesh.HasVertices())
       renderer.Submit(mesh.Mesh, renderItem.Material);
   }

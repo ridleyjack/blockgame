@@ -38,10 +38,11 @@ public:
 
   std::optional<BlockHit> RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance);
 
-  std::span<const std::optional<math::Vec3Int>> LoadedChunks() const noexcept;
+  std::span<const math::Vec3Int> LoadedChunks() const noexcept;
   const ChunkMesh& Mesh(const math::Vec3Int& chunkCoord) const;
 
 private:
+  WorldStore worldStore_;
   WorldGenerator worldGenerator_;
   BlockRegistry blockRegistry_;
   ChunkMesher chunkMesher_;

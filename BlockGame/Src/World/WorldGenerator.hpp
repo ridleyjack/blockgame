@@ -10,10 +10,6 @@ namespace math = engine::math;
 
 class WorldGenerator {
 public:
-  static constexpr std::uint32_t WorldWidth{100};
-  static constexpr std::uint32_t WorldHeight{3};
-  static constexpr std::uint32_t WorldDepth{100};
-
   BlockType BlockAt(math::Vec3Int worldCoord);
   Chunk GenerateChunk(math::Vec3Int chunkCoord);
 

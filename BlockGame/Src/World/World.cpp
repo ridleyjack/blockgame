@@ -1,7 +1,7 @@
 #include "World.hpp"
 
 World::World(vlk::Renderer& renderer)
-    : chunkMesher_(renderer, worldGenerator_, blockRegistry_), chunkStreamer_(worldGenerator_, chunkMesher_) {}
+    : chunkMesher_(renderer, worldStore_, blockRegistry_), chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {}
 
 void World::Update(math::Vec3Int playerPosition) {
   chunkStreamer_.Update(playerPosition);
@@ -21,7 +21,7 @@ std::optional<World::BlockHit> World::RaycastBlock(glm::vec3 origin, glm::vec3 d
   return std::nullopt;
 }
 
-std::span<const std::optional<math::Vec3Int>> World::LoadedChunks() const noexcept {
+std::span<const math::Vec3Int> World::LoadedChunks() const noexcept {
   return chunkStreamer_.LoadedChunks();
 }
 

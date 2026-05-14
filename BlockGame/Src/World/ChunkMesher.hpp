@@ -1,6 +1,5 @@
 #pragma once
 #include "Containers/Grid3D.hpp"
-#include "WorldGenerator.hpp"
 #include "Containers/ThreadSafeQueue.hpp"
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/Mesh.hpp"
@@ -55,9 +54,11 @@ struct ChunkBuildResult {
   ChunkMesh Mesh{};
 };
 
+class WorldStore;
+
 class ChunkMesher {
 public:
-  ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator, BlockRegistry& blockRegistry);
+  ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry);
   ~ChunkMesher();
 
   const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
@@ -77,7 +78,7 @@ private:
   };
 
   vlk::Renderer& renderer_;
-  WorldGenerator& worldGenerator_;
+  WorldStore& worldStore_;
   Grid3D<ChunkMeshSlot> meshes_{0, 0, 0, {}};
 
   std::vector<std::thread> workers_{};
@@ -92,9 +93,9 @@ private:
   void stopWorkers_();
   void workerLoop_();
 
-  void enqueueBuild_(const math::Vec3Int& mapCoord);
+  void enqueueBuild_(math::Vec3Int mapCoord);
 
-  ChunkMesh buildChunk_(const math::Vec3Int& mapCoord);
+  ChunkMesh buildChunk_(math::Vec3Int chunkCoord);
   void buildVertices_(ChunkMesh& mesh, const BlockFaces& faces, std::uint32_t blockType, float z, float y, float x);
   void buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, std::uint32_t numFaces);
 };

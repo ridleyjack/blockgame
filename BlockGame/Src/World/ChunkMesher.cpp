@@ -1,6 +1,7 @@
 #include "ChunkMesher.hpp"
 
 #include "BlockRegistry.hpp"
+#include "WorldStore.hpp"
 #include "Containers/Grid3D.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
@@ -9,10 +10,10 @@
 #include <print>
 #include <thread>
 
-ChunkMesher::ChunkMesher(vlk::Renderer& renderer, WorldGenerator& worldGenerator, BlockRegistry& blockRegistry)
+ChunkMesher::ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry)
     : renderer_(renderer),
-      worldGenerator_(worldGenerator),
-      meshes_(WorldGenerator::WorldDepth, WorldGenerator::WorldHeight, WorldGenerator::WorldWidth, {}),
+      worldStore_(worldStore),
+      meshes_(WorldStore::WorldDepth, WorldStore::WorldHeight, WorldStore::WorldWidth, {}),
       blockRegistry_(blockRegistry) {
 
   std::uint32_t threadNum = std::thread::hardware_concurrency();
@@ -102,7 +103,7 @@ void ChunkMesher::workerLoop_() {
   }
 }
 
-void ChunkMesher::enqueueBuild_(const math::Vec3Int& mapCoord) {
+void ChunkMesher::enqueueBuild_(math::Vec3Int mapCoord) {
   ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
   meshSlot.Wanted = true;
   if (meshSlot.Status == ChunkMeshStatus::Building || meshSlot.Status == ChunkMeshStatus::Uploaded)
@@ -112,9 +113,12 @@ void ChunkMesher::enqueueBuild_(const math::Vec3Int& mapCoord) {
   buildQueue_.Push({mapCoord});
 }
 
-ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
-  Chunk chunk = worldGenerator_.GenerateChunk(mapCoord);
-  const auto& blocks = chunk.Blocks;
+ChunkMesh ChunkMesher::buildChunk_(math::Vec3Int chunkCoord) {
+  WorldStore::ReadLock readLock = worldStore_.AcquireReadLock();
+  auto chunk = worldStore_.TryGetChunk(chunkCoord);
+  if (chunk == nullptr)
+    throw std::runtime_error("Generating mesh for un-created chunk");
+  auto& blocks = chunk->Blocks;
 
   ChunkMesh mesh{};
   for (std::int32_t z = 0; z < blocks.Depth(); z++) {
@@ -125,9 +129,9 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
           continue;
 
         auto getBlock = [&](const int deltaZ, const int deltaY, const int deltaX) -> std::uint32_t {
-          math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(mapCoord.X * blocks.Width()) + x,
-                                   .Y = static_cast<std::int32_t>(mapCoord.Y * blocks.Height()) + y,
-                                   .Z = static_cast<std::int32_t>(mapCoord.Z * blocks.Depth()) + z};
+          math::Vec3Int worldCoord{.X = static_cast<std::int32_t>(chunkCoord.X * blocks.Width()) + x,
+                                   .Y = static_cast<std::int32_t>(chunkCoord.Y * blocks.Height()) + y,
+                                   .Z = static_cast<std::int32_t>(chunkCoord.Z * blocks.Depth()) + z};
 
           const int targetZ = z + deltaZ;
           const int targetY = y + deltaY;
@@ -141,12 +145,20 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
           worldCoord.Y += deltaY;
           worldCoord.X += deltaX;
 
-          if (worldCoord.Z < 0 || worldCoord.Z >= WorldGenerator::WorldDepth * Chunk::ChunkDepth || worldCoord.Y < 0 ||
-              worldCoord.Y >= WorldGenerator::WorldHeight * Chunk::ChunkHeight || worldCoord.X < 0 ||
-              worldCoord.X >= WorldGenerator::WorldWidth * Chunk::ChunkWidth)
+          if (worldCoord.Z < 0 || worldCoord.Z >= WorldStore::WorldDepth * Chunk::ChunkDepth || worldCoord.Y < 0 ||
+              worldCoord.Y >= WorldStore::WorldHeight * Chunk::ChunkHeight || worldCoord.X < 0 ||
+              worldCoord.X >= WorldStore::WorldWidth * Chunk::ChunkWidth)
             return 0;
 
-          return static_cast<std::uint32_t>(worldGenerator_.BlockAt(worldCoord));
+          Chunk* neighbour = worldStore_.TryGetChunk({static_cast<std::int32_t>(worldCoord.X / Chunk::ChunkWidth),
+                                                      static_cast<std::int32_t>(worldCoord.Y / Chunk::ChunkHeight),
+                                                      static_cast<std::int32_t>(worldCoord.Z / Chunk::ChunkDepth)});
+          if (neighbour == nullptr)
+            throw std::runtime_error("Missing neighbour chunk when generating mesh");
+
+          return neighbour->Blocks[worldCoord.Z % Chunk::ChunkDepth,
+                                   worldCoord.Y % Chunk::ChunkHeight,
+                                   worldCoord.X % Chunk::ChunkWidth];
         };
 
         BlockFaces faces{};
@@ -166,9 +178,9 @@ ChunkMesh ChunkMesher::buildChunk_(const math::Vec3Int& mapCoord) {
         if (getBlock(0, 0, 1) == 0)
           faces.Right = true;
 
-        const auto worldZ = static_cast<float>(blocks.Depth() * mapCoord.Z + z);
-        const auto worldY = static_cast<float>(blocks.Height() * mapCoord.Y + y);
-        const auto worldX = static_cast<float>(blocks.Width() * mapCoord.X + x);
+        const auto worldZ = static_cast<float>(blocks.Depth() * chunkCoord.Z + z);
+        const auto worldY = static_cast<float>(blocks.Height() * chunkCoord.Y + y);
+        const auto worldX = static_cast<float>(blocks.Width() * chunkCoord.X + x);
 
         const std::uint32_t baseVertex = mesh.Vertices.size();
         buildVertices_(mesh, faces, blocks[z, y, x], worldZ, worldY, worldX);
