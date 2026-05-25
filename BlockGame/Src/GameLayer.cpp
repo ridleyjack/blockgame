@@ -54,7 +54,7 @@ void GameLayer::OnRender() {
                                                       }),
                                                   .View = camera_.View()};
 
-  if (const auto r = renderer.BeginFrame(renderItem.RenderPass, renderItem.Pipeline, cameraMatrices); !r) {
+  if (const auto r = renderer.BeginFrame(renderItem.RenderPass, cameraMatrices); !r) {
     if (r.error() != vlk::RenderError::FrameOutOfDate) {
       std::println("Failed to begin rendering frame", 1);
       return;
@@ -64,7 +64,7 @@ void GameLayer::OnRender() {
   for (const auto& meshCoords : world_.LoadedChunks()) {
     const ChunkMesh& mesh{world_.Mesh(meshCoords)};
     if (mesh.HasVertices())
-      renderer.Submit(mesh.Mesh, renderItem.Material);
+      renderer.Submit(renderItem.Pipeline, mesh.Mesh, renderItem.Material);
   }
 
   if (const auto rv = renderer.EndFrame(); !rv) {
@@ -114,6 +114,20 @@ void GameLayer::handleKeyInput(const int keycode, const bool state) {
   case GLFW_KEY_D:
     input_.Movement.Right = state;
     break;
+  case GLFW_KEY_P: {
+    if (!state)
+      return;
+    auto pos = camera_.Position();
+    auto dir = camera_.Forward();
+    auto result = world_.RaycastBlock(pos, dir, 10);
+    if (!result) {
+      std::println("Miss");
+    } else {
+      auto pos2 = result->Position;
+      std::println("Hit:{} at (x:{},y:{},z:{})", static_cast<int>(result->BlockType), pos2.X, pos2.Y, pos2.Z);
+    }
+    break;
+  }
   case GLFW_KEY_ESCAPE:
     input_.Exit = true;
     break;

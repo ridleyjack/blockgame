@@ -53,7 +53,6 @@ Renderer::~Renderer() {
 }
 
 std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& renderPassHandle,
-                                                      const PipelineHandle& pipelineHandle,
                                                       const CameraMatrices& camera) noexcept {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
@@ -64,11 +63,7 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
 
   const VkExtent2D swapChainExtent = swapchain.Extent();
 
-  frameContext_.RenderPassID = renderPassHandle.RenderPassID;
-  frameContext_.PipelineID = pipelineHandle.PipelineID;
-
-  VkRenderPass renderPass = renderPassCache_.GetRenderPass(frameContext_.RenderPassID).Handle;
-  VkPipeline pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID).Handle();
+  VkRenderPass renderPass = renderPassCache_.GetRenderPass(renderPassHandle.RenderPassID).Handle;
 
   vkWaitForFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame), VK_TRUE, UINT64_MAX);
   meshAllocator_.ProcessDeferredDeletions(frameContext_.CurrentFrame);
@@ -121,7 +116,6 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   renderPassInfo.pClearValues = clearValues.data();
 
   vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
   VkViewport viewport{};
   viewport.x = 0.0f;
@@ -199,9 +193,12 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   return {};
 }
 
-void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) {
+void Renderer::Submit(const PipelineHandle& pipelineHandle, const MeshHandle& handle, const MaterialHandle& material) {
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
+
+  auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
 
   const MeshAllocator::MeshGPU& meshGPU = meshAllocator_.Get(handle.MeshID);
   if (meshGPU.State != MeshState::Ready)
@@ -217,8 +214,6 @@ void Renderer::Submit(const MeshHandle& handle, const MaterialHandle& material) 
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
   vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), meshGPU.IndexOffset, VK_INDEX_TYPE_UINT32);
-
-  auto& pipeline = pipelineCache_.GetPipeline(frameContext_.PipelineID);
 
   std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, texDescriptor};
   vkCmdBindDescriptorSets(commandBuffer,

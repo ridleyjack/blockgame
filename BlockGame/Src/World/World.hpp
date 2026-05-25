@@ -22,7 +22,8 @@ struct ChunkMesh;
 class World {
 public:
   struct BlockHit {
-    math::Vec3Int BlockPosition;
+    math::Vec3Int Position{};
+    BlockType BlockType{};
   };
 
   static constexpr std::uint32_t WorldWidth{100};

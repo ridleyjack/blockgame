@@ -49,8 +49,6 @@ enum class RenderError : uint8_t {
 struct FrameContext {
   std::uint32_t CurrentFrame{};
   std::uint32_t ImageIndex{};
-  std::uint32_t RenderPassID{};
-  std::uint32_t PipelineID{};
 
   UniformBuffer CameraGPU{};
   bool FrameActive{};
@@ -71,10 +69,9 @@ public:
   Renderer& operator=(const Renderer&) = delete;
 
   std::expected<void, RenderError> BeginFrame(const RenderPassHandle& renderPassHandle,
-                                              const PipelineHandle& pipelineHandle,
                                               const CameraMatrices& camera) noexcept;
   std::expected<void, RenderError> EndFrame();
-  void Submit(const MeshHandle& handle, const MaterialHandle& material);
+  void Submit(const PipelineHandle& pipelineHandle, const MeshHandle& handle, const MaterialHandle& material);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
