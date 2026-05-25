@@ -7,13 +7,14 @@ A voxel-based game engine and application built in modern C++ using Vulkan for r
 ### Requirements:
 
 - Clang 20+
+- libstdc++ 14+ (or another C++23 compatible standard library)
 - CMake
 - Ninja
 - pkg-config
 - Vulkan development libraries
 - X11 development libraries
 - Wayland development libraries
-- C++23 compatible standard library (libstdc++ 14+)
+- glslc (GLSL Shader Compiler)
 
 ### Install dependencies (Ubuntu / Debian)
 
@@ -34,7 +35,8 @@ libxi-dev \
 libwayland-dev \
 libxkbcommon-dev \
 libgl1-mesa-dev \
-libvulkan-dev
+libvulkan-dev \
+glslc
 ```
 
 ### Configure:
