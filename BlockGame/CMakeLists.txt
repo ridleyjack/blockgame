@@ -36,9 +36,39 @@ target_link_libraries(Blockgame
         glfw
 )
 
+# Textures
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Textures
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-# Copy shaders to the build directory.
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/Shaders
-        DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+# Shaders
+find_program(GLSLC glslc REQUIRED)
+
+set(SHADER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Shaders")
+set(SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/Shaders")
+
+set(SHADERS
+        shader.vert
+        shader.frag
+)
+
+set(SPIRV_OUTPUTS)
+
+foreach (shader IN LISTS SHADERS)
+    set(input "${SHADER_SOURCE_DIR}/${shader}")
+    set(output "${SHADER_OUTPUT_DIR}/${shader}.spv")
+
+    add_custom_command(
+            OUTPUT "${output}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${SHADER_OUTPUT_DIR}"
+            COMMAND "${GLSLC}" "${input}" -o "${output}"
+            DEPENDS "${input}"
+            VERBATIM
+            COMMENT "Compiling shader ${shader}"
+    )
+
+    list(APPEND SPIRV_OUTPUTS "${output}")
+endforeach ()
+
+add_custom_target(CompileShaders DEPENDS ${SPIRV_OUTPUTS})
+
+add_dependencies(Blockgame CompileShaders)

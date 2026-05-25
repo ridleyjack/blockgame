@@ -13,8 +13,8 @@ TextureRegistry::TextureRegistry(vlk::Renderer& renderer) {
   const gfx::RenderPassHandle renderPass = renderer.CreateRenderPass();
   const gfx::PipelineHandle pipeline =
       renderer.CreatePipeline(gfx::PipelineCreateInfo{.RenderPass = renderPass,
-                                                      .VertexShaderFile = "Shaders/vert.spv",
-                                                      .FragmentShaderFile = "Shaders/frag.spv"});
+                                                      .VertexShaderFile = "Shaders/shader.vert.spv",
+                                                      .FragmentShaderFile = "Shaders/shader.frag.spv"});
 
   std::array<std::string_view, blockTextures_.size()> paths{};
   for (std::size_t i = 0; i < blockTextures_.size(); i++) {
