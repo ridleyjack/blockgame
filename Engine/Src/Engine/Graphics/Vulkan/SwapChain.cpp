@@ -4,7 +4,6 @@
 #include "Device.hpp"
 #include "Image.hpp"
 #include "Sync.hpp"
-#include "RenderPassCache.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -26,8 +25,6 @@ SwapChain::~SwapChain() {
 
 void SwapChain::Cleanup() {
   auto vkDevice = context_.GetDevice().Logical();
-
-  framebuffers_.clear();
 
   for (auto imageView : imageViews_) {
     vkDestroyImageView(vkDevice, imageView, nullptr);
@@ -61,16 +58,6 @@ void SwapChain::Recreate() {
   context_.GetSync().RecreatePerImageSemaphores();
 }
 
-void SwapChain::CreateFramebuffers(RenderPass& renderPass) {
-  renderPasses_.push_back(&renderPass);
-  framebuffers_.emplace_back(context_, *this, renderPass);
-}
-
-FramebufferSet& SwapChain::Framebuffers(const size_t setID) noexcept {
-  assert(setID < framebuffers_.size());
-  return framebuffers_[setID];
-}
-
 VkSwapchainKHR SwapChain::Handle() const noexcept {
   return swapchain_;
 }
@@ -89,8 +76,14 @@ std::vector<VkImage> SwapChain::Images() const noexcept {
 std::vector<VkImageView> SwapChain::ImageViews() const noexcept {
   return imageViews_;
 }
+VkImage SwapChain::DepthImage() const noexcept {
+  return depthImage_;
+}
 VkImageView SwapChain::DepthImageView() const noexcept {
   return depthImageView_;
+}
+VkImage SwapChain::ColorImage() const noexcept {
+  return colorImage_;
 }
 VkImageView SwapChain::ColorImageView() const noexcept {
   return colorImageView_;
@@ -165,10 +158,6 @@ void SwapChain::create_() {
 
   createColorResources_();
   createDepthResources_();
-
-  for (const auto& renderPass : renderPasses_) {
-    framebuffers_.emplace_back(context_, *this, *renderPass);
-  }
 }
 
 VkSurfaceFormatKHR SwapChain::chooseSurfaceFormat_(const std::vector<VkSurfaceFormatKHR>& availableFormats) const {

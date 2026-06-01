@@ -2,7 +2,7 @@
 
 #include "Context.hpp"
 #include "Device.hpp"
-#include "RenderPassCache.hpp"
+#include "SwapChain.hpp"
 #include "VertexLayout.hpp"
 
 #include "Engine/Assets/File.hpp"
@@ -13,7 +13,6 @@
 namespace engine::graphics::vulkan {
 
 std::expected<Pipeline, PipelineError> Pipeline::Create(Context& context,
-                                                        const RenderPass& renderPass,
                                                         const PipelineCreateInfo& info,
                                                         std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) {
   auto vkDevice = context.GetDevice().Logical();
@@ -26,7 +25,7 @@ std::expected<Pipeline, PipelineError> Pipeline::Create(Context& context,
     pipelineLayout = *result;
   }
 
-  if (auto result = createPipeline_(context, info, renderPass, pipelineLayout); !result) {
+  if (auto result = createPipeline_(context, info, pipelineLayout); !result) {
     vkDestroyPipelineLayout(vkDevice, pipelineLayout, nullptr);
     return std::unexpected(result.error());
   } else {
@@ -80,11 +79,22 @@ Pipeline::createPipelineLayout_(const Context& context,
 
 std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context& context,
                                                                    const PipelineCreateInfo& info,
-                                                                   const RenderPass& renderPass,
                                                                    VkPipelineLayout pipelineLayout) noexcept {
-
+  const auto& swapchain = context.GetSwapchain();
   const auto& device = context.GetDevice();
   const auto vkDevice = device.Logical();
+
+  const VkFormat depthFormat =
+      device.FindSupportedFormat({VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+                                 VK_IMAGE_TILING_OPTIMAL,
+                                 VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+  std::array<VkFormat, 1> swapchainFormat{swapchain.ImageFormat()};
+  VkPipelineRenderingCreateInfo renderingInfo{
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+      .colorAttachmentCount = swapchainFormat.size(),
+      .pColorAttachmentFormats = swapchainFormat.data(),
+      .depthAttachmentFormat = depthFormat,
+  };
 
   auto vertShaderCode = assets::ReadBinaryFile(info.VertexShaderFile);
   auto fragShaderCode = assets::ReadBinaryFile(info.FragmentShaderFile);
@@ -206,6 +216,7 @@ std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context
 
   VkGraphicsPipelineCreateInfo pipelineInfo{
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = &renderingInfo,
       .stageCount = static_cast<uint32_t>(shaderStages.size()),
       .pStages = shaderStages.data(),
       .pVertexInputState = &vertexInputInfo,
@@ -217,7 +228,6 @@ std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context
       .pColorBlendState = &colorBlending,
       .pDynamicState = &dynamicState,
       .layout = pipelineLayout,
-      .renderPass = renderPass.Handle,
       .subpass = 0,
   };
 

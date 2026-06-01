@@ -16,7 +16,6 @@ namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 
 struct RenderItem {
-  gfx::RenderPassHandle RenderPass{};
   gfx::PipelineHandle Pipeline{};
   gfx::MaterialHandle Material{};
 };

@@ -54,7 +54,7 @@ void GameLayer::OnRender() {
                                                       }),
                                                   .View = camera_.View()};
 
-  if (const auto r = renderer.BeginFrame(renderItem.RenderPass, cameraMatrices); !r) {
+  if (const auto r = renderer.BeginFrame(cameraMatrices); !r) {
     if (r.error() != vlk::RenderError::FrameOutOfDate) {
       std::println("Failed to begin rendering frame", 1);
       return;

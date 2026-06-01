@@ -13,7 +13,6 @@ struct PipelineCreateInfo;
 namespace engine::graphics::vulkan {
 
 class Context;
-class RenderPass;
 
 class PipelineCache {
 public:
@@ -23,9 +22,7 @@ public:
   PipelineCache& operator=(const PipelineCache&) = delete;
 
   std::expected<std::uint32_t, PipelineError>
-  CreatePipeline(const PipelineCreateInfo& info,
-                 const RenderPass& renderPass,
-                 std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) noexcept;
+  CreatePipeline(const PipelineCreateInfo& info, std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) noexcept;
   Pipeline& GetPipeline(std::uint32_t pipelineID) noexcept;
   void DestroyPipeline(std::uint32_t pipelineID) noexcept;
 

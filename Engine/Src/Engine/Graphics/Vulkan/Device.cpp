@@ -4,8 +4,6 @@
 #include "Command.hpp"
 #include "Config.hpp"
 
-#include <cassert>
-#include <iostream>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -30,22 +28,33 @@ Device::Device(Context& context) : context_{context} {
     queueCreateInfos.push_back(queueCreateInfo);
   }
 
-  VkPhysicalDeviceFeatures deviceFeatures{};
-  deviceFeatures.samplerAnisotropy = VK_TRUE;
+  VkPhysicalDeviceVulkan13Features enabledVK13Features{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+      .synchronization2 = VK_TRUE,
+      .dynamicRendering = VK_TRUE,
+  };
+  VkPhysicalDeviceVulkan14Features enabledVK14Features{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+      .pNext = &enabledVK13Features,
+  };
+  VkPhysicalDeviceFeatures enabledVK10Features{
+      .samplerAnisotropy = VK_TRUE,
+  };
 
-  VkDeviceCreateInfo createInfo{};
-  createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
-  createInfo.pQueueCreateInfos = queueCreateInfos.data();
-  createInfo.pEnabledFeatures = &deviceFeatures;
+  VkDeviceCreateInfo createInfo{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext = &enabledVK14Features,
+      .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
+      .pQueueCreateInfos = queueCreateInfos.data(),
+      .enabledLayerCount = 0,
+      .enabledExtensionCount = static_cast<uint32_t>(config::DeviceExtensions.size()),
+      .ppEnabledExtensionNames = config::DeviceExtensions.data(),
+      .pEnabledFeatures = &enabledVK10Features,
+  };
   if (config::EnableValidationLayers) { // These values are ignored in modern Vulkan.
     createInfo.enabledLayerCount = static_cast<uint32_t>(config::ValidationLayers.size());
     createInfo.ppEnabledLayerNames = config::ValidationLayers.data();
-  } else {
-    createInfo.enabledLayerCount = 0;
   }
-  createInfo.enabledExtensionCount = static_cast<uint32_t>(config::DeviceExtensions.size());
-  createInfo.ppEnabledExtensionNames = config::DeviceExtensions.data();
 
   if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS) {
     throw std::runtime_error("failed to create logical device!");
@@ -201,8 +210,14 @@ bool Device::isDeviceSuitable_(VkPhysicalDevice device, VkSurfaceKHR surface) {
   VkPhysicalDeviceProperties deviceProperties;
   vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
-  VkPhysicalDeviceFeatures supportedFeatures;
-  vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+  VkPhysicalDeviceVulkan13Features vk13Features{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+  };
+  VkPhysicalDeviceFeatures2 supportedFeatures{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+      .pNext = &vk13Features,
+  };
+  vkGetPhysicalDeviceFeatures2(device, &supportedFeatures);
 
   QueueFamilyIndices indices = findQueueFamilies_(device, surface);
 
@@ -214,7 +229,8 @@ bool Device::isDeviceSuitable_(VkPhysicalDevice device, VkSurfaceKHR surface) {
     swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
   }
 
-  return indices.IsComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.samplerAnisotropy;
+  return indices.IsComplete() && extensionsSupported && swapChainAdequate &&
+         supportedFeatures.features.samplerAnisotropy && vk13Features.synchronization2 && vk13Features.dynamicRendering;
 }
 
 QueueFamilyIndices Device::findQueueFamilies_(VkPhysicalDevice device, VkSurfaceKHR surface) {

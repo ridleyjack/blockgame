@@ -4,7 +4,6 @@
 #include "DescriptorAllocator.hpp"
 #include "MeshAllocator.hpp"
 #include "MeshBuffer.hpp"
-#include "RenderPassCache.hpp"
 #include "UniformBuffer.hpp"
 #include "TextureAllocator.hpp"
 #include "PipelineCache.hpp"
@@ -22,7 +21,6 @@ struct MeshHandle;
 struct Mesh;
 struct MeshCreateInfo;
 
-struct RenderPassHandle;
 struct PipelineHandle;
 struct PipelineCreateInfo;
 
@@ -68,15 +66,12 @@ public:
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  std::expected<void, RenderError> BeginFrame(const RenderPassHandle& renderPassHandle,
-                                              const CameraMatrices& camera) noexcept;
+  std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera) noexcept;
   std::expected<void, RenderError> EndFrame();
   void Submit(const PipelineHandle& pipelineHandle, const MeshHandle& handle, const MaterialHandle& material);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
-
-  RenderPassHandle CreateRenderPass();
 
   PipelineHandle CreatePipeline(const PipelineCreateInfo& info);
   void DeletePipeline(const PipelineHandle& handle);
@@ -98,7 +93,6 @@ public:
 private:
   Context context_;
 
-  RenderPassCache renderPassCache_;
   PipelineCache pipelineCache_;
 
   StagingBuffer stagingBuffer_;

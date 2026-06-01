@@ -10,10 +10,8 @@ namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 
 TextureRegistry::TextureRegistry(vlk::Renderer& renderer) {
-  const gfx::RenderPassHandle renderPass = renderer.CreateRenderPass();
   const gfx::PipelineHandle pipeline =
-      renderer.CreatePipeline(gfx::PipelineCreateInfo{.RenderPass = renderPass,
-                                                      .VertexShaderFile = "Shaders/shader.vert.spv",
+      renderer.CreatePipeline(gfx::PipelineCreateInfo{.VertexShaderFile = "Shaders/shader.vert.spv",
                                                       .FragmentShaderFile = "Shaders/shader.frag.spv"});
 
   std::array<std::string_view, blockTextures_.size()> paths{};
@@ -29,7 +27,7 @@ TextureRegistry::TextureRegistry(vlk::Renderer& renderer) {
     throw std::runtime_error("Failed to load texture " + texture.error().Detail);
 
   const auto material = renderer.CreateMaterial(*texture);
-  renderItem_ = {.RenderPass = renderPass, .Pipeline = pipeline, .Material = material};
+  renderItem_ = {.Pipeline = pipeline, .Material = material};
 }
 
 const RenderItem& TextureRegistry::GetRenderItem() const noexcept {

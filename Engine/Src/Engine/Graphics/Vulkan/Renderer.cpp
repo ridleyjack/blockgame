@@ -7,7 +7,6 @@
 #include "PipelineCache.hpp"
 #include "SwapChain.hpp"
 #include "Sync.hpp"
-#include "RenderPassCache.hpp"
 
 #include "Engine/Graphics/CameraMatrices.hpp"
 #include "Engine/Graphics/Handles.hpp"
@@ -26,12 +25,8 @@
 
 namespace engine::graphics::vulkan {
 
-// Single resources and hardcoded values are used in this stage of development.
-constexpr uint32_t defaultFramebufferID = 0;
-
 Renderer::Renderer(GLFWwindow* window)
     : context_(window),
-      renderPassCache_(context_),
       pipelineCache_(context_),
       stagingBuffer_(StagingBuffer::Create(context_)),
       uploader_(context_, stagingBuffer_),
@@ -52,8 +47,7 @@ Renderer::~Renderer() {
     device.DestroyBuffer(buffer);
 }
 
-std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& renderPassHandle,
-                                                      const CameraMatrices& camera) noexcept {
+std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& camera) noexcept {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
@@ -62,8 +56,6 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
   uploader_.Process();
 
   const VkExtent2D swapChainExtent = swapchain.Extent();
-
-  VkRenderPass renderPass = renderPassCache_.GetRenderPass(renderPassHandle.RenderPassID).Handle;
 
   vkWaitForFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame), VK_TRUE, UINT64_MAX);
   meshAllocator_.ProcessDeferredDeletions(frameContext_.CurrentFrame);
@@ -100,35 +92,82 @@ std::expected<void, RenderError> Renderer::BeginFrame(const RenderPassHandle& re
 
   frameContext_.FrameActive = true;
 
-  // Render Pass
-  VkRenderPassBeginInfo renderPassInfo{};
-  renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  renderPassInfo.renderPass = renderPass;
-  renderPassInfo.framebuffer = swapchain.Framebuffers(defaultFramebufferID).Framebuffer(frameContext_.ImageIndex);
-  renderPassInfo.renderArea.offset = {0, 0};
-  renderPassInfo.renderArea.extent = swapChainExtent;
+  std::array<VkImageMemoryBarrier2, 3> outputBarriers{
+      VkImageMemoryBarrier2{
+                            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                            .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                            .srcAccessMask = 0,
+                            .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                            .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                            .newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+                            .image = swapchain.ColorImage(),
+                            .subresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1}},
+      VkImageMemoryBarrier2{
+                            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                            .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                            .srcAccessMask = 0,
+                            .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                            .dstAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                            .newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+                            .image = swapchain.Images()[frameContext_.ImageIndex],
+                            .subresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1}},
+      VkImageMemoryBarrier2{
+                            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+                            .srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                            .srcAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                            .dstStageMask = VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT,
+                            .dstAccessMask = VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                            .newLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+                            .image = swapchain.DepthImage(),
+                            .subresourceRange{.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT, .levelCount = 1, .layerCount = 1}}
+  };
+  VkDependencyInfo barrierDependencyInfo{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                                         .imageMemoryBarrierCount = outputBarriers.size(),
+                                         .pImageMemoryBarriers = outputBarriers.data()};
+  vkCmdPipelineBarrier2(commandBuffer, &barrierDependencyInfo);
 
-  std::array<VkClearValue, 2> clearValues{};
-  clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
-  clearValues[1].depthStencil = {1.0f, 0};
+  VkRenderingAttachmentInfo colorAttachment{.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                                            .imageView = swapchain.ColorImageView(),
+                                            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+                                            .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
+                                            .resolveImageView = swapchain.ImageViews()[frameContext_.ImageIndex],
+                                            .resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+                                            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                            .clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}}};
+  VkRenderingAttachmentInfo depthAttachment{.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+                                            .imageView = swapchain.DepthImageView(),
+                                            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+                                            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                                            .clearValue = {.depthStencil = {1.0f, 0}}};
+  VkRenderingInfo renderInfo{
+      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      .renderArea = VkRect2D{VkOffset2D{}, swapchain.Extent()},
+      .layerCount = 1,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &colorAttachment,
+      .pDepthAttachment = &depthAttachment,
+  };
+  vkCmdBeginRendering(commandBuffer, &renderInfo);
 
-  renderPassInfo.clearValueCount = clearValues.size();
-  renderPassInfo.pClearValues = clearValues.data();
-
-  vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-  VkViewport viewport{};
-  viewport.x = 0.0f;
-  viewport.y = 0.0f;
-  viewport.width = static_cast<float>(swapChainExtent.width);
-  viewport.height = static_cast<float>(swapChainExtent.height);
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
+  VkViewport viewport{
+      .x = 0.0f,
+      .y = 0.0f,
+      .width = static_cast<float>(swapChainExtent.width),
+      .height = static_cast<float>(swapChainExtent.height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+  };
   vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 
-  VkRect2D scissor{};
-  scissor.offset = {0, 0};
-  scissor.extent = swapChainExtent;
+  VkRect2D scissor{
+      .offset = {0, 0},
+      .extent = swapChainExtent,
+  };
   vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
   return {};
@@ -142,8 +181,24 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
-  vkCmdEndRenderPass(commandBuffer);
+  vkCmdEndRendering(commandBuffer);
   frameContext_.FrameActive = false;
+
+  VkImageMemoryBarrier2 barrierPresent{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
+      .srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+      .srcAccessMask = VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+      .dstAccessMask = 0,
+      .oldLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+      .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+      .image = swapchain.Images()[frameContext_.ImageIndex],
+      .subresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1}
+  };
+  VkDependencyInfo barrierPresentDependencyInfo{.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+                                                .imageMemoryBarrierCount = 1,
+                                                .pImageMemoryBarriers = &barrierPresent};
+  vkCmdPipelineBarrier2(commandBuffer, &barrierPresentDependencyInfo);
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
     return std::unexpected(RenderError::RecordCommandFailed);
@@ -153,16 +208,17 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   const std::array<VkSemaphore, 1> signalSemaphores = {sync.RenderFinishedSemaphore(frameContext_.ImageIndex)};
   constexpr std::array<VkPipelineStageFlags, 1> waitStages = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
-  VkSubmitInfo submitInfo{};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = waitSemaphores.data();
-  submitInfo.pWaitDstStageMask = waitStages.data();
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &commandBuffer;
+  VkSubmitInfo submitInfo{
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = waitSemaphores.data(),
+      .pWaitDstStageMask = waitStages.data(),
+      .commandBufferCount = 1,
+      .pCommandBuffers = &commandBuffer,
 
-  submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = signalSemaphores.data();
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = signalSemaphores.data(),
+  };
 
   vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame));
   if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)) !=
@@ -197,25 +253,24 @@ void Renderer::Submit(const PipelineHandle& pipelineHandle, const MeshHandle& ha
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
-  auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
-  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
-
   const MeshAllocator::MeshGPU& meshGPU = meshAllocator_.Get(handle.MeshID);
   if (meshGPU.State != MeshState::Ready)
     return;
 
-  auto globalDescriptor = descriptorAllocator_.GlobalDescriptorSet(frameContext_.CurrentFrame);
-  auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(material.DescriptorSetID);
+  const auto globalDescriptor = descriptorAllocator_.GlobalDescriptorSet(frameContext_.CurrentFrame);
+  const auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(material.DescriptorSetID);
   if (texDescriptor == VK_NULL_HANDLE)
     return;
 
   const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
   const std::array<VkDeviceSize, 1> offsets = {meshGPU.VertexOffset};
+  const auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
 
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
   vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), meshGPU.IndexOffset, VK_INDEX_TYPE_UINT32);
 
-  std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, texDescriptor};
+  const std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, texDescriptor};
   vkCmdBindDescriptorSets(commandBuffer,
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline.PipelineLayout(),
@@ -235,19 +290,8 @@ void Renderer::WaitUntilIdle() const {
   context_.WaitUntilIdle();
 }
 
-RenderPassHandle Renderer::CreateRenderPass() {
-  auto result = renderPassCache_.CreateRenderPass();
-  if (!result) {
-    const std::string msg = std::format("Failed to create render pass: {}", ToString(result.error()));
-    throw std::runtime_error(msg);
-  }
-  context_.GetSwapchain().CreateFramebuffers(renderPassCache_.GetRenderPass(*result));
-  return RenderPassHandle{*result};
-}
-
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
-  const RenderPass& pass = renderPassCache_.GetRenderPass(info.RenderPass.RenderPassID);
-  auto pipeline = pipelineCache_.CreatePipeline(info, pass, descriptorAllocator_.DescriptorSetLayouts());
+  auto pipeline = pipelineCache_.CreatePipeline(info, descriptorAllocator_.DescriptorSetLayouts());
   if (!pipeline) {
     const std::string msg = std::format("Failed to create render pass: {}", ToString(pipeline.error()));
     throw std::runtime_error(msg);

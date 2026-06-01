@@ -1,7 +1,5 @@
 #pragma once
 
-#include "FramebufferSet.hpp"
-
 #include <vulkan/vulkan.h>
 
 #include <vector>
@@ -21,9 +19,6 @@ public:
   void Cleanup();
   void Recreate();
 
-  void CreateFramebuffers(RenderPass& renderPass);
-  FramebufferSet& Framebuffers(size_t setID) noexcept;
-
   VkSwapchainKHR Handle() const noexcept;
   VkFormat ImageFormat() const noexcept;
   VkExtent2D Extent() const noexcept;
@@ -31,20 +26,20 @@ public:
   std::vector<VkImage> Images() const noexcept;
   std::vector<VkImageView> ImageViews() const noexcept;
 
+  VkImage DepthImage() const noexcept;
   VkImageView DepthImageView() const noexcept;
+  VkImage ColorImage() const noexcept;
   VkImageView ColorImageView() const noexcept;
 
 private:
   Context& context_;
 
-  std::vector<RenderPass*> renderPasses_{};
   VkSwapchainKHR swapchain_{VK_NULL_HANDLE};
   VkFormat imageFormat_{};
   VkExtent2D extent_{};
 
   std::vector<VkImage> images_{};
   std::vector<VkImageView> imageViews_{};
-  std::vector<FramebufferSet> framebuffers_{};
 
   void create_();
 

@@ -2,10 +2,6 @@
 #include <cstdint>
 
 namespace engine::graphics {
-struct RenderPassHandle {
-  uint32_t RenderPassID;
-};
-
 struct PipelineHandle {
   uint32_t PipelineID{};
 };

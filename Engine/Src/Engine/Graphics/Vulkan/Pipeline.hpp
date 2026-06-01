@@ -15,7 +15,6 @@ struct PipelineHandle;
 namespace engine::graphics::vulkan {
 
 class Context;
-class RenderPass;
 
 enum class PipelineError : uint8_t {
   FailedPipelineCreation,
@@ -39,10 +38,8 @@ constexpr std::string_view ToString(const PipelineError e) noexcept {
 
 class Pipeline {
 public:
-  static std::expected<Pipeline, PipelineError> Create(Context& context,
-                                                       const RenderPass& renderPass,
-                                                       const PipelineCreateInfo& info,
-                                                       std::array<VkDescriptorSetLayout, 2> layouts);
+  static std::expected<Pipeline, PipelineError>
+  Create(Context& context, const PipelineCreateInfo& info, std::array<VkDescriptorSetLayout, 2> layouts);
 
   Pipeline(Context& context, VkPipelineLayout pipelineLayout, VkPipeline pipeline);
   ~Pipeline();
@@ -59,14 +56,12 @@ private:
   static std::expected<VkPipelineLayout, PipelineError>
   createPipelineLayout_(const Context& context, std::array<VkDescriptorSetLayout, 2> layouts) noexcept;
 
-  static std::expected<VkPipeline, PipelineError> createPipeline_(const Context& context,
-                                                                  const PipelineCreateInfo& info,
-                                                                  const RenderPass& renderPass,
-                                                                  VkPipelineLayout pipelineLayout) noexcept;
+  static std::expected<VkPipeline, PipelineError>
+  createPipeline_(const Context& context, const PipelineCreateInfo& info, VkPipelineLayout pipelineLayout) noexcept;
 
   static std::expected<VkShaderModule, PipelineError> createShaderModule_(const Context& context,
                                                                           const std::vector<char>& code) noexcept;
-
+  
   Context& context_;
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};

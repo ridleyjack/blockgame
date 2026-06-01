@@ -60,10 +60,6 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Handles.hpp
         Src/Engine/Graphics/PipelineCreateInfo.hpp
         Src/Engine/Graphics/Mesh.hpp
-        Src/Engine/Graphics/Vulkan/RenderPassCache.cpp
-        Src/Engine/Graphics/Vulkan/RenderPassCache.hpp
-        Src/Engine/Graphics/Vulkan/FramebufferSet.cpp
-        Src/Engine/Graphics/Vulkan/FramebufferSet.hpp
         Src/Engine/Graphics/Vulkan/UniformBuffer.hpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.cpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.hpp
