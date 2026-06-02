@@ -60,6 +60,7 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Handles.hpp
         Src/Engine/Graphics/PipelineCreateInfo.hpp
         Src/Engine/Graphics/Mesh.hpp
+        Src/Engine/Graphics/ObjectPushConstants.hpp
         Src/Engine/Graphics/Vulkan/UniformBuffer.hpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.cpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.hpp

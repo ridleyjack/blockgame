@@ -19,7 +19,8 @@ GameLayer::GameLayer(engine::Application& application)
     : application_(application),
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
-      world_(application.GetRenderer()) {
+      world_(application.GetRenderer()),
+      highlight_(application.GetRenderer()) {
   world_.Update({1, 1, 1});
 }
 
@@ -64,8 +65,11 @@ void GameLayer::OnRender() {
   for (const auto& meshCoords : world_.LoadedChunks()) {
     const ChunkMesh& mesh{world_.Mesh(meshCoords)};
     if (mesh.HasVertices())
-      renderer.Submit(renderItem.Pipeline, mesh.Mesh, renderItem.Material);
+      renderer.Submit(renderItem.Pipeline, mesh.Mesh, renderItem.Material, renderItem.PushConstants);
   }
+
+  auto& highlightItem = highlight_.GetRenderItem();
+  renderer.Submit(highlightItem.Pipeline, highlight_.GetMesh(), highlightItem.Material, highlightItem.PushConstants);
 
   if (const auto rv = renderer.EndFrame(); !rv) {
     std::println("Failed to render frame");

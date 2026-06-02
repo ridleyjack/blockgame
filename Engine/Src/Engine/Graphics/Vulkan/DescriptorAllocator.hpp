@@ -12,7 +12,7 @@ struct TextureGPU;
 class Context;
 class TextureAllocator;
 class Device;
-class UniformBuffer;
+struct UniformBuffer;
 
 class DescriptorAllocator {
 public:

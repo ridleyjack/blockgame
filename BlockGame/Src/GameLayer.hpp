@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Camera.hpp"
+#include "Highlight.hpp"
 #include "TextureRegistry.hpp"
 #include "Engine/Application.hpp"
 
@@ -59,6 +60,8 @@ private:
   KeyInput input_{};
 
   World world_;
+
+  Highlight highlight_;
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};

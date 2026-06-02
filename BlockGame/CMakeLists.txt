@@ -22,6 +22,9 @@ add_executable(Blockgame
         Src/World/Chunk.hpp
         Src/World/WorldStore.cpp
         Src/World/WorldStore.hpp
+        Src/Highlight.cpp
+        Src/Highlight.hpp
+        Src/RenderItem.hpp
 )
 
 target_include_directories(Blockgame
@@ -47,8 +50,10 @@ set(SHADER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Shaders")
 set(SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/Shaders")
 
 set(SHADERS
-        shader.vert
-        shader.frag
+        terrain.vert
+        terrain.frag
+        highlight.vert
+        highlight.frag
 )
 
 set(SPIRV_OUTPUTS)

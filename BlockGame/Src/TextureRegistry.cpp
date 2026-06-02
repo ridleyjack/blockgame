@@ -11,8 +11,8 @@ namespace vlk = gfx::vulkan;
 
 TextureRegistry::TextureRegistry(vlk::Renderer& renderer) {
   const gfx::PipelineHandle pipeline =
-      renderer.CreatePipeline(gfx::PipelineCreateInfo{.VertexShaderFile = "Shaders/shader.vert.spv",
-                                                      .FragmentShaderFile = "Shaders/shader.frag.spv"});
+      renderer.CreatePipeline(gfx::PipelineCreateInfo{.VertexShaderFile = "Shaders/terrain.vert.spv",
+                                                      .FragmentShaderFile = "Shaders/terrain.frag.spv"});
 
   std::array<std::string_view, blockTextures_.size()> paths{};
   for (std::size_t i = 0; i < blockTextures_.size(); i++) {

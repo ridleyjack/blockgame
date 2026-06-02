@@ -3,9 +3,11 @@
 #include "Context.hpp"
 #include "Device.hpp"
 #include "SwapChain.hpp"
+#include "UniformBuffer.hpp"
 #include "VertexLayout.hpp"
 
 #include "Engine/Assets/File.hpp"
+#include "Engine/Graphics/ObjectPushConstants.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 
 #include <array>
@@ -63,12 +65,16 @@ std::expected<VkPipelineLayout, PipelineError>
 Pipeline::createPipelineLayout_(const Context& context,
                                 std::array<VkDescriptorSetLayout, 2> descriptorLayouts) noexcept {
   const auto vkDevice = context.GetDevice().Logical();
-  VkPipelineLayoutCreateInfo pipelineLayoutInfo{
-      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-      .setLayoutCount = descriptorLayouts.size(),
-      .pSetLayouts = descriptorLayouts.data(),
-      .pushConstantRangeCount = 0,
-  };
+
+  VkPushConstantRange pushConstantRange{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+                                        .offset = 0,
+                                        .size = sizeof(ObjectPushConstants)};
+
+  VkPipelineLayoutCreateInfo pipelineLayoutInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                                                .setLayoutCount = descriptorLayouts.size(),
+                                                .pSetLayouts = descriptorLayouts.data(),
+                                                .pushConstantRangeCount = 1,
+                                                .pPushConstantRanges = &pushConstantRange};
 
   VkPipelineLayout layout{VK_NULL_HANDLE};
   if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &layout) != VK_SUCCESS) {

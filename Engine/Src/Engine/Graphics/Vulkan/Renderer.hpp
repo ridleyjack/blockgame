@@ -10,6 +10,8 @@
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
+#include "Engine/Graphics/ObjectPushConstants.hpp"
+
 #include <expected>
 
 struct GLFWwindow;
@@ -68,7 +70,10 @@ public:
 
   std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera) noexcept;
   std::expected<void, RenderError> EndFrame();
-  void Submit(const PipelineHandle& pipelineHandle, const MeshHandle& handle, const MaterialHandle& material);
+  void Submit(const PipelineHandle& pipelineHandle,
+              const MeshHandle& handle,
+              const MaterialHandle& material,
+              const ObjectPushConstants& model);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;

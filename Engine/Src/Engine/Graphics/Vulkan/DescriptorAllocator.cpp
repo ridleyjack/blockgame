@@ -13,7 +13,7 @@ UniformBuffer DescriptorAllocator::CreateUniformBuffer(const Device& device) {
 
   UniformBuffer uniform{};
   for (size_t i = 0; i < config::MaxFramesInFlight; i++) {
-    constexpr VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    constexpr VkDeviceSize bufferSize = sizeof(GlobalUBO);
 
     uniform.Buffers[i] =
         device.CreateBuffer(bufferSize,
@@ -77,7 +77,7 @@ void DescriptorAllocator::CreateGlobalDescriptorSets(const UniformBuffer& unifor
     VkDescriptorBufferInfo bufferInfo{
         .buffer = uniformGPU.Buffers[i].Buffer,
         .offset = 0,
-        .range = sizeof(UniformBufferObject),
+        .range = sizeof(GlobalUBO),
     };
 
     std::array<VkWriteDescriptorSet, 1> descriptorWrites{

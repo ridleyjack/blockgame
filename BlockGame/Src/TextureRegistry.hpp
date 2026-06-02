@@ -2,7 +2,7 @@
 
 #include "BlockTypes.hpp"
 
-#include "Engine/Graphics/Handles.hpp"
+#include "RenderItem.hpp"
 
 #include <array>
 #include <string_view>
@@ -14,11 +14,6 @@ class Renderer;
 
 namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
-
-struct RenderItem {
-  gfx::PipelineHandle Pipeline{};
-  gfx::MaterialHandle Material{};
-};
 
 class TextureRegistry {
 public:

@@ -14,10 +14,8 @@ struct UniformBuffer {
   std::array<void*, config::MaxFramesInFlight> MappedMemory{};
 };
 
-struct UniformBufferObject {
-  alignas(16) glm::mat4 Model{};
-  alignas(16) glm::mat4 View{};
-  alignas(16) glm::mat4 Projection{};
+struct GlobalUBO {
+  glm::mat4 View{1.0f};
+  glm::mat4 Projection{1.0f};
 };
-
 } // namespace engine::graphics::vulkan

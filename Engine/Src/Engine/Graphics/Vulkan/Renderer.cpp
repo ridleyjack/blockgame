@@ -76,8 +76,8 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
   }
 
   // Camera
-  const UniformBufferObject ubo{.Model = glm::mat4(1.0f), .View = camera.View, .Projection = camera.Projection};
-  memcpy(frameContext_.CameraGPU.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(UniformBufferObject));
+  const GlobalUBO ubo{.View = camera.View, .Projection = camera.Projection};
+  memcpy(frameContext_.CameraGPU.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(GlobalUBO));
 
   // Command Buffer
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
@@ -249,7 +249,10 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   return {};
 }
 
-void Renderer::Submit(const PipelineHandle& pipelineHandle, const MeshHandle& handle, const MaterialHandle& material) {
+void Renderer::Submit(const PipelineHandle& pipelineHandle,
+                      const MeshHandle& handle,
+                      const MaterialHandle& material,
+                      const ObjectPushConstants& model) {
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
@@ -262,11 +265,11 @@ void Renderer::Submit(const PipelineHandle& pipelineHandle, const MeshHandle& ha
   if (texDescriptor == VK_NULL_HANDLE)
     return;
 
-  const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
-  const std::array<VkDeviceSize, 1> offsets = {meshGPU.VertexOffset};
   const auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
 
+  const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
+  const std::array<VkDeviceSize, 1> offsets = {meshGPU.VertexOffset};
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
   vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), meshGPU.IndexOffset, VK_INDEX_TYPE_UINT32);
 
@@ -279,6 +282,14 @@ void Renderer::Submit(const PipelineHandle& pipelineHandle, const MeshHandle& ha
                           descriptors.data(),
                           0,
                           nullptr);
+
+  vkCmdPushConstants(commandBuffer,
+                     pipeline.PipelineLayout(),
+                     VK_SHADER_STAGE_VERTEX_BIT,
+                     0,
+                     sizeof(ObjectPushConstants),
+                     &model);
+
   vkCmdDrawIndexed(commandBuffer, meshGPU.IndexCount, 1, 0, 0, 0);
 }
 
