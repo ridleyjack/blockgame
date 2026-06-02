@@ -22,8 +22,8 @@ add_executable(Blockgame
         Src/World/Chunk.hpp
         Src/World/WorldStore.cpp
         Src/World/WorldStore.hpp
-        Src/Highlight.cpp
-        Src/Highlight.hpp
+        Src/BlockHighlighter.cpp
+        Src/BlockHighlighter.hpp
         Src/RenderItem.hpp
 )
 

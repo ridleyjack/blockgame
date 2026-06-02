@@ -20,7 +20,7 @@ GameLayer::GameLayer(engine::Application& application)
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
       world_(application.GetRenderer()),
-      highlight_(application.GetRenderer()) {
+      blockHighlighter_(application.GetRenderer()) {
   world_.Update({1, 1, 1});
 }
 
@@ -34,14 +34,19 @@ void GameLayer::OnUpdate(const float deltaTime) {
     camera_.Move(camera_.Right() * -speed);
   if (input_.Movement.Right)
     camera_.Move(camera_.Right() * speed);
-
   if (input_.Exit)
     application_.Stop();
 
   const int playerX = static_cast<int>(std::floor(camera_.Position().x / Chunk::ChunkWidth));
   const int playerZ = static_cast<int>(std::floor(camera_.Position().z / Chunk::ChunkDepth));
-
   world_.Update({playerX, 1, playerZ});
+
+  auto result = world_.RaycastBlock(camera_.Position(), camera_.Forward(), 10);
+  if (result) {
+    blockHit_ = true;
+    blockHighlighter_.SetPosition(result->Position);
+  } else
+    blockHit_ = false;
 }
 
 void GameLayer::OnRender() {
@@ -68,8 +73,13 @@ void GameLayer::OnRender() {
       renderer.Submit(renderItem.Pipeline, mesh.Mesh, renderItem.Material, renderItem.PushConstants);
   }
 
-  auto& highlightItem = highlight_.GetRenderItem();
-  renderer.Submit(highlightItem.Pipeline, highlight_.GetMesh(), highlightItem.Material, highlightItem.PushConstants);
+  if (blockHit_) {
+    auto& highlightItem = blockHighlighter_.GetRenderItem();
+    renderer.Submit(highlightItem.Pipeline,
+                    blockHighlighter_.GetMesh(),
+                    highlightItem.Material,
+                    highlightItem.PushConstants);
+  }
 
   if (const auto rv = renderer.EndFrame(); !rv) {
     std::println("Failed to render frame");

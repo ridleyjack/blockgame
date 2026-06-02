@@ -2,18 +2,23 @@
 
 #include "RenderItem.hpp"
 
+#include "Engine/Math/Vec3Int.hpp"
+
 namespace engine::graphics::vulkan {
 class Renderer;
 }
 
 namespace vlk = engine::graphics::vulkan;
+namespace math = engine::math;
 
-class Highlight {
+class BlockHighlighter {
 public:
-  Highlight(vlk::Renderer& renderer);
+  BlockHighlighter(vlk::Renderer& renderer);
 
   const RenderItem& GetRenderItem() const noexcept;
   gfx::MeshHandle GetMesh() const noexcept;
+
+  void SetPosition(math::Vec3Int worldBlockPos);
 
 private:
   RenderItem renderItem_{};

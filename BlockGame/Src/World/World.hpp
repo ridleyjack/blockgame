@@ -8,8 +8,9 @@
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Math/Vec3Int.hpp"
 
+#include <glm/vec3.hpp>S
+
 #include <cstdint>
-#include <glm/vec3.hpp>
 #include <optional>
 #include <span>
 

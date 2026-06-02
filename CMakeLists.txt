@@ -9,9 +9,9 @@ option(ENABLE_TESTS "Build unit tests" ON)
 
 include(Dependencies.cmake)
 
-add_subdirectory(Engine)
-add_subdirectory(BlockGame)
-
 if (ENABLE_TESTS)
     enable_testing()
 endif ()
+
+add_subdirectory(Engine)
+add_subdirectory(BlockGame)

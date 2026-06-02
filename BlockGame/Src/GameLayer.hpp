@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Camera.hpp"
-#include "Highlight.hpp"
+#include "BlockHighlighter.hpp"
 #include "TextureRegistry.hpp"
 #include "Engine/Application.hpp"
 
@@ -61,7 +61,8 @@ private:
 
   World world_;
 
-  Highlight highlight_;
+  BlockHighlighter blockHighlighter_;
+  bool blockHit_{};
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};
