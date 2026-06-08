@@ -21,7 +21,7 @@ public:
 
   VkBuffer Handle() const noexcept;
 
-  VkDeviceSize Allocate(VkDeviceSize size);
+  std::expected<VkDeviceSize, memory::SparseBuffer::AllocateError> Allocate(VkDeviceSize size);
   void Free(VkDeviceSize offset);
 
 private:

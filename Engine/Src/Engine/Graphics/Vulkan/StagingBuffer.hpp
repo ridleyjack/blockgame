@@ -22,7 +22,10 @@ public:
   StagingBuffer& operator=(const StagingBuffer&) = delete;
 
   std::uint64_t BeginBatch();
-  VkDeviceSize Write(std::span<const std::byte> bytes, VkDeviceSize alignment, std::uint64_t batchID);
+
+  std::expected<VkDeviceSize, memory::RingBuffer::AllocateError>
+  Write(std::span<const std::byte> bytes, VkDeviceSize alignment, std::uint64_t batchID);
+  
   void Free(std::uint64_t batchID);
 
   VkBuffer Handle() const noexcept;

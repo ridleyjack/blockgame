@@ -6,6 +6,8 @@
 
 #include "Engine/Graphics/Mesh.hpp"
 
+#include <stdexcept>
+
 namespace engine::graphics::vulkan {
 
 MeshAllocator::MeshAllocator(Context& context, Uploader& uploader, MeshBuffer& meshBuffer, StagingBuffer& stagingBuffer)
@@ -18,32 +20,17 @@ MeshAllocator::~MeshAllocator() {
   }
 }
 
-std::expected<uint32_t, MeshError> MeshAllocator::Create(const Mesh& mesh) {
+std::uint32_t MeshAllocator::Create(const Mesh& mesh) {
   MeshGPU meshGPU{
       .VertexCount = static_cast<uint32_t>(mesh.Vertices.size()),
       .IndexCount = static_cast<uint32_t>(mesh.Indices.size()),
   };
   auto [cmd, batchID] = uploader_.GetCurrent();
-  // TODO: If mesh creation encounters an error we still record copy commands on now freed buffers. We need to cancel
-  // the whole command or not free the buffers until execution is complete.
 
-  // Upload Vertices.
-  if (const std::expected<VkDeviceSize, MeshError> result =
-          uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Vertices)), alignof(Vertex), cmd, batchID);
-      !result) {
-    return std::unexpected(result.error());
-  } else {
-    meshGPU.VertexOffset = *result;
-  }
-  // Upload Indices.
-  if (const std::expected<VkDeviceSize, MeshError> result =
-          uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Indices)), alignof(std::uint32_t), cmd, batchID);
-      !result) {
-    meshBuffer_.Free(meshGPU.VertexOffset);
-    return std::unexpected(result.error());
-  } else {
-    meshGPU.IndexOffset = *result;
-  }
+  meshGPU.VertexOffset = uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Vertices)), alignof(Vertex), cmd, batchID);
+
+  meshGPU.IndexOffset =
+      uploadToMeshBuffer_(std::as_bytes(std::span(mesh.Indices)), alignof(std::uint32_t), cmd, batchID);
 
   std::uint32_t meshID = meshes_.Create(meshGPU);
 
@@ -72,7 +59,7 @@ void MeshAllocator::DeleteDeferred(const std::uint32_t meshID, const std::uint32
   mesh.State = MeshState::Deleting;
 }
 
-void MeshAllocator::ProcessDeferredDeletions(std::uint32_t currentframe) {
+void MeshAllocator::ProcessDeferredDeletions(const std::uint32_t currentframe) {
   std::erase_if(pendingDeletes_, [&](const PendingDelete& pending) {
     if (pending.RetireFrame != currentframe)
       return false;
@@ -87,26 +74,26 @@ MeshAllocator::MeshGPU& MeshAllocator::Get(const std::uint32_t meshID) noexcept 
   return meshes_.Get(meshID);
 }
 
-std::expected<VkDeviceSize, MeshError> MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
-                                                                          const VkDeviceSize alignment,
-                                                                          VkCommandBuffer cmd,
-                                                                          const std::uint64_t batchID) const {
+VkDeviceSize MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
+                                                const VkDeviceSize alignment,
+                                                VkCommandBuffer cmd,
+                                                const std::uint64_t batchID) const {
   const VkDeviceSize size = data.size();
   // Staging buffer.
-  const VkDeviceSize stagingOffset = stagingBuffer_.Write(data, alignment, batchID);
-  if (stagingOffset == std::numeric_limits<VkDeviceSize>::max())
-    return std::unexpected(MeshError::OutOfStagingMemory);
+  const auto stagingOffset = stagingBuffer_.Write(data, alignment, batchID);
+  if (!stagingOffset)
+    throw std::runtime_error("MeshAllocator failed to write to staging buffer");
 
   // Mesh buffer.
-  const VkDeviceSize meshOffset = meshBuffer_.Allocate(size);
-  if (meshOffset == std::numeric_limits<VkDeviceSize>::max())
-    return std::unexpected(MeshError::OutOfMeshMemory);
+  const auto meshOffset = meshBuffer_.Allocate(size);
+  if (!meshOffset)
+    throw std::runtime_error("MeshAllocator failed to write to mesh buffer");
 
   // Record the copy.
-  const VkBufferCopy copyRegion{.srcOffset = stagingOffset, .dstOffset = meshOffset, .size = size};
+  const VkBufferCopy copyRegion{.srcOffset = *stagingOffset, .dstOffset = *meshOffset, .size = size};
   vkCmdCopyBuffer(cmd, stagingBuffer_.Handle(), meshBuffer_.Handle(), 1, &copyRegion);
 
-  return meshOffset;
+  return *meshOffset;
 }
 
 void MeshAllocator::deleteMesh(const std::uint32_t meshID) {

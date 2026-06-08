@@ -81,12 +81,9 @@ BlockHighlighter::BlockHighlighter(vlk::Renderer& renderer) {
     throw std::runtime_error{"Highlight failed to load dummy texture"};
   }
   auto texture = renderer.CreateTexture(image->Pixels, image->Width, image->Height);
-  if (!texture) {
-    throw std::runtime_error{"Highlight failed to create dummy texture"};
-  }
 
   renderItem_.Pipeline = pipeline;
-  renderItem_.Material = renderer.CreateMaterial(*texture);
+  renderItem_.Material = renderer.CreateMaterial(texture);
   gfx::Mesh meshData = CreateBlockHighlightMesh();
   mesh_ = renderer.CreateMesh(meshData);
 }

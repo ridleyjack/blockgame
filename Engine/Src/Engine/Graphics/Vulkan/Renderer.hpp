@@ -36,14 +36,10 @@ struct TextureArrayInfo;
 
 namespace vulkan {
 class PipelineCache;
-struct TextureError;
 
 enum class RenderError : uint8_t {
   FrameAcquireFailed,
   FrameOutOfDate,
-  RecordCommandFailed,
-  SubmitCommandFailed,
-  PresentFailed
 };
 
 struct FrameContext {
@@ -68,8 +64,8 @@ public:
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera) noexcept;
-  std::expected<void, RenderError> EndFrame();
+  std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera);
+  void EndFrame();
   void Submit(const PipelineHandle& pipelineHandle,
               const MeshHandle& handle,
               const MaterialHandle& material,
@@ -84,10 +80,8 @@ public:
   MeshHandle CreateMesh(const Mesh& mesh);
   void DeleteMesh(const MeshHandle& handle);
 
-  std::expected<TextureHandle, TextureError>
-  CreateTexture(const std::span<const std::byte>& data, int width, int height);
-  std::expected<resources::TextureArrayBuilder, TextureError>
-  BeginTextureArray(const resources::TextureArrayInfo& info) noexcept;
+  TextureHandle CreateTexture(const std::span<const std::byte>& data, int width, int height);
+  resources::TextureArrayBuilder BeginTextureArray(const resources::TextureArrayInfo& info);
 
   MaterialHandle CreateMaterial(const TextureHandle& texture);
 

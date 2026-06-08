@@ -34,10 +34,11 @@ StagingBuffer StagingBuffer::Create(Context& context) {
       device.FindMemoryType(req.memoryTypeBits,
                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = req.size;
-  allocInfo.memoryTypeIndex = memoryType;
+  VkMemoryAllocateInfo allocInfo{
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .allocationSize = req.size,
+      .memoryTypeIndex = memoryType,
+  };
   if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
     vkDestroyBuffer(vkDevice, buffer, nullptr);
     throw std::runtime_error("failed to allocate vertex buffer memory!");
@@ -67,23 +68,22 @@ std::uint64_t StagingBuffer::BeginBatch() {
   return nextBatchID++;
 }
 
-VkDeviceSize
+std::expected<VkDeviceSize, memory::RingBuffer::AllocateError>
 StagingBuffer::Write(std::span<const std::byte> bytes, const VkDeviceSize alignment, const std::uint64_t batchID) {
   const std::size_t size{bytes.size()};
-
-  const VkDeviceSize offset = ringBuffer_.Allocate(size, alignment);
-  if (offset == std::numeric_limits<std::uint64_t>::max()) {
-    throw std::runtime_error("failed to reserve memory on ringbuffer!");
+  const auto offset = ringBuffer_.Allocate(size, alignment);
+  if (!offset) {
+    return std::unexpected(offset.error());
   }
 
-  std::memcpy(mappedMemory_ + offset, bytes.data(), size);
+  std::memcpy(mappedMemory_ + *offset, bytes.data(), size);
 
   const std::uint64_t idx = batchID - headBatchID;
   assert(idx < batches_.size());
 
   auto& batch = batches_[idx];
-  batch.Offsets.emplace_back(offset);
-  return offset;
+  batch.Offsets.emplace_back(*offset);
+  return *offset;
 }
 
 void StagingBuffer::Free(const std::uint64_t batchID) {

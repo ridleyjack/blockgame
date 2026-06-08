@@ -6,44 +6,46 @@
 
 namespace engine::memory {
 
-RingBuffer::RingBuffer(std::uint64_t size) : capacity_(size) {}
+RingBuffer::RingBuffer(const std::uint64_t size) : capacity_(size) {}
 
-std::uint64_t RingBuffer::Allocate(std::uint64_t size, std::uint64_t alignment) {
+std::expected<std::uint64_t, RingBuffer::AllocateError> RingBuffer::Allocate(const std::uint64_t size,
+                                                                             const std::uint64_t alignment) {
   if (head_ == tail_ && !allocatedBlocks_.empty())
-    return std::numeric_limits<std::uint64_t>::max();
+    return std::unexpected(AllocateError::OutOfCapacity);
 
-  std::uint64_t aligned = Align(head_, alignment);
+  auto aligned = Align(head_, alignment);
+  if (!aligned)
+    return std::unexpected(AllocateError::SizeOverflow);
 
   if (head_ >= tail_) { // Head is chasing end of buffer.
-    if (aligned > capacity_)
-      return std::numeric_limits<std::uint64_t>::max();
-    if (size > capacity_ - aligned) {
+    if (*aligned > capacity_)
+      return std::unexpected(AllocateError::OutOfCapacity);
+    if (size > capacity_ - *aligned) {
       if (size <= tail_) { // Try to wrap.
         head_ = 0;
-        aligned = 0;
+        *aligned = 0;
       } else
-        return std::numeric_limits<std::uint64_t>::max();
+        return std::unexpected(AllocateError::OutOfCapacity);
     }
   } else { // Head is chasing tail.
-    if (aligned > tail_) {
-      return std::numeric_limits<std::uint64_t>::max();
+    if (*aligned > tail_) {
+      return std::unexpected(AllocateError::OutOfCapacity);
     }
-    if (size > tail_ - aligned)
-      return std::numeric_limits<std::uint64_t>::max();
+    if (size > tail_ - *aligned)
+      return std::unexpected(AllocateError::OutOfCapacity);
   }
 
-  allocatedBlocks_.emplace_back(head_, aligned, aligned + size - head_);
-  head_ = aligned + size;
+  allocatedBlocks_.emplace_back(head_, *aligned, *aligned + size - head_);
+  head_ = *aligned + size;
 
-  return aligned;
+  return *aligned;
 }
 
-std::uint64_t RingBuffer::PopFront() {
-  if (allocatedBlocks_.empty())
-    return std::numeric_limits<std::uint64_t>::max();
+std::uint64_t RingBuffer::PopFront() noexcept {
+  assert(!Empty());
 
   BufferBlock& block = allocatedBlocks_.front();
-  std::uint64_t alignedOffset{block.AlignedOffset};
+  const std::uint64_t alignedOffset{block.AlignedOffset};
 
   tail_ = block.Offset + block.Size;
   if (tail_ == capacity_)
@@ -57,10 +59,13 @@ std::uint64_t RingBuffer::PopFront() {
   return alignedOffset;
 }
 
-std::uint64_t RingBuffer::PeekFront() const noexcept {
-  if (allocatedBlocks_.empty())
-    return std::numeric_limits<std::uint64_t>::max();
+bool RingBuffer::Empty() const noexcept {
+  return allocatedBlocks_.empty();
+}
 
+std::uint64_t RingBuffer::PeekFront() const noexcept {
+  assert(!Empty());
+  
   return allocatedBlocks_.begin()->AlignedOffset;
 }
 

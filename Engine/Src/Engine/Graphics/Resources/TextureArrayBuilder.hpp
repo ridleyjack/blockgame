@@ -1,6 +1,5 @@
 #pragma once
 
-#include <expected>
 #include <span>
 
 namespace engine::graphics {
@@ -8,7 +7,6 @@ struct TextureHandle;
 
 namespace vulkan {
 class TextureAllocator;
-struct TextureError;
 } // namespace vulkan
 
 namespace resources {
@@ -23,10 +21,10 @@ public:
 
   // Upload to image data to the next layer of the texture array. Assumes number of layers is not exceeded,
   // enforced via assert while debugging.
-  void Upload(std::span<const std::byte> pixels) const noexcept;
+  void Upload(std::span<const std::byte> pixels) const;
 
   // Finalize the array. Must be done before the building of another TextureArray is started.
-  std::expected<TextureHandle, vulkan::TextureError> Finalize() const noexcept;
+  TextureHandle Finalize() const;
 
 private:
   vulkan::TextureAllocator& allocator_;

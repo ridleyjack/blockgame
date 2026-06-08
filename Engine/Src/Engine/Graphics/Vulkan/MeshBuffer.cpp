@@ -32,10 +32,11 @@ MeshBuffer MeshBuffer::Create(Context& context) {
   capacity = req.size;
   const std::uint32_t memoryType = device.FindMemoryType(req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = req.size;
-  allocInfo.memoryTypeIndex = memoryType;
+  VkMemoryAllocateInfo allocInfo{
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .allocationSize = req.size,
+      .memoryTypeIndex = memoryType,
+  };
   if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
     vkDestroyBuffer(vkDevice, buffer, nullptr);
     throw std::runtime_error("failed to allocate vertex buffer memory!");
@@ -55,13 +56,12 @@ VkBuffer MeshBuffer::Handle() const noexcept {
   return buffer_;
 }
 
-VkDeviceSize MeshBuffer::Allocate(const VkDeviceSize size) {
+std::expected<VkDeviceSize, memory::SparseBuffer::AllocateError> MeshBuffer::Allocate(const VkDeviceSize size) {
   constexpr VkDeviceSize alignment = std::max<VkDeviceSize>(alignof(Vertex), alignof(std::uint32_t));
- const std::uint64_t offset = sparseBuffer_.Allocate(size, alignment);
-  if (offset == std::numeric_limits<std::uint64_t>::max())
-    throw std::runtime_error("failed to reserve space on vertex buffer!");
-
-  return offset;
+  const auto offset = sparseBuffer_.Allocate(size, alignment);
+  if (!offset)
+    return std::unexpected(offset.error());
+  return *offset;
 }
 
 void MeshBuffer::Free(const VkDeviceSize offset) {

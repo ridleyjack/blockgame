@@ -23,10 +23,8 @@ TextureRegistry::TextureRegistry(vlk::Renderer& renderer) {
 
   const gfx::resources::TextureLoader loader(renderer);
   auto texture = loader.LoadArray(paths);
-  if (!texture)
-    throw std::runtime_error("Failed to load texture " + texture.error().Detail);
 
-  const auto material = renderer.CreateMaterial(*texture);
+  const auto material = renderer.CreateMaterial(texture);
   renderItem_ = {.Pipeline = pipeline, .Material = material};
 }
 

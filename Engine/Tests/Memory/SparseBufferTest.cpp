@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 namespace ctn = engine::memory;
+using allocateError = ctn::SparseBuffer::AllocateError;
 
 TEST(SparseBufferTest, SimpleAllocations) {
   ctn::SparseBuffer buffer{8};
@@ -15,7 +16,7 @@ TEST(SparseBufferTest, SimpleAllocations) {
 TEST(SparseBufferTest, AllocateOverCapacity) {
   ctn::SparseBuffer buffer{8};
   buffer.Allocate(6, 2);
-  EXPECT_EQ(buffer.Allocate(4, 2), std::numeric_limits<std::uint64_t>::max());
+  EXPECT_EQ(buffer.Allocate(4, 2).error(), allocateError::OutOfCapacity);
 }
 
 TEST(SparseBufferTest, AllocateWithPadding) {
@@ -27,13 +28,13 @@ TEST(SparseBufferTest, AllocateWithPadding) {
 TEST(SparseBufferTest, ExactFit) {
   ctn::SparseBuffer buffer{8};
   buffer.Allocate(8, 1);
-  EXPECT_EQ(buffer.Allocate(1, 1), std::numeric_limits<std::uint64_t>::max());
+  EXPECT_EQ(buffer.Allocate(1, 1).error(), allocateError::OutOfCapacity);
 }
 
 TEST(SparseBufferTest, AlignedOffsetOverCapacity) {
   ctn::SparseBuffer buffer{8};
   EXPECT_EQ(buffer.Allocate(4, 16), 0);
-  EXPECT_EQ(buffer.Allocate(2, 16), std::numeric_limits<std::uint64_t>::max());
+  EXPECT_EQ(buffer.Allocate(2, 16).error(), allocateError::OutOfCapacity);
 }
 
 TEST(SparseBufferTest, BigAlignment) {
@@ -100,4 +101,11 @@ TEST(SparseBufferTest, FreeThenUseMiddle) {
 
   EXPECT_EQ(buffer.FreeCapacity(), 4);
   EXPECT_EQ(buffer.Allocate(4, 2), 4);
+}
+
+TEST(SparseBufferTest, SizeOverflow) {
+  ctn::SparseBuffer buffer{std::numeric_limits<std::uint64_t>::max()};
+
+  EXPECT_EQ(buffer.Allocate(std::numeric_limits<std::uint64_t>::max() - 1, 2), 0);
+  EXPECT_EQ(buffer.Allocate(1, 4).error(), allocateError::SizeOverflow);
 }

@@ -3,17 +3,22 @@
 #include <cstdint>
 #include <vector>
 #include <map>
+#include <expected>
 
 namespace engine::memory {
 
 // SparseBuffer is a first-fit free-list allocator for a fixed-capacity contiguous byte region.
-// Returns std::numeric_limits<uint64_t>::max() on failure. (Not enough space or overflow)
 // Free adjacent blocks are merged to reduce fragmentation.
 class SparseBuffer {
 public:
-  SparseBuffer(std::uint64_t size);
+  enum class AllocateError : std::uint8_t {
+    OutOfCapacity,
+    SizeOverflow,
+  };
 
-  std::uint64_t Allocate(std::uint64_t size, std::uint64_t alignment);
+  explicit SparseBuffer(std::uint64_t size);
+
+  std::expected<std::uint64_t, AllocateError> Allocate(std::uint64_t size, std::uint64_t alignment);
   void Free(std::uint64_t alignedOffset);
 
   std::uint64_t Capacity() const noexcept;

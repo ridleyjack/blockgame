@@ -61,10 +61,8 @@ void GameLayer::OnRender() {
                                                   .View = camera_.View()};
 
   if (const auto r = renderer.BeginFrame(cameraMatrices); !r) {
-    if (r.error() != vlk::RenderError::FrameOutOfDate) {
-      std::println("Failed to begin rendering frame", 1);
-      return;
-    }
+    std::println("Failed to begin rendering frame");
+    return;
   }
 
   for (const auto& meshCoords : world_.LoadedChunks()) {
@@ -81,10 +79,7 @@ void GameLayer::OnRender() {
                     highlightItem.PushConstants);
   }
 
-  if (const auto rv = renderer.EndFrame(); !rv) {
-    std::println("Failed to render frame");
-    return;
-  }
+  renderer.EndFrame();
 }
 
 void GameLayer::OnKeyReleased(const engine::events::KeyReleasedEvent& event) {

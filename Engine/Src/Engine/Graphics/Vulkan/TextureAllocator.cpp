@@ -6,9 +6,11 @@
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
-#include "../Resources/TextureArrayInfo.hpp"
+#include "Engine/Graphics/Resources/TextureArrayInfo.hpp"
 
 #include <cassert>
+#include <format>
+#include <stdexcept>
 
 namespace engine::graphics::vulkan {
 
@@ -38,34 +40,33 @@ TextureAllocator::~TextureAllocator() {
   }
 }
 
-std::expected<std::uint32_t, TextureError> TextureAllocator::Create(const std::span<const std::byte>& imageData,
-                                                                    const std::uint32_t width,
-                                                                    const std::uint32_t height) {
+std::uint32_t TextureAllocator::Create(const std::span<const std::byte>& imageData,
+                                       const std::uint32_t width,
+                                       const std::uint32_t height) {
   constexpr std::uint32_t numLayers = 1;
   auto [cmd, batchID] = uploader_.GetCurrent();
-  // TODO: If texture creation encounters an error we still record copy commands on now freed buffers. We need to cancel
-  // the whole command or not free the buffers until execution is complete.
 
-  TextureGPU texture{};
-  if (auto result = createImage_(cmd, width, height, numLayers); !result) {
-    return std::unexpected(result.error());
-  } else {
-    texture = *result;
+  auto textureResult = createImage_(cmd, width, height, numLayers);
+  if (!textureResult)
+    throw std::runtime_error("Failed to create texture image");
+
+  TextureGPU texture = *textureResult;
+
+  if (auto result = uploadLayer_(texture, cmd, batchID, 0, imageData); !result) {
+    cleanupGPUTexture_(texture);
+    throw std::runtime_error("Failed to uploade texture to image");
   }
 
-  uploadLayer_(texture, cmd, batchID, 0, imageData);
-
-  std::uint32_t textureID{};
-  if (auto result = finishTexture_(cmd, texture, numLayers); !result) {
-    return std::unexpected(result.error());
-  } else {
-    textureID = *result;
+  auto textureIDResult = finishTexture_(cmd, texture, numLayers);
+  if (!textureIDResult) {
+    cleanupGPUTexture_(texture);
+    throw std::runtime_error("Failed to create texture image");
   }
+  const std::uint32_t textureID = *textureIDResult;
 
   Uploader::UploadRequest request{.OnComplete = [this, textureID]() noexcept {
     TextureGPU& texture = textures_[textureID];
-    if (texture.State != TextureState::Failed)
-      texture.State = TextureState::Ready;
+    texture.State = TextureState::Ready;
   }};
   uploader_.Queue(std::move(request));
 
@@ -77,21 +78,21 @@ const TextureGPU& TextureAllocator::Get(const std::uint32_t textureID) const noe
   return textures_[textureID];
 }
 
-std::expected<void, TextureError> TextureAllocator::BeginArray(const resources::TextureArrayInfo& info) noexcept {
+void TextureAllocator::BeginArray(const resources::TextureArrayInfo& info) {
   assert(!arrayState_.has_value());
   arrayState_.emplace(ArrayBuildState{.LayerSizeBytes = info.LayerSizeBytes, .NumLayers = info.NumLayers});
 
   auto [cmd, batchID] = uploader_.GetCurrent();
   TextureGPU& texture = arrayState_->Texture;
 
-  if (auto result = createImage_(cmd, info.Width, info.Height, info.NumLayers); !result) {
+  auto textureResult = createImage_(cmd, info.Width, info.Height, info.NumLayers);
+  if (!textureResult) {
     arrayState_.reset();
-    return std::unexpected(result.error());
-  } else {
-    texture = *result;
+    throw std::runtime_error("Failed to create texture image");
   }
+  texture = *textureResult;
+
   uploader_.Queue({});
-  return {};
 }
 
 void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) {
@@ -100,7 +101,11 @@ void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) 
   assert(imageData.size() == arrayState_->LayerSizeBytes);
 
   auto [cmd, batchID] = uploader_.GetCurrent();
-  uploadLayer_(arrayState_->Texture, cmd, batchID, arrayState_->NextLayer, imageData);
+  if (auto result = uploadLayer_(arrayState_->Texture, cmd, batchID, arrayState_->NextLayer, imageData); !result) {
+    cleanupGPUTexture_(arrayState_->Texture);
+    arrayState_.reset();
+    throw std::runtime_error("Failed to upload layer to image");
+  }
 
   Uploader::UploadRequest request{.OnComplete = []() noexcept {}};
   uploader_.Queue(std::move(request));
@@ -108,22 +113,22 @@ void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) 
   arrayState_->NextLayer++;
 }
 
-std::expected<std::uint32_t, TextureError> TextureAllocator::FinishArray() {
+std::uint32_t TextureAllocator::FinishArray() {
   assert(arrayState_.has_value());
   assert(arrayState_->NextLayer == arrayState_->NumLayers);
 
-  std::uint32_t textureID{};
   auto [cmd, batchID] = uploader_.GetCurrent();
-  if (auto result = finishTexture_(cmd, arrayState_->Texture, arrayState_->NumLayers); !result) {
-    return std::unexpected(result.error());
-  } else {
-    textureID = *result;
+  auto textureIDResult = finishTexture_(cmd, arrayState_->Texture, arrayState_->NumLayers);
+  if (!textureIDResult) {
+    cleanupGPUTexture_(arrayState_->Texture);
+    arrayState_.reset();
+    throw std::runtime_error("Failed to finish texture array");
   }
+  const std::uint32_t textureID = *textureIDResult;
 
   Uploader::UploadRequest request{.OnComplete = [this, textureID]() noexcept {
     TextureGPU& texture = textures_[textureID];
-    if (texture.State != TextureState::Failed)
-      texture.State = TextureState::Ready;
+    texture.State = TextureState::Ready;
   }};
   uploader_.Queue(std::move(request));
 
@@ -134,7 +139,7 @@ std::expected<std::uint32_t, TextureError> TextureAllocator::FinishArray() {
 std::expected<TextureGPU, TextureError> TextureAllocator::createImage_(VkCommandBuffer cmd,
                                                                        const std::uint32_t width,
                                                                        const std::uint32_t height,
-                                                                       const std::uint32_t numLayers) const noexcept {
+                                                                       const std::uint32_t numLayers) const {
 
   const auto& device = context_.GetDevice();
 
@@ -174,20 +179,25 @@ std::expected<TextureGPU, TextureError> TextureAllocator::createImage_(VkCommand
   return texture;
 }
 
-void TextureAllocator::uploadLayer_(const TextureGPU& texture,
-                                    VkCommandBuffer cmd,
-                                    const std::uint64_t batchID,
-                                    const std::uint32_t layerIndex,
-                                    const std::span<const std::byte>& bytes) const noexcept {
-  const VkDeviceSize offset = stagingBuffer_.Write(bytes, 1, batchID);
-  copyBufferToImage_(cmd, offset, texture.Image, texture.Width, texture.Height, layerIndex);
+std::expected<void, TextureError> TextureAllocator::uploadLayer_(const TextureGPU& texture,
+                                                                 VkCommandBuffer cmd,
+                                                                 const std::uint64_t batchID,
+                                                                 const std::uint32_t layerIndex,
+                                                                 const std::span<const std::byte>& bytes) const {
+  const auto offset = stagingBuffer_.Write(bytes, 1, batchID);
+  if (!offset)
+    return std::unexpected(
+        TextureError{.Code = TextureError::ErrorCode::StagingBufferFailure, .Cause = offset.error()});
+
+  copyBufferToImage_(cmd, *offset, texture.Image, texture.Width, texture.Height, layerIndex);
   generateMipmaps_(cmd, texture.Image, texture.Width, texture.Height, layerIndex, texture.MipLevels);
+  return {};
 }
 
 std::expected<std::uint32_t, TextureError>
 TextureAllocator::finishTexture_(VkCommandBuffer cmd,
                                  TextureGPU& texture,
-                                 std::uint32_t numLayers) noexcept { // Create the Imageview.
+                                 std::uint32_t numLayers) { // Create the Imageview.
   const image::ImageViewSpec spec{
       .ArrayLayers = numLayers,
       .MipLevels = texture.MipLevels,
@@ -197,15 +207,12 @@ TextureAllocator::finishTexture_(VkCommandBuffer cmd,
 
   };
   if (auto result = createTextureImageView_(texture.Image, spec); !result) {
-    cleanupGPUTexture_(texture);
     return std::unexpected(result.error());
   } else {
     texture.ImageView = *result;
   }
-
   // Create the Sampler.
   if (auto result = createSampler_(); !result) {
-    cleanupGPUTexture_(texture);
     return std::unexpected(result.error());
   } else {
     texture.Sampler = *result;
@@ -220,7 +227,7 @@ void TextureAllocator::copyBufferToImage_(VkCommandBuffer cmd,
                                           VkImage image,
                                           const std::uint32_t width,
                                           const std::uint32_t height,
-                                          const std::uint32_t layerIndex) const noexcept {
+                                          const std::uint32_t layerIndex) const {
   VkBufferImageCopy region{};
   region.bufferOffset = stagingOffset;
   region.bufferRowLength = 0;
@@ -238,14 +245,14 @@ void TextureAllocator::copyBufferToImage_(VkCommandBuffer cmd,
 }
 
 std::expected<VkImageView, TextureError>
-TextureAllocator::createTextureImageView_(VkImage image, const image::ImageViewSpec& spec) const noexcept {
+TextureAllocator::createTextureImageView_(VkImage image, const image::ImageViewSpec& spec) const {
   auto result = image::CreateImageView(context_.GetDevice(), image, spec);
   if (!result)
     return std::unexpected(TextureError{.Code = TextureError::ErrorCode::ImageUtilFailure, .Cause = result.error()});
   return *result;
 }
 
-std::expected<VkSampler, TextureError> TextureAllocator::createSampler_() const noexcept {
+std::expected<VkSampler, TextureError> TextureAllocator::createSampler_() const {
   const auto& device = context_.GetDevice();
 
   VkSamplerCreateInfo samplerInfo{};

@@ -14,15 +14,14 @@ class Renderer;
 namespace resources {
 
 struct TextureLoadError {
-  // TODO: Error enum.
   std::string Detail{};
 };
 
 class TextureLoader {
 public:
   explicit TextureLoader(vulkan::Renderer& renderer);
-  std::expected<TextureHandle, TextureLoadError> Load(std::string_view path) const noexcept;
-  std::expected<TextureHandle, TextureLoadError> LoadArray(std::span<const std::string_view> paths) const noexcept;
+  std::expected<TextureHandle, TextureLoadError> Load(std::string_view path) const;
+  TextureHandle LoadArray(std::span<const std::string_view> paths) const;
 
 private:
   vulkan::Renderer& renderer_;

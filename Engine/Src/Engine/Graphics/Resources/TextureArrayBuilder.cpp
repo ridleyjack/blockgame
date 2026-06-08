@@ -6,14 +6,12 @@
 namespace engine::graphics::resources {
 TextureArrayBuilder::TextureArrayBuilder(vulkan::TextureAllocator& allocator) : allocator_(allocator) {}
 
-void TextureArrayBuilder::Upload(const std::span<const std::byte> pixels) const noexcept {
+void TextureArrayBuilder::Upload(const std::span<const std::byte> pixels) const {
   allocator_.UploadLayer(pixels);
 }
 
-std::expected<TextureHandle, vulkan::TextureError> TextureArrayBuilder::Finalize() const noexcept {
-  auto result = allocator_.FinishArray();
-  if (!result)
-    return std::unexpected(result.error());
-  return TextureHandle{.TextureID = *result};
+TextureHandle TextureArrayBuilder::Finalize() const {
+  const std::uint32_t result = allocator_.FinishArray();
+  return TextureHandle{.TextureID = result};
 }
 } // namespace engine::graphics::resources

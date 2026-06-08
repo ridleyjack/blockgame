@@ -2,17 +2,24 @@
 
 #include <cstdint>
 #include <deque>
+#include <expected>
 
 namespace engine::memory {
 
 class RingBuffer {
 public:
+  enum class AllocateError : std::uint8_t {
+    OutOfCapacity,
+    SizeOverflow,
+  };
+
   explicit RingBuffer(std::uint64_t size);
 
-  std::uint64_t Allocate(std::uint64_t size, std::uint64_t alignment);
-  std::uint64_t PopFront();
-  std::uint64_t PeekFront() const noexcept;
+  std::expected<std::uint64_t, AllocateError> Allocate(std::uint64_t size, std::uint64_t alignment);
+  std::uint64_t PopFront() noexcept;
 
+  bool Empty() const noexcept;
+  std::uint64_t PeekFront() const noexcept;
   std::uint64_t Capacity() const noexcept;
 
 private:

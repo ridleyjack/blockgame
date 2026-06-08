@@ -13,15 +13,16 @@ SparseBuffer::SparseBuffer(const std::uint64_t size) : capacity_(size) {
   freeBlocks_.push_back({.Offset = 0, .Size = size});
 }
 
-std::uint64_t SparseBuffer::Allocate(const std::uint64_t size, const std::uint64_t alignment) {
+std::expected<std::uint64_t, SparseBuffer::AllocateError> SparseBuffer::Allocate(const std::uint64_t size,
+                                                                                 const std::uint64_t alignment) {
   for (size_t i = 0; i < freeBlocks_.size(); i++) {
     const auto& freeBlock = freeBlocks_[i];
 
-    const std::uint64_t alignedOffset{Align(freeBlock.Offset, alignment)};
-    if (alignedOffset == std::numeric_limits<std::uint64_t>::max())
-      return std::numeric_limits<std::uint64_t>::max();
+    auto alignedOffset = Align(freeBlock.Offset, alignment);
+    if (!alignedOffset)
+      return std::unexpected(AllocateError::SizeOverflow);
 
-    const std::uint64_t padding{alignedOffset - freeBlock.Offset};
+    const std::uint64_t padding{*alignedOffset - freeBlock.Offset};
 
     if (padding > freeBlock.Size)
       continue; // Underflow.
@@ -32,7 +33,7 @@ std::uint64_t SparseBuffer::Allocate(const std::uint64_t size, const std::uint64
 
     // Record of the total allocated space.
     const BufferBlock allocated{.Offset = freeBlock.Offset, .Size = consumed};
-    allocatedBlocks_[alignedOffset] = allocated;
+    allocatedBlocks_[*alignedOffset] = allocated;
 
     // New empty space record.
     BufferBlock emptyBlock{.Offset = freeBlock.Offset + consumed, .Size = freeBlock.Size - consumed};
@@ -40,15 +41,16 @@ std::uint64_t SparseBuffer::Allocate(const std::uint64_t size, const std::uint64
       freeBlocks_[i] = emptyBlock;
     else
       freeBlocks_.erase(freeBlocks_.begin() + i);
-    return alignedOffset;
+    return *alignedOffset;
   }
-  return std::numeric_limits<uint64_t>::max();
+  return std::unexpected(AllocateError::OutOfCapacity);
 }
 
 void SparseBuffer::Free(const std::uint64_t alignedOffset) {
   const auto it = allocatedBlocks_.find(alignedOffset);
   if (it == allocatedBlocks_.end())
     return;
+
   std::uint64_t offset{it->second.Offset};
   std::uint64_t size{it->second.Size};
   allocatedBlocks_.erase(it);

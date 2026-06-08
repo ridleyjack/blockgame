@@ -20,22 +20,6 @@ class Uploader;
 class StagingBuffer;
 class MeshBuffer;
 
-enum class MeshError : std::uint8_t {
-  OutOfStagingMemory,
-  OutOfMeshMemory
-};
-
-constexpr std::string_view ToString(const MeshError error) noexcept {
-  switch (error) {
-  case MeshError::OutOfStagingMemory:
-    return "OutOfStagingMemory";
-
-  case MeshError::OutOfMeshMemory:
-    return "OutOfMeshMemory";
-  }
-  return "UnknownMeshError";
-}
-
 enum class MeshState : std::uint8_t {
   Uploading,
   Ready,
@@ -60,7 +44,7 @@ public:
   MeshAllocator(const MeshAllocator&) = delete;
   MeshAllocator& operator=(const MeshAllocator&) = delete;
 
-  std::expected<uint32_t, MeshError> Create(const Mesh& mesh);
+  std::uint32_t Create(const Mesh& mesh);
 
   void DeleteDeferred(std::uint32_t meshID, std::uint32_t retireFrame);
   void ProcessDeferredDeletions(std::uint32_t currentframe);
@@ -82,10 +66,10 @@ private:
 
   std::vector<PendingDelete> pendingDeletes_{};
 
-  std::expected<VkDeviceSize, MeshError> uploadToMeshBuffer_(std::span<const std::byte> data,
-                                                             VkDeviceSize alignment,
-                                                             VkCommandBuffer cmd,
-                                                             std::uint64_t batchID) const;
+  VkDeviceSize uploadToMeshBuffer_(std::span<const std::byte> data,
+                                   VkDeviceSize alignment,
+                                   VkCommandBuffer cmd,
+                                   std::uint64_t batchID) const;
   void deleteMesh(std::uint32_t meshID);
 };
 

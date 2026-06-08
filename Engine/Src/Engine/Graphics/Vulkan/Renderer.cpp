@@ -47,7 +47,7 @@ Renderer::~Renderer() {
     device.DestroyBuffer(buffer);
 }
 
-std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& camera) noexcept {
+std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& camera) {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
@@ -72,7 +72,7 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
     return std::unexpected(RenderError::FrameOutOfDate);
   }
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    return std::unexpected(RenderError::FrameAcquireFailed);
+    throw std::runtime_error("Failed to acquire next swapchain image.");
   }
 
   // Camera
@@ -81,13 +81,15 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
 
   // Command Buffer
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
-  vkResetCommandBuffer(commandBuffer, 0);
+  if (vkResetCommandBuffer(commandBuffer, 0) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to reset command buffer when beginning next frame.");
+  }
 
   VkCommandBufferBeginInfo beginInfo{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
   if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-    return std::unexpected(RenderError::RecordCommandFailed);
+    throw std::runtime_error("Failed to begin command buffer of frame.");
   }
 
   frameContext_.FrameActive = true;
@@ -173,7 +175,7 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
   return {};
 }
 
-std::expected<void, RenderError> Renderer::EndFrame() {
+void Renderer::EndFrame() {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
@@ -201,7 +203,7 @@ std::expected<void, RenderError> Renderer::EndFrame() {
   vkCmdPipelineBarrier2(commandBuffer, &barrierPresentDependencyInfo);
 
   if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-    return std::unexpected(RenderError::RecordCommandFailed);
+    throw std::runtime_error("Failed to end recording command buffer of frame.");
   }
 
   const std::array<VkSemaphore, 1> waitSemaphores = {sync.ImageAvailableSemaphore(frameContext_.CurrentFrame)};
@@ -220,11 +222,12 @@ std::expected<void, RenderError> Renderer::EndFrame() {
       .pSignalSemaphores = signalSemaphores.data(),
   };
 
-  vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame));
+  if (vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame)) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to reset fence of frame.");
+  };
   if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)) !=
       VK_SUCCESS) {
-    // TODO: Fence is never signalled on this path. Fence needs to be recreated or error simply treated as fatal.
-    return std::unexpected(RenderError::SubmitCommandFailed);
+    throw std::runtime_error("Failed to submit frame commands to graphics queue.");
   }
 
   VkPresentInfoKHR presentInfo{};
@@ -242,11 +245,10 @@ std::expected<void, RenderError> Renderer::EndFrame() {
     swapchain.Recreate();
     context_.SetFramebufferHasResized(false);
   } else if (result != VK_SUCCESS) {
-    return std::unexpected(RenderError::PresentFailed);
+    throw std::runtime_error("Failed to present graphics queue.");
   }
 
   frameContext_.CurrentFrame = (frameContext_.CurrentFrame + 1) % config::MaxFramesInFlight;
-  return {};
 }
 
 void Renderer::Submit(const PipelineHandle& pipelineHandle,
@@ -304,7 +306,7 @@ void Renderer::WaitUntilIdle() const {
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
   auto pipeline = pipelineCache_.CreatePipeline(info, descriptorAllocator_.DescriptorSetLayouts());
   if (!pipeline) {
-    const std::string msg = std::format("Failed to create render pass: {}", ToString(pipeline.error()));
+    const std::string msg = std::format("Failed to create pipeline: {}", ToString(pipeline.error()));
     throw std::runtime_error(msg);
   }
 
@@ -316,11 +318,8 @@ void Renderer::DeletePipeline(const PipelineHandle& handle) {
 }
 
 MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
-  auto result = meshAllocator_.Create(mesh);
-  if (!result) {
-    throw std::runtime_error(std::format("Failed to create mesh: {}", ToString(result.error())));
-  }
-  return MeshHandle{.MeshID = *result};
+  const auto result = meshAllocator_.Create(mesh);
+  return MeshHandle{.MeshID = result};
 }
 
 void Renderer::DeleteMesh(const MeshHandle& handle) {
@@ -331,20 +330,13 @@ void Renderer::DeleteMesh(const MeshHandle& handle) {
   meshAllocator_.DeleteDeferred(handle.MeshID, retireFrame);
 }
 
-std::expected<TextureHandle, TextureError>
-Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
+TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
   const auto result = textureAllocator_.Create(data, width, height);
-  if (!result) {
-    return std::unexpected(result.error());
-  }
-  return TextureHandle{.TextureID = *result};
+  return TextureHandle{.TextureID = result};
 }
 
-std::expected<resources::TextureArrayBuilder, TextureError>
-Renderer::BeginTextureArray(const resources::TextureArrayInfo& info) noexcept {
-  if (auto result = textureAllocator_.BeginArray(info); !result)
-    return std::unexpected{result.error()};
-
+resources::TextureArrayBuilder Renderer::BeginTextureArray(const resources::TextureArrayInfo& info) {
+  textureAllocator_.BeginArray(info);
   return resources::TextureArrayBuilder{textureAllocator_};
 }
 
