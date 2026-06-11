@@ -1,5 +1,6 @@
 #include "Sync.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
 #include "SwapChain.hpp"
@@ -23,10 +24,9 @@ Sync::Sync(Context& context) : context_(context) {
   fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
   for (size_t i = 0; i < config::MaxFramesInFlight; i++) {
-    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS ||
-        vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create semaphores!");
-    }
+    CheckVk(vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]),
+            "vkCreateSemaphore");
+    CheckVk(vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences_[i]), "vkCreateFence");
   }
   createPerImageSemaphores_();
 }
@@ -72,8 +72,8 @@ void Sync::createPerImageSemaphores_() {
   semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
   for (size_t i = 0; i < numImages; i++) {
-    if (vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS)
-      throw std::runtime_error("failed to create semaphores!");
+    CheckVk(vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]),
+            "vkCreateSemaphore");
   }
 }
 

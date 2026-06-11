@@ -1,5 +1,6 @@
 #include "Uploader.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
 #include "Command.hpp"
@@ -71,10 +72,8 @@ void Uploader::Process() {
   const VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                                 .commandBufferCount = 1,
                                 .pCommandBuffers = &pending_->Command};
-  if (vkEndCommandBuffer(pending_->Command) != VK_SUCCESS)
-    throw std::runtime_error("failed to end uploader command!");
-  if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, pending_->Fence) != VK_SUCCESS)
-    throw std::runtime_error("failed to submit uploader command!");
+  CheckVk(vkEndCommandBuffer(pending_->Command), "vkEndCommandBuffer");
+  CheckVk(vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, pending_->Fence), "vkQueueSubmit");
 
   submitted_.push_back(std::move(*pending_));
   pending_.reset();
@@ -89,9 +88,7 @@ void Uploader::createBatch_() {
   };
 
   VkFence fence{VK_NULL_HANDLE};
-  if (vkCreateFence(vkDevice, &fenceInfo, nullptr, &fence) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create uploader fence!");
-  }
+  CheckVk(vkCreateFence(vkDevice, &fenceInfo, nullptr, &fence), "vkCreateFence");
 
   pending_.emplace(
       UploadBatch{.Fence = fence, .Command = cmd.BeginTransient(), .BatchID = stagingBuffer_.BeginBatch()});

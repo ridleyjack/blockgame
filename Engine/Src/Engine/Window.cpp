@@ -2,6 +2,7 @@
 
 #include "Events/Events.hpp"
 #include "Events/IEventRaiser.hpp"
+#include "Engine/Fatal.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -23,7 +24,7 @@ void Window::Create() {
   handle_ = glfwCreateWindow(config_.Width, config_.Height, config_.Title.c_str(), nullptr, nullptr);
   if (!handle_) {
     glfwTerminate();
-    throw std::runtime_error("Failed to create glfw window.");
+    Fatal("Failed to create glfw window.");
   }
   glfwMakeContextCurrent(handle_);
   glfwSetWindowUserPointer(handle_, this);

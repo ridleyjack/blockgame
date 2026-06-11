@@ -1,9 +1,9 @@
 #include "MeshBuffer.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
 #include "Engine/Graphics/Mesh.hpp"
-#include "Engine/Memory/Alignment.hpp"
 
 #include <print>
 
@@ -24,8 +24,7 @@ MeshBuffer MeshBuffer::Create(Context& context) {
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
   };
 
-  if (vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-    throw std::runtime_error("failed to create dummy vertex/index buffer!");
+  CheckVk(vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer), "vkCreateBuffer");
 
   VkMemoryRequirements req;
   vkGetBufferMemoryRequirements(vkDevice, buffer, &req);
@@ -37,11 +36,17 @@ MeshBuffer MeshBuffer::Create(Context& context) {
       .allocationSize = req.size,
       .memoryTypeIndex = memoryType,
   };
-  if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+  const VkResult allocateResult = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory);
+  if (allocateResult != VK_SUCCESS) {
     vkDestroyBuffer(vkDevice, buffer, nullptr);
-    throw std::runtime_error("failed to allocate vertex buffer memory!");
+    CheckVk(allocateResult, "vkAllocateMemory");
   }
-  vkBindBufferMemory(vkDevice, buffer, memory, 0);
+  const VkResult bindResult = vkBindBufferMemory(vkDevice, buffer, memory, 0);
+  if (bindResult != VK_SUCCESS) {
+    vkDestroyBuffer(vkDevice, buffer, nullptr);
+    vkFreeMemory(vkDevice, memory, nullptr);
+    CheckVk(bindResult, "vkBindBufferMemory");
+  }
 
   return MeshBuffer(context, buffer, memory, capacity);
 }

@@ -3,12 +3,12 @@
 #include "TextureArrayInfo.hpp"
 #include "TextureArrayBuilder.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
+#include "Engine/Fatal.hpp"
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <cassert>
 #include <format>
-#include <stdexcept>
 
 namespace engine::graphics::resources {
 TextureLoader::TextureLoader(vulkan::Renderer& renderer) : renderer_(renderer) {};
@@ -27,7 +27,7 @@ TextureHandle TextureLoader::LoadArray(std::span<const std::string_view> paths) 
   auto image = assets::LoadImage(paths[0]);
   if (!image) {
     const auto msg = std::format("TextureLoader failed to load image at {} reason:{}", paths[0], image.error());
-    throw std::runtime_error(msg);
+    Fatal(msg);
   }
 
   const TextureArrayInfo info{.Height = static_cast<std::uint32_t>(image->Height),
@@ -42,7 +42,7 @@ TextureHandle TextureLoader::LoadArray(std::span<const std::string_view> paths) 
     image = assets::LoadImage(paths[i]);
     if (!image) {
       const auto msg = std::format("TextureLoader failed to load image at {} reason:{}", paths[i], image.error());
-      throw std::runtime_error(msg);
+      Fatal(msg);
     }
     assert(image->Height == info.Height);
     assert(image->Width == info.Width);

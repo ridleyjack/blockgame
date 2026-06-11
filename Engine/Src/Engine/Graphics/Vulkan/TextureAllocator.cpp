@@ -6,11 +6,11 @@
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
+#include "Engine/Fatal.hpp"
 #include "Engine/Graphics/Resources/TextureArrayInfo.hpp"
 
 #include <cassert>
 #include <format>
-#include <stdexcept>
 
 namespace engine::graphics::vulkan {
 
@@ -25,7 +25,7 @@ TextureAllocator::TextureAllocator(Context& context, Uploader& uploader, Staging
   vkGetPhysicalDeviceFormatProperties(vkDevicePhysical, imageFormat, &formatProperties);
 
   if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
-    throw std::runtime_error("texture image format does not support linear blitting!");
+    Fatal("Texture image format does not support linear blitting!");
   }
 }
 
@@ -48,19 +48,19 @@ std::uint32_t TextureAllocator::Create(const std::span<const std::byte>& imageDa
 
   auto textureResult = createImage_(cmd, width, height, numLayers);
   if (!textureResult)
-    throw std::runtime_error("Failed to create texture image");
+    Fatal("Failed to create texture image");
 
   TextureGPU texture = *textureResult;
 
   if (auto result = uploadLayer_(texture, cmd, batchID, 0, imageData); !result) {
     cleanupGPUTexture_(texture);
-    throw std::runtime_error("Failed to uploade texture to image");
+    Fatal("Failed to uploade texture to image");
   }
 
   auto textureIDResult = finishTexture_(cmd, texture, numLayers);
   if (!textureIDResult) {
     cleanupGPUTexture_(texture);
-    throw std::runtime_error("Failed to create texture image");
+    Fatal("Failed to create texture image");
   }
   const std::uint32_t textureID = *textureIDResult;
 
@@ -88,7 +88,7 @@ void TextureAllocator::BeginArray(const resources::TextureArrayInfo& info) {
   auto textureResult = createImage_(cmd, info.Width, info.Height, info.NumLayers);
   if (!textureResult) {
     arrayState_.reset();
-    throw std::runtime_error("Failed to create texture image");
+    Fatal("Failed to create texture image");
   }
   texture = *textureResult;
 
@@ -104,7 +104,7 @@ void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) 
   if (auto result = uploadLayer_(arrayState_->Texture, cmd, batchID, arrayState_->NextLayer, imageData); !result) {
     cleanupGPUTexture_(arrayState_->Texture);
     arrayState_.reset();
-    throw std::runtime_error("Failed to upload layer to image");
+    Fatal("Failed to upload layer to image");
   }
 
   Uploader::UploadRequest request{.OnComplete = []() noexcept {}};
@@ -122,7 +122,7 @@ std::uint32_t TextureAllocator::FinishArray() {
   if (!textureIDResult) {
     cleanupGPUTexture_(arrayState_->Texture);
     arrayState_.reset();
-    throw std::runtime_error("Failed to finish texture array");
+    Fatal("Failed to finish texture array");
   }
   const std::uint32_t textureID = *textureIDResult;
 

@@ -1,5 +1,6 @@
 #include "DescriptorAllocator.hpp"
 
+#include "CheckVk.hpp"
 #include "Device.hpp"
 #include "Context.hpp"
 #include "Config.hpp"
@@ -42,9 +43,7 @@ DescriptorAllocator::DescriptorAllocator(Context& context, TextureAllocator& tex
       .pPoolSizes = poolSizes.data(),
   };
 
-  if (vkCreateDescriptorPool(device.Logical(), &poolInfo, nullptr, &descriptorPool_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create descriptor pool!");
-  }
+  CheckVk(vkCreateDescriptorPool(device.Logical(), &poolInfo, nullptr, &descriptorPool_), "vkCreateDescriptorPool");
 
   createDescriptorSetLayouts_();
 }
@@ -68,9 +67,7 @@ void DescriptorAllocator::CreateGlobalDescriptorSets(const UniformBuffer& unifor
       .descriptorSetCount = static_cast<uint32_t>(config::MaxFramesInFlight),
       .pSetLayouts = layouts.data(),
   };
-  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, globalSets_.data()) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate descriptor sets!");
-  }
+  CheckVk(vkAllocateDescriptorSets(vkDevice, &allocInfo, globalSets_.data()), "vkAllocateDescriptorSets");
 
   // Update Descriptor Sets.
   for (std::size_t i = 0; i < config::MaxFramesInFlight; i++) {
@@ -105,9 +102,7 @@ std::uint32_t DescriptorAllocator::CreateTextureDescriptorSet(std::uint32_t text
       .descriptorSetCount = 1,
       .pSetLayouts = &textureSetLayout_,
   };
-  if (vkAllocateDescriptorSets(vkDevice, &allocInfo, &entry.DescriptorSet) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate descriptor sets!");
-  }
+  CheckVk(vkAllocateDescriptorSets(vkDevice, &allocInfo, &entry.DescriptorSet), "vkAllocateDescriptorSets");
 
   textureSets_.emplace_back(entry);
   return textureSets_.size() - 1;
@@ -155,9 +150,8 @@ void DescriptorAllocator::createDescriptorSetLayouts_() {
       .pBindings = uboBinding.data(),
   };
 
-  if (vkCreateDescriptorSetLayout(device, &uboLayoutInfo, nullptr, &globalSetLayout_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create UBO descriptor set layout!");
-  }
+  CheckVk(vkCreateDescriptorSetLayout(device, &uboLayoutInfo, nullptr, &globalSetLayout_),
+          "vkCreateDescriptorSetLayout");
 
   // Texture Layout
   constexpr VkDescriptorSetLayoutBinding samplerLayoutBinding{
@@ -174,9 +168,8 @@ void DescriptorAllocator::createDescriptorSetLayouts_() {
       .pBindings = textureBinding.data(),
   };
 
-  if (vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr, &textureSetLayout_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create texture descriptor set layout!");
-  }
+  CheckVk(vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr, &textureSetLayout_),
+          "vkCreateDescriptorSetLayout");
 }
 
 void DescriptorAllocator::writeTexture(DescriptorEntry& entry, const TextureGPU& texture) const noexcept {

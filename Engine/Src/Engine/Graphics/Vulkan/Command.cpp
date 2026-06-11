@@ -1,10 +1,10 @@
 #include "Command.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Config.hpp"
 #include "Engine/Graphics/Vulkan/Device.hpp"
 
-#include <stdexcept>
 
 namespace engine::graphics::vulkan {
 
@@ -34,28 +34,28 @@ VkCommandBuffer Command::BeginSingleTimeCommands() const noexcept {
   allocInfo.commandBufferCount = 1;
 
   VkCommandBuffer commandBuffer;
-  vkAllocateCommandBuffers(vkDevice, &allocInfo, &commandBuffer);
+  CheckVk(vkAllocateCommandBuffers(vkDevice, &allocInfo, &commandBuffer), "vkAllocateCommandBuffers");
 
   VkCommandBufferBeginInfo beginInfo{};
   beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  vkBeginCommandBuffer(commandBuffer, &beginInfo);
+  CheckVk(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer");
   return commandBuffer;
 }
 
 void Command::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const noexcept {
   const auto& device = context_.GetDevice();
 
-  vkEndCommandBuffer(commandBuffer);
+  CheckVk(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
 
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
 
-  vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(device.GraphicsQueue());
+  CheckVk(vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE), "vkQueueSubmit");
+  CheckVk(vkQueueWaitIdle(device.GraphicsQueue()), "vkQueueWaitIdle");
 
   vkFreeCommandBuffers(device.Logical(), transientPool_, 1, &commandBuffer);
 }
@@ -79,9 +79,7 @@ void Command::createFramePool_() {
   poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
 
-  if (vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &framePool_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create command pool!");
-  }
+  CheckVk(vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &framePool_), "vkCreateCommandPool");
 }
 
 void Command::createFrameBuffers_() {
@@ -95,9 +93,8 @@ void Command::createFrameBuffers_() {
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = static_cast<uint32_t>(perFrameBuffers_.size());
 
-  if (vkAllocateCommandBuffers(device.Logical(), &allocInfo, perFrameBuffers_.data()) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate command buffers!");
-  }
+  CheckVk(vkAllocateCommandBuffers(device.Logical(), &allocInfo, perFrameBuffers_.data()),
+          "vkAllocateCommandBuffers");
 }
 
 void Command::createTransientPool_() {
@@ -109,8 +106,6 @@ void Command::createTransientPool_() {
   poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
   poolInfo.queueFamilyIndex = queueFamilyIndices.GraphicsFamily.value();
 
-  if (vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &transientPool_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create transient pool!");
-  }
+  CheckVk(vkCreateCommandPool(device.Logical(), &poolInfo, nullptr, &transientPool_), "vkCreateCommandPool");
 }
 } // namespace engine::graphics::vulkan

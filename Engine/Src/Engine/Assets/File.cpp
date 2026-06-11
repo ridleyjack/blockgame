@@ -1,5 +1,7 @@
 #include "File.hpp"
 
+#include "Engine/Fatal.hpp"
+
 #include <cstring>
 #include <fstream>
 #include <sstream>
@@ -22,7 +24,7 @@ std::vector<char> ReadBinaryFile(const std::string& path) {
     if (errno != 0) {
       errMsg << " - System error: " << std::strerror(errno);
     }
-    throw std::runtime_error(errMsg.str());
+    Fatal(errMsg.str());
   }
 
   size_t size = file.tellg();

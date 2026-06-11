@@ -1,14 +1,15 @@
 #include "Context.hpp"
 
+#include "CheckVk.hpp"
 #include "Command.hpp"
 #include "Device.hpp"
 #include "SwapChain.hpp"
 #include "Sync.hpp"
 #include "Config.hpp"
+#include "Engine/Fatal.hpp"
 
 #include <cstring>
 #include <iostream>
-#include <stdexcept>
 #include <vector>
 
 #include <vulkan/vulkan.h>
@@ -169,7 +170,7 @@ void Context::WaitUntilIdle() const noexcept {
 
 void Context::createInstance_() {
   if (config::EnableValidationLayers && !CheckValidationLayerSupport()) {
-    throw std::runtime_error("validation layers requested, but not available!");
+    Fatal("Validation layers requested, but not available!");
   }
 
   VkApplicationInfo appInfo{
@@ -198,24 +199,19 @@ void Context::createInstance_() {
     createInfo.pNext = &debugCreateInfo;
   }
 
-  if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create vulkan instance!");
-  }
+  CheckVk(vkCreateInstance(&createInfo, nullptr, &instance_), "vkCreateInstance");
 }
 
 void Context::setupDebugMessenger_() {
   if constexpr (config::EnableValidationLayers) {
     VkDebugUtilsMessengerCreateInfoEXT createInfo{};
     debug::PopulateMessengerCreateInfo(createInfo);
-    if (debug::CreateUtilsMessengerEXT(instance_, &createInfo, nullptr, &debugMessenger_) != VK_SUCCESS) {
-      throw std::runtime_error("failed to set up debug messenger!");
-    }
+    CheckVk(debug::CreateUtilsMessengerEXT(instance_, &createInfo, nullptr, &debugMessenger_),
+            "debug::CreateUtilsMessengerEXT");
   }
 }
 
 void Context::createSurface_() {
-  if (glfwCreateWindowSurface(instance_, window_, nullptr, &surface_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create window surface!");
-  }
+  CheckVk(glfwCreateWindowSurface(instance_, window_, nullptr, &surface_), "glfwCreateWindowSurface");
 }
 } // namespace engine::graphics::vulkan

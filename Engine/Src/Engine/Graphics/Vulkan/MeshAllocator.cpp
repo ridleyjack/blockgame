@@ -4,9 +4,9 @@
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
+#include "Engine/Fatal.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 
-#include <stdexcept>
 
 namespace engine::graphics::vulkan {
 
@@ -82,12 +82,12 @@ VkDeviceSize MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
   // Staging buffer.
   const auto stagingOffset = stagingBuffer_.Write(data, alignment, batchID);
   if (!stagingOffset)
-    throw std::runtime_error("MeshAllocator failed to write to staging buffer");
+    Fatal("MeshAllocator failed to write to staging buffer");
 
   // Mesh buffer.
   const auto meshOffset = meshBuffer_.Allocate(size);
   if (!meshOffset)
-    throw std::runtime_error("MeshAllocator failed to write to mesh buffer");
+    Fatal("MeshAllocator failed to write to mesh buffer");
 
   // Record the copy.
   const VkBufferCopy copyRegion{.srcOffset = *stagingOffset, .dstOffset = *meshOffset, .size = size};

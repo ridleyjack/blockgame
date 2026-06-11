@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
 
 #include "Command.hpp"
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
 #include "Pipeline.hpp"
@@ -13,6 +14,7 @@
 #include "Engine/Graphics/Resources/TextureArrayBuilder.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
+#include "Engine/Fatal.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -72,7 +74,7 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
     return std::unexpected(RenderError::FrameOutOfDate);
   }
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    throw std::runtime_error("Failed to acquire next swapchain image.");
+    CheckVk(result, "vkAcquireNextImageKHR");
   }
 
   // Camera
@@ -81,16 +83,12 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
 
   // Command Buffer
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
-  if (vkResetCommandBuffer(commandBuffer, 0) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to reset command buffer when beginning next frame.");
-  }
+  CheckVk(vkResetCommandBuffer(commandBuffer, 0), "vkResetCommandBuffer");
 
   VkCommandBufferBeginInfo beginInfo{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
   };
-  if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to begin command buffer of frame.");
-  }
+  CheckVk(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer");
 
   frameContext_.FrameActive = true;
 
@@ -202,9 +200,7 @@ void Renderer::EndFrame() {
                                                 .pImageMemoryBarriers = &barrierPresent};
   vkCmdPipelineBarrier2(commandBuffer, &barrierPresentDependencyInfo);
 
-  if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to end recording command buffer of frame.");
-  }
+  CheckVk(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
 
   const std::array<VkSemaphore, 1> waitSemaphores = {sync.ImageAvailableSemaphore(frameContext_.CurrentFrame)};
   const std::array<VkSemaphore, 1> signalSemaphores = {sync.RenderFinishedSemaphore(frameContext_.ImageIndex)};
@@ -222,13 +218,9 @@ void Renderer::EndFrame() {
       .pSignalSemaphores = signalSemaphores.data(),
   };
 
-  if (vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame)) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to reset fence of frame.");
-  };
-  if (vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to submit frame commands to graphics queue.");
-  }
+  CheckVk(vkResetFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame)), "vkResetFences");
+  CheckVk(vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)),
+          "vkQueueSubmit");
 
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -245,7 +237,7 @@ void Renderer::EndFrame() {
     swapchain.Recreate();
     context_.SetFramebufferHasResized(false);
   } else if (result != VK_SUCCESS) {
-    throw std::runtime_error("Failed to present graphics queue.");
+    CheckVk(result, "vkQueuePresentKHR");
   }
 
   frameContext_.CurrentFrame = (frameContext_.CurrentFrame + 1) % config::MaxFramesInFlight;
@@ -307,7 +299,7 @@ PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
   auto pipeline = pipelineCache_.CreatePipeline(info, descriptorAllocator_.DescriptorSetLayouts());
   if (!pipeline) {
     const std::string msg = std::format("Failed to create pipeline: {}", ToString(pipeline.error()));
-    throw std::runtime_error(msg);
+    Fatal(msg);
   }
 
   return PipelineHandle{*pipeline};

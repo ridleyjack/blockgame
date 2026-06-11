@@ -1,11 +1,12 @@
 #include "Device.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Command.hpp"
 #include "Config.hpp"
+#include "Engine/Fatal.hpp"
 
 #include <set>
-#include <stdexcept>
 #include <vector>
 #include <print>
 
@@ -56,9 +57,7 @@ Device::Device(Context& context) : context_{context} {
     createInfo.ppEnabledLayerNames = config::ValidationLayers.data();
   }
 
-  if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create logical device!");
-  }
+  CheckVk(vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_), "vkCreateDevice");
 
   vkGetDeviceQueue(device_, indices.GraphicsFamily.value(), 0, &graphicsQueue_);
   vkGetDeviceQueue(device_, indices.PresentFamily.value(), 0, &presentQueue_);
@@ -119,7 +118,7 @@ uint32_t Device::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags prope
     }
   }
 
-  throw std::runtime_error("failed to find suitable memory type!");
+  Fatal("Failed to find suitable memory type!");
 }
 VkFormat Device::FindSupportedFormat(const std::vector<VkFormat>& candidates,
                                      const VkImageTiling tiling,
@@ -135,7 +134,7 @@ VkFormat Device::FindSupportedFormat(const std::vector<VkFormat>& candidates,
       return format;
     }
   }
-  throw std::runtime_error("failed to find supported format!");
+  Fatal("Failed to find supported format!");
 }
 VkSampleCountFlagBits Device::MsaaSamples() const noexcept {
   return msaaSamples_;
@@ -154,9 +153,7 @@ AllocatedBuffer Device::CreateBuffer(const VkDeviceSize size,
   bufferInfo.usage = usage;
   bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create vertex buffer!");
-  }
+  CheckVk(vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer), "vkCreateBuffer");
 
   // Buffer Memory
   VkMemoryRequirements memRequirements;
@@ -166,10 +163,8 @@ AllocatedBuffer Device::CreateBuffer(const VkDeviceSize size,
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   allocInfo.allocationSize = memRequirements.size;
   allocInfo.memoryTypeIndex = this->FindMemoryType(memRequirements.memoryTypeBits, properties);
-  if (vkAllocateMemory(device_, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate vertex buffer memory!");
-  }
-  vkBindBufferMemory(device_, buffer, memory, 0);
+  CheckVk(vkAllocateMemory(device_, &allocInfo, nullptr, &memory), "vkAllocateMemory");
+  CheckVk(vkBindBufferMemory(device_, buffer, memory, 0), "vkBindBufferMemory");
 
   return AllocatedBuffer{.Buffer = buffer, .Memory = memory};
 }
@@ -286,7 +281,7 @@ void Device::pickPhysicalDevice_() {
   uint32_t deviceCount = 0;
   vkEnumeratePhysicalDevices(context_.Instance(), &deviceCount, nullptr);
   if (deviceCount == 0) {
-    throw std::runtime_error("failed to find GPUs with Vulkan support!");
+    Fatal("Failed to find GPUs with Vulkan support!");
   }
 
   std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -301,7 +296,7 @@ void Device::pickPhysicalDevice_() {
   }
 
   if (physicalDevice_ == VK_NULL_HANDLE) {
-    throw std::runtime_error("failed to find a suitable GPU!");
+    Fatal("Failed to find a suitable GPU!");
   }
 }
 

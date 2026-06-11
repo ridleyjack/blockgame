@@ -21,6 +21,7 @@ add_library(Engine
         Src/Engine/Memory/Alignment.hpp
         Src/Engine/Memory/RingBuffer.cpp
         Src/Engine/Memory/RingBuffer.hpp
+        Src/Engine/Fatal.hpp
 )
 target_include_directories(Engine
         PUBLIC
@@ -84,6 +85,7 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Resources/TextureArrayInfo.hpp
         Src/Engine/Graphics/Resources/TextureLoader.cpp
         Src/Engine/Graphics/Resources/TextureLoader.hpp
+        Src/Engine/Graphics/Vulkan/CheckVk.hpp
 )
 
 target_include_directories(Engine_Graphics

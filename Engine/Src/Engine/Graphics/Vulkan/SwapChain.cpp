@@ -1,16 +1,17 @@
 #include "SwapChain.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
 #include "Image.hpp"
 #include "Sync.hpp"
+#include "Engine/Fatal.hpp"
 
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
 #include <cassert>
 #include <limits>
-#include <stdexcept>
 #include <print>
 
 namespace engine::graphics::vulkan {
@@ -133,9 +134,7 @@ void SwapChain::create_() {
   createInfo.clipped = VK_TRUE;
   createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-  if (vkCreateSwapchainKHR(vkDevice, &createInfo, nullptr, &swapchain_) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create swap chain!");
-  }
+  CheckVk(vkCreateSwapchainKHR(vkDevice, &createInfo, nullptr, &swapchain_), "vkCreateSwapchainKHR");
 
   vkGetSwapchainImagesKHR(vkDevice, swapchain_, &imageCount, nullptr);
   images_.resize(imageCount);
@@ -153,7 +152,7 @@ void SwapChain::create_() {
         result)
       imageViews_[i] = *result;
     else
-      throw std::runtime_error("failed to create image views!");
+      Fatal("Failed to create image views!");
   }
 
   createColorResources_();
@@ -211,7 +210,7 @@ void SwapChain::createColorResources_() {
                                  .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                              });
       !result) {
-    throw std::runtime_error("failed to create msaa image!");
+    Fatal("Failed to create msaa image!");
   } else {
     colorImage_ = result->Handle;
     colorImageMemory_ = result->Memory;
@@ -220,7 +219,7 @@ void SwapChain::createColorResources_() {
   const auto result =
       image::CreateImageView(device, colorImage_, {.Format = imageFormat_, .AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT});
   if (!result)
-    throw std::runtime_error("failed to create msaa image view!");
+    Fatal("Failed to create msaa image view!");
   colorImageView_ = *result;
 }
 
@@ -239,7 +238,7 @@ void SwapChain::createDepthResources_() {
                                            .Properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                        });
       !result) {
-    throw std::runtime_error("failed to create depth texture image!");
+    Fatal("Failed to create depth texture image!");
   } else {
     depthImage_ = result->Handle;
     depthImageMemory_ = result->Memory;
@@ -248,7 +247,7 @@ void SwapChain::createDepthResources_() {
   const auto result =
       image::CreateImageView(device, depthImage_, {.Format = depthFormat, .AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT});
   if (!result)
-    throw std::runtime_error("failed to create depth image view!");
+    Fatal("Failed to create depth image view!");
   depthImageView_ = *result;
 }
 

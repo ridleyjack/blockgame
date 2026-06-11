@@ -1,11 +1,11 @@
 #include "StagingBuffer.hpp"
 
+#include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
 
 #include <cassert>
 #include <cstring>
-#include <print>
 #include <ranges>
 
 namespace engine::graphics::vulkan {
@@ -24,8 +24,7 @@ StagingBuffer StagingBuffer::Create(Context& context) {
   VkBuffer buffer{VK_NULL_HANDLE};
   VkDeviceMemory memory{VK_NULL_HANDLE};
 
-  if (vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-    throw std::runtime_error("failed to create dummy vertex/index buffer!");
+  CheckVk(vkCreateBuffer(vkDevice, &bufferInfo, nullptr, &buffer), "vkCreateBuffer");
 
   VkMemoryRequirements req;
   vkGetBufferMemoryRequirements(vkDevice, buffer, &req);
@@ -39,18 +38,25 @@ StagingBuffer StagingBuffer::Create(Context& context) {
       .allocationSize = req.size,
       .memoryTypeIndex = memoryType,
   };
-  if (vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+  const VkResult allocateResult = vkAllocateMemory(vkDevice, &allocInfo, nullptr, &memory);
+  if (allocateResult != VK_SUCCESS) {
     vkDestroyBuffer(vkDevice, buffer, nullptr);
-    throw std::runtime_error("failed to allocate vertex buffer memory!");
+    CheckVk(allocateResult, "vkAllocateMemory");
   }
 
-  vkBindBufferMemory(vkDevice, buffer, memory, 0);
-
-  void* memoryMapping{};
-  if (vkMapMemory(vkDevice, memory, 0, req.size, 0, &memoryMapping) != VK_SUCCESS) {
+  const VkResult bindResult = vkBindBufferMemory(vkDevice, buffer, memory, 0);
+  if (bindResult != VK_SUCCESS) {
     vkDestroyBuffer(vkDevice, buffer, nullptr);
     vkFreeMemory(vkDevice, memory, nullptr);
-    throw std::runtime_error("Failed to map staging buffer memory");
+    CheckVk(bindResult, "vkBindBufferMemory");
+  }
+
+  void* memoryMapping{};
+  const VkResult mapResult = vkMapMemory(vkDevice, memory, 0, req.size, 0, &memoryMapping);
+  if (mapResult != VK_SUCCESS) {
+    vkDestroyBuffer(vkDevice, buffer, nullptr);
+    vkFreeMemory(vkDevice, memory, nullptr);
+    CheckVk(mapResult, "vkMapMemory");
   }
 
   return StagingBuffer(context, buffer, memory, static_cast<std::byte*>(memoryMapping), req.size);
