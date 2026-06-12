@@ -1,11 +1,11 @@
 #pragma once
 
-#include <expected>
-#include <string_view>
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
 #include <vector>
+#include <expected>
+#include <string_view>
 
 namespace engine::graphics {
 struct PipelineCreateInfo;
@@ -17,21 +17,24 @@ namespace engine::graphics::vulkan {
 class Context;
 
 enum class PipelineError : uint8_t {
-  FailedPipelineCreation,
-  FailedPipelineLayoutCreation,
-  FailedShaderCompile,
+  PipelineCreation,
+  PipelineLayoutCreation,
+  ShaderCompile,
+  ShaderFileRead,
 };
 
 constexpr std::string_view ToString(const PipelineError e) noexcept {
   using enum PipelineError;
 
   switch (e) {
-  case FailedPipelineCreation:
+  case PipelineCreation:
     return "FailedPipelineCreation";
-  case FailedPipelineLayoutCreation:
+  case PipelineLayoutCreation:
     return "FailedPipelineLayoutCreation";
-  case FailedShaderCompile:
+  case ShaderCompile:
     return "FailedShaderCompile";
+  case ShaderFileRead:
+    return "FailedShaderFileRead";
   }
   return "UnknownPipelineError";
 }
@@ -59,9 +62,9 @@ private:
   static std::expected<VkPipeline, PipelineError>
   createPipeline_(const Context& context, const PipelineCreateInfo& info, VkPipelineLayout pipelineLayout) noexcept;
 
-  static std::expected<VkShaderModule, PipelineError> createShaderModule_(const Context& context,
-                                                                          const std::vector<char>& code) noexcept;
-  
+  static std::expected<VkShaderModule, PipelineError>
+  createShaderModule_(const Context& context, const std::vector<std::uint32_t>& code) noexcept;
+
   Context& context_;
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};

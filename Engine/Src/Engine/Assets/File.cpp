@@ -1,37 +1,42 @@
 #include "File.hpp"
 
-#include "Engine/Fatal.hpp"
-
-#include <cstring>
 #include <fstream>
-#include <sstream>
-#include <string>
+#include <limits>
+
+namespace fs = std::filesystem;
 
 namespace engine::assets {
 
-std::vector<char> ReadBinaryFile(const std::string& path) {
-  std::ifstream file(path, std::ios::ate | std::ios::binary);
+std::optional<std::vector<std::uint32_t>> ReadBinaryFile(const fs::path& path) {
 
-  if (!file) {
-    std::ostringstream errMsg{};
-    errMsg << "Could not open file: " << path;
-    if (file.bad()) {
-      errMsg << " (badbit set)";
-    }
-    if (file.fail()) {
-      errMsg << " (failbit set)";
-    }
-    if (errno != 0) {
-      errMsg << " - System error: " << std::strerror(errno);
-    }
-    Fatal(errMsg.str());
+  std::error_code err;
+
+  if (!fs::exists(path, err) || err) {
+    return {};
+  }
+  if (!fs::is_regular_file(path, err) || err) {
+    return {};
   }
 
-  size_t size = file.tellg();
-  file.seekg(0);
+  const uintmax_t size = fs::file_size(path, err);
+  if (err)
+    return {};
 
-  std::vector<char> buffer(size);
-  file.read(buffer.data(), static_cast<std::streamsize>(size));
+  if (size % sizeof(std::uint32_t) != 0)
+    return {};
+
+  if (size > static_cast<std::uintmax_t>(std::numeric_limits<std::streamsize>::max()))
+    return {};
+
+  std::ifstream file(path, std::ios::binary);
+  if (!file)
+    return {};
+
+  std::vector<std::uint32_t> buffer(size / sizeof(std::uint32_t));
+
+  if (!file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(size)))
+    return {};
+
   return buffer;
 }
 

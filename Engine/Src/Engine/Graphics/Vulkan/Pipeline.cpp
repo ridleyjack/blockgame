@@ -3,7 +3,6 @@
 #include "Context.hpp"
 #include "Device.hpp"
 #include "SwapChain.hpp"
-#include "UniformBuffer.hpp"
 #include "VertexLayout.hpp"
 
 #include "Engine/Assets/File.hpp"
@@ -78,7 +77,7 @@ Pipeline::createPipelineLayout_(const Context& context,
 
   VkPipelineLayout layout{VK_NULL_HANDLE};
   if (vkCreatePipelineLayout(vkDevice, &pipelineLayoutInfo, nullptr, &layout) != VK_SUCCESS) {
-    return std::unexpected(PipelineError::FailedPipelineLayoutCreation);
+    return std::unexpected(PipelineError::PipelineLayoutCreation);
   }
   return layout;
 }
@@ -103,7 +102,14 @@ std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context
   };
 
   auto vertShaderCode = assets::ReadBinaryFile(info.VertexShaderFile);
+  if (!vertShaderCode) {
+    return std::unexpected(PipelineError::ShaderFileRead);
+  }
+
   auto fragShaderCode = assets::ReadBinaryFile(info.FragmentShaderFile);
+  if (!fragShaderCode) {
+    return std::unexpected(PipelineError::ShaderFileRead);
+  }
 
   struct ShaderModules {
     VkDevice device{VK_NULL_HANDLE};
@@ -113,21 +119,23 @@ std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context
     explicit ShaderModules(VkDevice d) noexcept : device{d} {}
 
     ~ShaderModules() {
-      if (vert)
+      if (vert) {
         vkDestroyShaderModule(device, vert, nullptr);
-      if (frag)
+      }
+      if (frag) {
         vkDestroyShaderModule(device, frag, nullptr);
+      }
     }
   };
   ShaderModules shaderModules{vkDevice};
 
-  if (auto result = createShaderModule_(context, vertShaderCode); !result) {
+  if (auto result = createShaderModule_(context, *vertShaderCode); !result) {
     return std::unexpected(result.error());
   } else {
     shaderModules.vert = *result;
   }
 
-  if (auto result = createShaderModule_(context, fragShaderCode); !result) {
+  if (auto result = createShaderModule_(context, *fragShaderCode); !result) {
     return std::unexpected(result.error());
   } else {
     shaderModules.frag = *result;
@@ -239,24 +247,25 @@ std::expected<VkPipeline, PipelineError> Pipeline::createPipeline_(const Context
 
   VkPipeline pipeline{VK_NULL_HANDLE};
   if (vkCreateGraphicsPipelines(vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
-    return std::unexpected(PipelineError::FailedPipelineCreation);
+    return std::unexpected(PipelineError::PipelineCreation);
   }
 
   return pipeline;
 }
 
-std::expected<VkShaderModule, PipelineError> Pipeline::createShaderModule_(const Context& context,
-                                                                           const std::vector<char>& code) noexcept {
+std::expected<VkShaderModule, PipelineError>
+Pipeline::createShaderModule_(const Context& context, const std::vector<std::uint32_t>& code) noexcept {
   const auto device = context.GetDevice().Logical();
 
-  VkShaderModuleCreateInfo createInfo{};
-  createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  createInfo.codeSize = code.size();
-  createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+  VkShaderModuleCreateInfo createInfo{
+      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+      .codeSize = code.size() * sizeof(std::uint32_t),
+      .pCode = code.data(),
+  };
 
   VkShaderModule shaderModule{};
   if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-    return std::unexpected(PipelineError::FailedShaderCompile);
+    return std::unexpected(PipelineError::ShaderCompile);
   }
   return shaderModule;
 }
