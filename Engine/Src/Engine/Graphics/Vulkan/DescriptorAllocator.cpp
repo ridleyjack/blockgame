@@ -128,8 +128,12 @@ VkDescriptorSet DescriptorAllocator::TextureDescriptorSet(const std::uint32_t te
   return entry.DescriptorSet;
 }
 
-std::array<VkDescriptorSetLayout, 2> DescriptorAllocator::DescriptorSetLayouts() const noexcept {
-  return std::array<VkDescriptorSetLayout, 2>{globalSetLayout_, textureSetLayout_};
+std::span<const VkDescriptorSetLayout> DescriptorAllocator::GlobalSetLayouts() const noexcept {
+  return {&globalSetLayout_, 1};
+}
+
+std::span<const VkDescriptorSetLayout> DescriptorAllocator::DescriptorSetLayouts() const noexcept {
+  return descriptorSetLayouts_;
 }
 
 void DescriptorAllocator::createDescriptorSetLayouts_() {
@@ -170,6 +174,8 @@ void DescriptorAllocator::createDescriptorSetLayouts_() {
 
   CheckVk(vkCreateDescriptorSetLayout(device, &textureLayoutInfo, nullptr, &textureSetLayout_),
           "vkCreateDescriptorSetLayout");
+
+  descriptorSetLayouts_ = {globalSetLayout_, textureSetLayout_};
 }
 
 void DescriptorAllocator::writeTexture(DescriptorEntry& entry, const TextureGPU& texture) const noexcept {

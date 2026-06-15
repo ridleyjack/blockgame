@@ -5,6 +5,7 @@
 
 #include <array>
 #include <vector>
+#include <span>
 
 namespace engine::graphics::vulkan {
 struct TextureGPU;
@@ -29,8 +30,10 @@ public:
   VkDescriptorSet GlobalDescriptorSet(std::uint32_t frame) const noexcept;
   VkDescriptorSet TextureDescriptorSet(std::uint32_t setID) noexcept;
 
+  std::span<const VkDescriptorSetLayout> GlobalSetLayouts() const noexcept;
+
   // DescriptorSetLayout returns the layout used for the per frame global UBO and the
-  std::array<VkDescriptorSetLayout, 2> DescriptorSetLayouts() const noexcept;
+  std::span<const VkDescriptorSetLayout> DescriptorSetLayouts() const noexcept;
 
 private:
   struct DescriptorEntry {
@@ -44,6 +47,7 @@ private:
 
   VkDescriptorSetLayout globalSetLayout_{VK_NULL_HANDLE};
   VkDescriptorSetLayout textureSetLayout_{VK_NULL_HANDLE};
+  std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts_{};
 
   VkDescriptorPool descriptorPool_{VK_NULL_HANDLE};
 

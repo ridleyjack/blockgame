@@ -72,19 +72,12 @@ gfx::Mesh CreateBlockHighlightMesh() {
 
 BlockHighlighter::BlockHighlighter(vlk::Renderer& renderer) {
   const gfx::PipelineHandle pipeline =
-      renderer.CreatePipeline(gfx::PipelineCreateInfo{.VertexShaderFile = "Shaders/highlight.vert.spv",
+      renderer.CreatePipeline(gfx::PipelineCreateInfo{.Kind = gfx::PipelineKind::SolidGeometry,
+                                                      .VertexShaderFile = "Shaders/highlight.vert.spv",
                                                       .FragmentShaderFile = "Shaders/highlight.frag.spv"});
 
-  // Create a dummy texture.
-  auto image = engine::assets::LoadImage("Textures/Tiles/dirt.png");
-  if (!image) {
-    throw std::runtime_error{"Highlight failed to load dummy texture"};
-  }
-  auto texture = renderer.CreateTexture(image->Pixels, image->Width, image->Height);
-
   renderItem_.Pipeline = pipeline;
-  renderItem_.Material = renderer.CreateMaterial(texture);
-  gfx::Mesh meshData = CreateBlockHighlightMesh();
+  const gfx::Mesh meshData = CreateBlockHighlightMesh();
   mesh_ = renderer.CreateMesh(meshData);
 }
 

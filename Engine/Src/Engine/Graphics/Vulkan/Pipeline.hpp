@@ -1,11 +1,16 @@
 #pragma once
 
+#include "Engine/Graphics/PipelineCreateInfo.hpp"
+
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
 #include <vector>
 #include <expected>
 #include <string_view>
+#include <span>
+
+namespace gfx = engine::graphics;
 
 namespace engine::graphics {
 struct PipelineCreateInfo;
@@ -42,9 +47,9 @@ constexpr std::string_view ToString(const PipelineError e) noexcept {
 class Pipeline {
 public:
   static std::expected<Pipeline, PipelineError>
-  Create(Context& context, const PipelineCreateInfo& info, std::array<VkDescriptorSetLayout, 2> layouts);
+  Create(Context& context, const PipelineCreateInfo& info, std::span<const VkDescriptorSetLayout> layouts);
 
-  Pipeline(Context& context, VkPipelineLayout pipelineLayout, VkPipeline pipeline);
+  Pipeline(Context& context, const PipelineCreateInfo& info, VkPipelineLayout pipelineLayout, VkPipeline pipeline);
   ~Pipeline();
 
   Pipeline(const Pipeline&) = delete;
@@ -55,9 +60,11 @@ public:
   VkPipelineLayout PipelineLayout() const noexcept;
   VkPipeline Handle() const noexcept;
 
+  PipelineKind Kind() const noexcept;
+
 private:
   static std::expected<VkPipelineLayout, PipelineError>
-  createPipelineLayout_(const Context& context, std::array<VkDescriptorSetLayout, 2> layouts) noexcept;
+  createPipelineLayout_(const Context& context, std::span<const VkDescriptorSetLayout> layouts) noexcept;
 
   static std::expected<VkPipeline, PipelineError>
   createPipeline_(const Context& context, const PipelineCreateInfo& info, VkPipelineLayout pipelineLayout) noexcept;
@@ -69,6 +76,8 @@ private:
 
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};
   VkPipeline pipeline_{VK_NULL_HANDLE};
+
+  gfx::PipelineKind kind_;
 };
 
 } // namespace engine::graphics::vulkan

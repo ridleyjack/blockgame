@@ -250,16 +250,23 @@ void Renderer::Submit(const PipelineHandle& pipelineHandle,
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
+  const auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
+
   const MeshAllocator::MeshGPU& meshGPU = meshAllocator_.Get(handle.MeshID);
   if (meshGPU.State != MeshState::Ready)
     return;
 
   const auto globalDescriptor = descriptorAllocator_.GlobalDescriptorSet(frameContext_.CurrentFrame);
-  const auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(material.DescriptorSetID);
-  if (texDescriptor == VK_NULL_HANDLE)
-    return;
+  std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, VK_NULL_HANDLE};
+  std::uint32_t numDescriptorSets = 1;
 
-  const auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
+  if (pipeline.Kind() == PipelineKind::SolidTexture) {
+    const auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(material.DescriptorSetID);
+    if (texDescriptor == VK_NULL_HANDLE)
+      return;
+    descriptors[numDescriptorSets++] = texDescriptor;
+  }
+
   vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.Handle());
 
   const std::array<VkBuffer, 1> vertexBuffers = {meshBuffer_.Handle()};
@@ -267,12 +274,11 @@ void Renderer::Submit(const PipelineHandle& pipelineHandle,
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
   vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), meshGPU.IndexOffset, VK_INDEX_TYPE_UINT32);
 
-  const std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, texDescriptor};
   vkCmdBindDescriptorSets(commandBuffer,
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           pipeline.PipelineLayout(),
                           0,
-                          descriptors.size(),
+                          numDescriptorSets,
                           descriptors.data(),
                           0,
                           nullptr);
@@ -296,7 +302,11 @@ void Renderer::WaitUntilIdle() const {
 }
 
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
-  auto pipeline = pipelineCache_.CreatePipeline(info, descriptorAllocator_.DescriptorSetLayouts());
+  std::span<const VkDescriptorSetLayout> layouts = descriptorAllocator_.DescriptorSetLayouts();
+  if (info.Kind == PipelineKind::SolidGeometry)
+    layouts = descriptorAllocator_.GlobalSetLayouts();
+
+  auto pipeline = pipelineCache_.CreatePipeline(info, layouts);
   if (!pipeline) {
     const std::string msg = std::format("Failed to create pipeline: {}", ToString(pipeline.error()));
     Fatal(msg);

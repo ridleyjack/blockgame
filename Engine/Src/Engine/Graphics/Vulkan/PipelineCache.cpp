@@ -9,7 +9,7 @@ PipelineCache::PipelineCache(Context& context) : context_(context) {}
 
 std::expected<std::uint32_t, PipelineError>
 PipelineCache::CreatePipeline(const PipelineCreateInfo& info,
-                              std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) noexcept {
+                              std::span<const VkDescriptorSetLayout> descriptorSetLayouts) noexcept {
 
   auto pipeline = Pipeline::Create(context_, info, descriptorSetLayouts);
   if (!pipeline)

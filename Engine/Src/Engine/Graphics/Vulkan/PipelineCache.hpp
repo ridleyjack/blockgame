@@ -5,6 +5,7 @@
 #include "Engine/Containers/HandlePool.hpp"
 
 #include <expected>
+#include <span>
 
 namespace engine::graphics {
 struct PipelineCreateInfo;
@@ -22,7 +23,7 @@ public:
   PipelineCache& operator=(const PipelineCache&) = delete;
 
   std::expected<std::uint32_t, PipelineError>
-  CreatePipeline(const PipelineCreateInfo& info, std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) noexcept;
+  CreatePipeline(const PipelineCreateInfo& info, std::span<const VkDescriptorSetLayout> descriptorSetLayouts) noexcept;
   Pipeline& GetPipeline(std::uint32_t pipelineID) noexcept;
   void DestroyPipeline(std::uint32_t pipelineID) noexcept;
 

@@ -15,7 +15,7 @@ namespace engine::graphics::vulkan {
 
 std::expected<Pipeline, PipelineError> Pipeline::Create(Context& context,
                                                         const PipelineCreateInfo& info,
-                                                        std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts) {
+                                                        std::span<const VkDescriptorSetLayout> descriptorSetLayouts) {
   auto vkDevice = context.GetDevice().Logical();
   VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
   VkPipeline pipeline{VK_NULL_HANDLE};
@@ -33,11 +33,14 @@ std::expected<Pipeline, PipelineError> Pipeline::Create(Context& context,
     pipeline = *result;
   }
 
-  return Pipeline(context, pipelineLayout, pipeline);
+  return Pipeline(context, info, pipelineLayout, pipeline);
 }
 
-Pipeline::Pipeline(Context& context, VkPipelineLayout pipelineLayout, VkPipeline pipeline)
-    : context_{context}, pipelineLayout_{pipelineLayout}, pipeline_{pipeline} {}
+Pipeline::Pipeline(Context& context,
+                   const PipelineCreateInfo& info,
+                   VkPipelineLayout pipelineLayout,
+                   VkPipeline pipeline)
+    : context_{context}, pipelineLayout_{pipelineLayout}, pipeline_{pipeline}, kind_{info.Kind} {}
 
 Pipeline::~Pipeline() {
   const auto vkDevice = context_.GetDevice().Logical();
@@ -47,7 +50,7 @@ Pipeline::~Pipeline() {
 }
 
 Pipeline::Pipeline(Pipeline&& other) noexcept
-    : context_{other.context_}, pipelineLayout_{other.pipelineLayout_}, pipeline_{other.pipeline_} {
+    : context_{other.context_}, pipelineLayout_{other.pipelineLayout_}, pipeline_{other.pipeline_}, kind_{other.kind_} {
   other.pipelineLayout_ = VK_NULL_HANDLE;
   other.pipeline_ = VK_NULL_HANDLE;
 }
@@ -60,9 +63,12 @@ VkPipeline Pipeline::Handle() const noexcept {
   return pipeline_;
 }
 
+PipelineKind Pipeline::Kind() const noexcept {
+  return kind_;
+}
+
 std::expected<VkPipelineLayout, PipelineError>
-Pipeline::createPipelineLayout_(const Context& context,
-                                std::array<VkDescriptorSetLayout, 2> descriptorLayouts) noexcept {
+Pipeline::createPipelineLayout_(const Context& context, std::span<const VkDescriptorSetLayout> layouts) noexcept {
   const auto vkDevice = context.GetDevice().Logical();
 
   VkPushConstantRange pushConstantRange{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
@@ -70,8 +76,8 @@ Pipeline::createPipelineLayout_(const Context& context,
                                         .size = sizeof(ObjectPushConstants)};
 
   VkPipelineLayoutCreateInfo pipelineLayoutInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-                                                .setLayoutCount = descriptorLayouts.size(),
-                                                .pSetLayouts = descriptorLayouts.data(),
+                                                .setLayoutCount = static_cast<uint32_t>(layouts.size()),
+                                                .pSetLayouts = layouts.data(),
                                                 .pushConstantRangeCount = 1,
                                                 .pPushConstantRanges = &pushConstantRange};
 
