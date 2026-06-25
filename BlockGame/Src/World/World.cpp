@@ -1,5 +1,7 @@
 #include "World.hpp"
 
+#include <array>
+
 World::World(vlk::Renderer& renderer)
     : chunkMesher_(renderer, worldStore_, blockRegistry_), chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {}
 
@@ -13,7 +15,60 @@ BlockType World::GetBlock(math::Vec3Int worldBlockPos) {
 }
 
 void World::SetBlock(math::Vec3Int worldBlockPos, BlockType blockType) {
-  throw std::logic_error("not implemented");
+  const math::Vec3Int chunkCoord{
+      .X = worldBlockPos.X / static_cast<std::int32_t>(Chunk::ChunkWidth),
+      .Y = worldBlockPos.Y / static_cast<std::int32_t>(Chunk::ChunkHeight),
+      .Z = worldBlockPos.Z / static_cast<std::int32_t>(Chunk::ChunkDepth),
+  };
+  const math::Vec3Int localCoord{
+      .X = worldBlockPos.X % static_cast<std::int32_t>(Chunk::ChunkWidth),
+      .Y = worldBlockPos.Y % static_cast<std::int32_t>(Chunk::ChunkHeight),
+      .Z = worldBlockPos.Z % static_cast<std::int32_t>(Chunk::ChunkDepth),
+  };
+
+  {
+    auto writeView = worldStore_.AcquireWriteView();
+    Chunk* chunk = writeView.GetChunk(chunkCoord);
+    if (chunk == nullptr)
+      return;
+
+    if (chunk->BlockAt(localCoord) == blockType)
+      return;
+
+    chunk->SetBlock(localCoord, blockType);
+  }
+
+  std::array<math::Vec3Int, 7> chunksToRebuild{chunkCoord};
+  std::size_t chunkCount = 1;
+
+  auto addChunk = [&](const math::Vec3Int coord) {
+    if (coord.X < 0 || coord.X >= WorldStore::WorldWidth || coord.Y < 0 || coord.Y >= WorldStore::WorldHeight ||
+        coord.Z < 0 || coord.Z >= WorldStore::WorldDepth) {
+      return;
+    }
+
+    chunksToRebuild[chunkCount++] = coord;
+  };
+
+  if (localCoord.X == 0)
+    addChunk({.X = chunkCoord.X - 1, .Y = chunkCoord.Y, .Z = chunkCoord.Z});
+  if (localCoord.X == static_cast<std::int32_t>(Chunk::ChunkWidth) - 1)
+    addChunk({.X = chunkCoord.X + 1, .Y = chunkCoord.Y, .Z = chunkCoord.Z});
+
+  if (localCoord.Y == 0)
+    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y - 1, .Z = chunkCoord.Z});
+  if (localCoord.Y == static_cast<std::int32_t>(Chunk::ChunkHeight) - 1)
+    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y + 1, .Z = chunkCoord.Z});
+
+  if (localCoord.Z == 0)
+    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y, .Z = chunkCoord.Z - 1});
+  if (localCoord.Z == static_cast<std::int32_t>(Chunk::ChunkDepth) - 1)
+    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y, .Z = chunkCoord.Z + 1});
+
+  for (std::size_t i = 0; i < chunkCount; i++) {
+    chunkMesher_.RequestUnload(chunksToRebuild[i]);
+    chunkMesher_.RequestLoad(chunksToRebuild[i]);
+  }
 }
 
 std::optional<World::BlockHit> World::RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance) {
@@ -51,9 +106,11 @@ std::optional<World::BlockHit> World::RaycastBlock(glm::vec3 origin, glm::vec3 d
     sideDist.z = (static_cast<float>(blockPos.z + 1) - origin.z) * deltaDist.z;
   }
 
+  const auto worldView = worldStore_.AcquireReadView();
+
   float distance = 0.0f;
   while (distance <= maxDistance) {
-    if (auto result = worldStore_.TryGetBlockType({.X = blockPos.x, .Y = blockPos.y, .Z = blockPos.z});
+    if (auto result = worldView.TryGetBlockType({.X = blockPos.x, .Y = blockPos.y, .Z = blockPos.z});
         result && *result != BlockType::Air) {
       return BlockHit{
           .Position = {.X = blockPos.x, .Y = blockPos.y, .Z = blockPos.z},

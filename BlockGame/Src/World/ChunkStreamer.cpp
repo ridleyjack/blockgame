@@ -14,18 +14,20 @@ void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
   ChunkSet desiredMeshChunks = buildChunkSet_(playerChunk, LoadRadius);
   ChunkSet desiredDataChunks = buildChunkSet_(playerChunk, LoadRadius + 1);
 
+  auto worldView = worldStore_.AcquireWriteView();
+
   // Update chunk block data.
   // Chunk mesh generation depends on the block data for the desired chunk to mesh and its neighbors.
   for (auto& chunkCoord : desiredDataChunks) {
-    if (const auto result = worldStore_.TryGetChunk(chunkCoord); !result) {
-      worldStore_.StoreChunk(chunkCoord, worldGenerator_.GenerateChunk(chunkCoord));
+    if (const auto result = worldView.GetChunk(chunkCoord); !result) {
+      worldView.StoreChunk(chunkCoord, worldGenerator_.GenerateChunk(chunkCoord));
     }
   }
 
-  // TODO: Remove unneeded data chunks.
+  // TODO: Remove unneeded dataChunks.
 
   // Update Mesh chunks.
-  // Remove unneeded chunks
+  // Remove unneeded mesh chunks
   for (auto it = loadedChunks_.begin(); it != loadedChunks_.end();) {
     if (!desiredMeshChunks.contains(*it)) {
       mesher_.RequestUnload(*it);
@@ -36,12 +38,14 @@ void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
   }
 
   loadedChunkList_.clear();
-  // Request missing chunks be built.
+  // Request missing mesh chunks be built.
   for (const auto& chunk : desiredMeshChunks) {
     if (!loadedChunks_.contains(chunk)) {
       mesher_.RequestLoad(chunk);
       loadedChunks_.insert(chunk);
     }
+    if (mesher_.ChunkStatus(chunk) == ChunkMeshStatus::MissingDependencies)
+      mesher_.RequestLoad(chunk);
     loadedChunkList_.push_back(chunk);
   }
 }

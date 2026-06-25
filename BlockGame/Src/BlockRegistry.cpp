@@ -25,6 +25,6 @@ BlockRegistry::BlockRegistry() {
   blockDefs_[toIndex(BlockType::Stone)].FaceTextures.fill(BlockTexture::Stone);
 }
 
-BlockRegistry::BlockDef& BlockRegistry::GetBlockDef(BlockType blockType) {
+const BlockRegistry::BlockDef& BlockRegistry::GetBlockDef(BlockType blockType) const {
   return blockDefs_[static_cast<std::size_t>(blockType)];
 }

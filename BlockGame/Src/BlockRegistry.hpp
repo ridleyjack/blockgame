@@ -22,7 +22,7 @@ public:
 
   BlockRegistry();
 
-  BlockDef& GetBlockDef(BlockType blockType);
+  const BlockDef& GetBlockDef(BlockType blockType) const;
 
 private:
   std::array<BlockDef, BlockTypeCount> blockDefs_{};

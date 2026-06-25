@@ -134,6 +134,7 @@ void GameLayer::handleKeyInput(const int keycode, const bool state) {
     } else {
       auto pos2 = result->Position;
       std::println("Hit:{} at (x:{},y:{},z:{})", static_cast<int>(result->BlockType), pos2.X, pos2.Y, pos2.Z);
+      world_.SetBlock(pos2, BlockType::Air);
     }
     break;
   }

@@ -20,12 +20,13 @@ enum class ChunkMeshStatus : std::uint8_t {
   Unloaded = 0,
   Building,
   Uploaded,
+  MissingDependencies,
 };
 
 struct ChunkMesh {
   engine::graphics::MeshHandle Mesh{};
   std::vector<gfx::Vertex> Vertices{};
-  std::vector<uint32_t> Indices{};
+  std::vector<std::uint32_t> Indices{};
 
   bool HasVertices() const noexcept {
     return !Vertices.empty();
@@ -47,11 +48,14 @@ struct BlockFaces {
 
 struct ChunkBuildJob {
   math::Vec3Int Coord{};
+  std::uint64_t Generation{};
 };
 
 struct ChunkBuildResult {
   math::Vec3Int Coord{};
   ChunkMesh Mesh{};
+  ChunkMeshStatus Status{};
+  std::uint64_t Generation{};
 };
 
 class WorldStore;
@@ -75,6 +79,7 @@ private:
     ChunkMesh Mesh{};
     ChunkMeshStatus Status{};
     bool Wanted{};
+    std::uint64_t Generation{};
   };
 
   vlk::Renderer& renderer_;
@@ -95,7 +100,7 @@ private:
 
   void enqueueBuild_(math::Vec3Int mapCoord);
 
-  ChunkMesh buildChunk_(math::Vec3Int chunkCoord);
+  std::optional<ChunkMesh> buildChunk_(math::Vec3Int chunkCoord);
   void buildVertices_(ChunkMesh& mesh, const BlockFaces& faces, std::uint32_t blockType, float z, float y, float x);
   void buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, std::uint32_t numFaces);
 };

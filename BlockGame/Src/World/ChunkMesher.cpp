@@ -42,9 +42,9 @@ void ChunkMesher::RequestUnload(const math::Vec3Int& mapCoord) {
   if (meshSlot.Status == ChunkMeshStatus::Uploaded) {
     if (mesh.HasVertices())
       renderer_.DeleteMesh(mesh.Mesh);
-    meshSlot.Status = ChunkMeshStatus::Unloaded;
     mesh = {};
   }
+  meshSlot.Status = ChunkMeshStatus::Unloaded;
 }
 
 ChunkMeshStatus ChunkMesher::ChunkStatus(const math::Vec3Int& mapCoord) {
@@ -56,24 +56,28 @@ void ChunkMesher::Update() {
     auto& result = *opt;
 
     auto& meshSlot = meshes_[result.Coord.Z, result.Coord.Y, result.Coord.X];
-    if (meshSlot.Wanted) {
-      if (result.Mesh.HasVertices()) {
-        const auto handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
-        meshSlot.Mesh = std::move(result.Mesh);
-        meshSlot.Mesh.Mesh = handle;
-      } else {
-        meshSlot.Mesh = {};
-      }
-      meshSlot.Status = ChunkMeshStatus::Uploaded;
+    if (meshSlot.Generation != result.Generation || !meshSlot.Wanted)
+      continue; // Discard outdated or un-needed result.
 
+    meshSlot = {.Generation = meshSlot.Generation};
+    if (result.Status == ChunkMeshStatus::MissingDependencies) {
+      meshSlot.Status = ChunkMeshStatus::MissingDependencies;
+      continue; // The caller handles missing dependencies.
+    }
+
+    // Only meshes with vertices are uploaded to the GPU.
+    if (result.Mesh.HasVertices()) {
+      const auto handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
+      meshSlot.Mesh = std::move(result.Mesh);
+      meshSlot.Mesh.Mesh = handle;
+      meshSlot.Status = ChunkMeshStatus::Uploaded;
     } else {
-      meshSlot.Mesh = {};
       meshSlot.Status = ChunkMeshStatus::Unloaded;
     }
   }
 }
 
-void ChunkMesher::startWorkers_(std::uint32_t count) {
+void ChunkMesher::startWorkers_(const std::uint32_t count) {
   stop_ = false;
   for (std::uint32_t i = 0; i < count; i++) {
     workers_.emplace_back(&ChunkMesher::workerLoop_, this);
@@ -98,28 +102,67 @@ void ChunkMesher::workerLoop_() {
     if (!job) {
       return; // Stop requested.
     }
-    ChunkMesh mesh = buildChunk_(job->Coord);
-    resultQueue_.Push({job->Coord, std::move(mesh)});
+    auto meshResult = buildChunk_(job->Coord);
+
+    ChunkBuildResult buildResult{.Coord = job->Coord, .Generation = job->Generation};
+    if (!meshResult) {
+      buildResult.Status = ChunkMeshStatus::MissingDependencies;
+    } else {
+      buildResult.Status = ChunkMeshStatus::Building; // Building includes uploading.
+      buildResult.Mesh = std::move(*meshResult);
+    }
+    resultQueue_.Push(buildResult);
   }
 }
 
-void ChunkMesher::enqueueBuild_(math::Vec3Int mapCoord) {
+void ChunkMesher::enqueueBuild_(const math::Vec3Int mapCoord) {
   ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
   meshSlot.Wanted = true;
   if (meshSlot.Status == ChunkMeshStatus::Building || meshSlot.Status == ChunkMeshStatus::Uploaded)
-    return;
+    return; // Must request deletion of chunk before building it again.
 
+  meshSlot.Generation++;
   meshSlot.Status = ChunkMeshStatus::Building;
-  buildQueue_.Push({mapCoord});
+  buildQueue_.Push({.Coord = mapCoord, .Generation = meshSlot.Generation});
 }
 
-ChunkMesh ChunkMesher::buildChunk_(math::Vec3Int chunkCoord) {
-  WorldStore::ReadLock readLock = worldStore_.AcquireReadLock();
-  auto chunk = worldStore_.TryGetChunk(chunkCoord);
-  if (chunk == nullptr)
-    throw std::runtime_error("Generating mesh for un-created chunk");
-  auto& blocks = chunk->Blocks;
+std::optional<ChunkMesh> ChunkMesher::buildChunk_(const math::Vec3Int chunkCoord) {
+  const auto worldView = worldStore_.AcquireReadView();
 
+  const auto chunk = worldView.GetChunk(chunkCoord);
+  if (chunk == nullptr)
+    return std::nullopt; // Current chunk has not been generated.
+
+  // Verify required neighboring chunks have been generated.
+  constexpr std::array<math::Vec3Int, 6> offsets{
+      {
+       {.X = -1, .Y = 0, .Z = 0},
+       {.X = 1, .Y = 0, .Z = 0},
+       {.X = 0, .Y = -1, .Z = 0},
+       {.X = 0, .Y = 1, .Z = 0},
+       {.X = 0, .Y = 0, .Z = -1},
+       {.X = 0, .Y = 0, .Z = 1},
+       }
+  };
+
+  for (const auto offset : offsets) {
+    const math::Vec3Int neighbor{
+        .X = chunkCoord.X + offset.X,
+        .Y = chunkCoord.Y + offset.Y,
+        .Z = chunkCoord.Z + offset.Z,
+    };
+
+    if (neighbor.X < 0 || neighbor.X >= WorldStore::WorldWidth || neighbor.Y < 0 ||
+        neighbor.Y >= WorldStore::WorldHeight || neighbor.Z < 0 || neighbor.Z >= WorldStore::WorldDepth) {
+      continue;
+    }
+
+    if (worldView.GetChunk(neighbor) == nullptr)
+      return std::nullopt;
+  }
+
+  // Create the mesh.
+  auto& blocks = chunk->Blocks;
   ChunkMesh mesh{};
   for (std::int32_t z = 0; z < blocks.Depth(); z++) {
     for (std::int32_t y = 0; y < blocks.Height(); y++) {
@@ -150,12 +193,10 @@ ChunkMesh ChunkMesher::buildChunk_(math::Vec3Int chunkCoord) {
               worldCoord.X >= WorldStore::WorldWidth * Chunk::ChunkWidth)
             return 0;
 
-          Chunk* neighbour = worldStore_.TryGetChunk({static_cast<std::int32_t>(worldCoord.X / Chunk::ChunkWidth),
-                                                      static_cast<std::int32_t>(worldCoord.Y / Chunk::ChunkHeight),
-                                                      static_cast<std::int32_t>(worldCoord.Z / Chunk::ChunkDepth)});
-          if (neighbour == nullptr)
-            throw std::runtime_error("Missing neighbour chunk when generating mesh");
-
+          const Chunk* neighbour = worldView.GetChunk({static_cast<std::int32_t>(worldCoord.X / Chunk::ChunkWidth),
+                                                       static_cast<std::int32_t>(worldCoord.Y / Chunk::ChunkHeight),
+                                                       static_cast<std::int32_t>(worldCoord.Z / Chunk::ChunkDepth)});
+          assert(neighbour != nullptr);
           return neighbour->Blocks[worldCoord.Z % Chunk::ChunkDepth,
                                    worldCoord.Y % Chunk::ChunkHeight,
                                    worldCoord.X % Chunk::ChunkWidth];
@@ -194,7 +235,7 @@ ChunkMesh ChunkMesher::buildChunk_(math::Vec3Int chunkCoord) {
 
 void ChunkMesher::buildVertices_(ChunkMesh& mesh,
                                  const BlockFaces& faces,
-                                 std::uint32_t blockType,
+                                 const std::uint32_t blockType,
                                  float z,
                                  float y,
                                  float x) {
@@ -282,7 +323,7 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
   }
 }
 
-void ChunkMesher::buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, const std::uint32_t numFaces) {
+void ChunkMesher::buildIndices_(ChunkMesh& mesh, const std::uint32_t baseVertex, const std::uint32_t numFaces) {
   constexpr std::size_t indicesPerFace = 6;
   constexpr std::uint32_t verticesPerFace = 4;
   static constexpr std::array<std::uint32_t, indicesPerFace> faceIndices{
