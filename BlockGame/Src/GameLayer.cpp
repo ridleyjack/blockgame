@@ -66,9 +66,9 @@ void GameLayer::OnRender() {
   }
 
   for (const auto& meshCoords : world_.LoadedChunks()) {
-    const ChunkMesh& mesh{world_.Mesh(meshCoords)};
-    if (mesh.HasVertices())
-      renderer.Submit(renderItem.Pipeline, mesh.Mesh, renderItem.Material, renderItem.PushConstants);
+    const auto meshHandle = world_.Mesh(meshCoords);
+    if (meshHandle)
+      renderer.Submit(renderItem.Pipeline, *meshHandle, renderItem.Material, renderItem.PushConstants);
   }
 
   if (blockHit_) {

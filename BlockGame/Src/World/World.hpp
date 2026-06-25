@@ -41,7 +41,7 @@ public:
   std::optional<BlockHit> RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance);
 
   std::span<const math::Vec3Int> LoadedChunks() const noexcept;
-  const ChunkMesh& Mesh(const math::Vec3Int& chunkCoord) const;
+  std::optional<gfx::MeshHandle> Mesh(const math::Vec3Int& chunkCoord) const;
 
 private:
   WorldStore worldStore_;

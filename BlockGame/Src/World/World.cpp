@@ -5,33 +5,24 @@
 World::World(vlk::Renderer& renderer)
     : chunkMesher_(renderer, worldStore_, blockRegistry_), chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {}
 
-void World::Update(math::Vec3Int playerPosition) {
+void World::Update(const math::Vec3Int playerPosition) {
   chunkStreamer_.Update(playerPosition);
   chunkMesher_.Update();
 }
 
-BlockType World::GetBlock(math::Vec3Int worldBlockPos) {
+BlockType World::GetBlock(const math::Vec3Int worldBlockPos) {
   return worldGenerator_.BlockAt(worldBlockPos);
 }
 
-void World::SetBlock(math::Vec3Int worldBlockPos, BlockType blockType) {
-  const math::Vec3Int chunkCoord{
-      .X = worldBlockPos.X / static_cast<std::int32_t>(Chunk::ChunkWidth),
-      .Y = worldBlockPos.Y / static_cast<std::int32_t>(Chunk::ChunkHeight),
-      .Z = worldBlockPos.Z / static_cast<std::int32_t>(Chunk::ChunkDepth),
-  };
-  const math::Vec3Int localCoord{
-      .X = worldBlockPos.X % static_cast<std::int32_t>(Chunk::ChunkWidth),
-      .Y = worldBlockPos.Y % static_cast<std::int32_t>(Chunk::ChunkHeight),
-      .Z = worldBlockPos.Z % static_cast<std::int32_t>(Chunk::ChunkDepth),
-  };
+void World::SetBlock(const math::Vec3Int worldBlockPos, const BlockType blockType) {
+  const math::Vec3Int chunkCoord = worldStore_.WorldToChunkPosition(worldBlockPos);
+  const math::Vec3Int localCoord = worldStore_.WorldToChunkLocalPosition(worldBlockPos);
 
   {
     auto writeView = worldStore_.AcquireWriteView();
     Chunk* chunk = writeView.GetChunk(chunkCoord);
     if (chunk == nullptr)
       return;
-
     if (chunk->BlockAt(localCoord) == blockType)
       return;
 
@@ -66,8 +57,10 @@ void World::SetBlock(math::Vec3Int worldBlockPos, BlockType blockType) {
     addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y, .Z = chunkCoord.Z + 1});
 
   for (std::size_t i = 0; i < chunkCount; i++) {
-    chunkMesher_.RequestUnload(chunksToRebuild[i]);
-    chunkMesher_.RequestLoad(chunksToRebuild[i]);
+    auto chunk = chunksToRebuild[i];
+    if (chunkMesher_.ChunkStatus(chunk) == ChunkMeshStatus::Unloaded)
+      continue; // No need to rebuild unloaded meshes.
+    chunkMesher_.RequestRebuild(chunk);
   }
 }
 
@@ -141,6 +134,6 @@ std::span<const math::Vec3Int> World::LoadedChunks() const noexcept {
   return chunkStreamer_.LoadedChunks();
 }
 
-const ChunkMesh& World::Mesh(const math::Vec3Int& chunkCoord) const {
+std::optional<gfx::MeshHandle> World::Mesh(const math::Vec3Int& chunkCoord) const {
   return chunkMesher_.Mesh(chunkCoord);
 }

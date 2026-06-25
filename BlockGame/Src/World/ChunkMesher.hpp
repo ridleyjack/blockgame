@@ -23,16 +23,6 @@ enum class ChunkMeshStatus : std::uint8_t {
   MissingDependencies,
 };
 
-struct ChunkMesh {
-  engine::graphics::MeshHandle Mesh{};
-  std::vector<gfx::Vertex> Vertices{};
-  std::vector<std::uint32_t> Indices{};
-
-  bool HasVertices() const noexcept {
-    return !Vertices.empty();
-  }
-};
-
 struct BlockFaces {
   bool Front{};
   bool Back{};
@@ -44,6 +34,15 @@ struct BlockFaces {
   constexpr std::uint8_t NumEnabled() const noexcept {
     return static_cast<std::uint8_t>(Front + Back + Right + Left + Top + Bottom);
   };
+};
+
+struct ChunkMesh {
+  std::vector<gfx::Vertex> Vertices{};
+  std::vector<std::uint32_t> Indices{};
+
+  bool HasVertices() const noexcept {
+    return !Vertices.empty();
+  }
 };
 
 struct ChunkBuildJob {
@@ -65,9 +64,10 @@ public:
   ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry);
   ~ChunkMesher();
 
-  const ChunkMesh& Mesh(const math::Vec3Int& mapCoord) const;
+  std::optional<gfx::MeshHandle> Mesh(const math::Vec3Int& mapCoord) const;
 
   void RequestLoad(const math::Vec3Int& mapCoord);
+  void RequestRebuild(const math::Vec3Int& mapCoord);
   void RequestUnload(const math::Vec3Int& mapCoord);
 
   ChunkMeshStatus ChunkStatus(const math::Vec3Int& mapCoord);
@@ -76,10 +76,11 @@ public:
 
 private:
   struct ChunkMeshSlot {
-    ChunkMesh Mesh{};
+    std::optional<gfx::MeshHandle> Handle{};
     ChunkMeshStatus Status{};
-    bool Wanted{};
     std::uint64_t Generation{};
+
+    bool Wanted{};
   };
 
   vlk::Renderer& renderer_;

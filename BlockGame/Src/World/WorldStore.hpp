@@ -13,8 +13,20 @@ public:
   using ReadLock = std::shared_lock<std::shared_mutex>;
   using WriteLock = std::unique_lock<std::shared_mutex>;
 
-  static constexpr math::Vec3Int WorldToChunkPosition(math::Vec3Int worldPosition);
-  static constexpr math::Vec3Int WorldToChunkLocalPosition(math::Vec3Int worldPosition);
+  // WorldToChunkPosition returns the coordinate containing the block at worldPosition.
+  static constexpr math::Vec3Int WorldToChunkPosition(const math::Vec3Int worldPosition) {
+    assert(worldPosition.X >= 0 && worldPosition.Y >= 0 && worldPosition.Z >= 0);
+    return {.X = worldPosition.X / static_cast<std::int32_t>(Chunk::ChunkWidth),
+            .Y = worldPosition.Y / static_cast<std::int32_t>(Chunk::ChunkHeight),
+            .Z = worldPosition.Z / static_cast<std::int32_t>(Chunk::ChunkDepth)};
+  }
+  // WorldToChunkLocalPosition returns the block coordinate within its chunk for worldPosition.
+  static constexpr math::Vec3Int WorldToChunkLocalPosition(const math::Vec3Int worldPosition) {
+    assert(worldPosition.X >= 0 && worldPosition.Y >= 0 && worldPosition.Z >= 0);
+    return {.X = worldPosition.X % static_cast<std::int32_t>(Chunk::ChunkWidth),
+            .Y = worldPosition.Y % static_cast<std::int32_t>(Chunk::ChunkHeight),
+            .Z = worldPosition.Z % static_cast<std::int32_t>(Chunk::ChunkDepth)};
+  }
 
   class ReadView {
   public:

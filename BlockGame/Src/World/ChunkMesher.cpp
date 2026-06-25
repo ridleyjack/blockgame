@@ -25,25 +25,30 @@ ChunkMesher::~ChunkMesher() {
   stopWorkers_();
 }
 
-const ChunkMesh& ChunkMesher::Mesh(const math::Vec3Int& mapCoord) const {
+std::optional<gfx::MeshHandle> ChunkMesher::Mesh(const math::Vec3Int& mapCoord) const {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
-  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Mesh;
+  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Handle;
 }
 
 void ChunkMesher::RequestLoad(const math::Vec3Int& mapCoord) {
+  ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
+  if (meshSlot.Status == ChunkMeshStatus::Building || meshSlot.Status == ChunkMeshStatus::Uploaded)
+    return; // Must request deletion of mesh before building it again.
+  enqueueBuild_(mapCoord);
+}
+
+void ChunkMesher::RequestRebuild(const math::Vec3Int& mapCoord) {
   enqueueBuild_(mapCoord);
 }
 
 void ChunkMesher::RequestUnload(const math::Vec3Int& mapCoord) {
   auto& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
-  auto& mesh = meshSlot.Mesh;
 
+  if (meshSlot.Handle)
+    renderer_.DeleteMesh(*meshSlot.Handle);
+
+  meshSlot.Handle = std::nullopt;
   meshSlot.Wanted = false;
-  if (meshSlot.Status == ChunkMeshStatus::Uploaded) {
-    if (mesh.HasVertices())
-      renderer_.DeleteMesh(mesh.Mesh);
-    mesh = {};
-  }
   meshSlot.Status = ChunkMeshStatus::Unloaded;
 }
 
@@ -59,20 +64,21 @@ void ChunkMesher::Update() {
     if (meshSlot.Generation != result.Generation || !meshSlot.Wanted)
       continue; // Discard outdated or un-needed result.
 
-    meshSlot = {.Generation = meshSlot.Generation};
     if (result.Status == ChunkMeshStatus::MissingDependencies) {
       meshSlot.Status = ChunkMeshStatus::MissingDependencies;
       continue; // The caller handles missing dependencies.
     }
 
+    if (meshSlot.Handle)
+      renderer_.DeleteMesh(*meshSlot.Handle);
+    meshSlot = {.Handle = std::nullopt,
+                .Status = ChunkMeshStatus::Uploaded,
+                .Generation = meshSlot.Generation,
+                .Wanted = true};
+
     // Only meshes with vertices are uploaded to the GPU.
     if (result.Mesh.HasVertices()) {
-      const auto handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
-      meshSlot.Mesh = std::move(result.Mesh);
-      meshSlot.Mesh.Mesh = handle;
-      meshSlot.Status = ChunkMeshStatus::Uploaded;
-    } else {
-      meshSlot.Status = ChunkMeshStatus::Unloaded;
+      meshSlot.Handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
     }
   }
 }
@@ -117,10 +123,8 @@ void ChunkMesher::workerLoop_() {
 
 void ChunkMesher::enqueueBuild_(const math::Vec3Int mapCoord) {
   ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
-  meshSlot.Wanted = true;
-  if (meshSlot.Status == ChunkMeshStatus::Building || meshSlot.Status == ChunkMeshStatus::Uploaded)
-    return; // Must request deletion of chunk before building it again.
 
+  meshSlot.Wanted = true;
   meshSlot.Generation++;
   meshSlot.Status = ChunkMeshStatus::Building;
   buildQueue_.Push({.Coord = mapCoord, .Generation = meshSlot.Generation});
