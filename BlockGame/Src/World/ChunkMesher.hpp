@@ -64,7 +64,7 @@ public:
   ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry);
   ~ChunkMesher();
 
-  std::optional<gfx::MeshHandle> Mesh(const math::Vec3Int& mapCoord) const;
+  std::optional<gfx::MeshHandle> RenderableMesh(const math::Vec3Int& mapCoord);
 
   void RequestLoad(const math::Vec3Int& mapCoord);
   void RequestRebuild(const math::Vec3Int& mapCoord);
@@ -76,7 +76,8 @@ public:
 
 private:
   struct ChunkMeshSlot {
-    std::optional<gfx::MeshHandle> Handle{};
+    std::optional<gfx::MeshHandle> VisibleHandle{};
+    std::optional<gfx::MeshHandle> PendingHandle{};
     ChunkMeshStatus Status{};
     std::uint64_t Generation{};
 

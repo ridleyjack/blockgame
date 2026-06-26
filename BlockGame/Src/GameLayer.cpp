@@ -129,11 +129,8 @@ void GameLayer::handleKeyInput(const int keycode, const bool state) {
     auto pos = camera_.Position();
     auto dir = camera_.Forward();
     auto result = world_.RaycastBlock(pos, dir, 10);
-    if (!result) {
-      std::println("Miss");
-    } else {
+    if (result) {
       auto pos2 = result->Position;
-      std::println("Hit:{} at (x:{},y:{},z:{})", static_cast<int>(result->BlockType), pos2.X, pos2.Y, pos2.Z);
       world_.SetBlock(pos2, BlockType::Air);
     }
     break;

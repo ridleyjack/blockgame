@@ -134,6 +134,6 @@ std::span<const math::Vec3Int> World::LoadedChunks() const noexcept {
   return chunkStreamer_.LoadedChunks();
 }
 
-std::optional<gfx::MeshHandle> World::Mesh(const math::Vec3Int& chunkCoord) const {
-  return chunkMesher_.Mesh(chunkCoord);
+std::optional<gfx::MeshHandle> World::Mesh(const math::Vec3Int& chunkCoord) {
+  return chunkMesher_.RenderableMesh(chunkCoord);
 }

@@ -7,7 +7,6 @@
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <cstddef>
-#include <print>
 #include <thread>
 
 ChunkMesher::ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry)
@@ -25,9 +24,18 @@ ChunkMesher::~ChunkMesher() {
   stopWorkers_();
 }
 
-std::optional<gfx::MeshHandle> ChunkMesher::Mesh(const math::Vec3Int& mapCoord) const {
+std::optional<gfx::MeshHandle> ChunkMesher::RenderableMesh(const math::Vec3Int& mapCoord) {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
-  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Handle;
+
+  auto& mesh = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
+  if (mesh.PendingHandle && renderer_.IsMeshReady(*mesh.PendingHandle)) {
+    if (mesh.VisibleHandle)
+      renderer_.DeleteMesh(*mesh.VisibleHandle);
+    mesh.VisibleHandle = mesh.PendingHandle;
+    mesh.PendingHandle = std::nullopt;
+  }
+
+  return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].VisibleHandle;
 }
 
 void ChunkMesher::RequestLoad(const math::Vec3Int& mapCoord) {
@@ -44,10 +52,13 @@ void ChunkMesher::RequestRebuild(const math::Vec3Int& mapCoord) {
 void ChunkMesher::RequestUnload(const math::Vec3Int& mapCoord) {
   auto& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
 
-  if (meshSlot.Handle)
-    renderer_.DeleteMesh(*meshSlot.Handle);
+  if (meshSlot.VisibleHandle)
+    renderer_.DeleteMesh(*meshSlot.VisibleHandle);
+  if (meshSlot.PendingHandle)
+    renderer_.DeleteMesh(*meshSlot.PendingHandle);
 
-  meshSlot.Handle = std::nullopt;
+  meshSlot.VisibleHandle = std::nullopt;
+  meshSlot.PendingHandle = std::nullopt;
   meshSlot.Wanted = false;
   meshSlot.Status = ChunkMeshStatus::Unloaded;
 }
@@ -69,16 +80,31 @@ void ChunkMesher::Update() {
       continue; // The caller handles missing dependencies.
     }
 
-    if (meshSlot.Handle)
-      renderer_.DeleteMesh(*meshSlot.Handle);
-    meshSlot = {.Handle = std::nullopt,
-                .Status = ChunkMeshStatus::Uploaded,
-                .Generation = meshSlot.Generation,
-                .Wanted = true};
+    meshSlot.Status = ChunkMeshStatus::Uploaded;
+
+    // Promote pending to visible if done or delete it.
+    if (meshSlot.PendingHandle) {
+      if (renderer_.IsMeshReady(*meshSlot.PendingHandle)) {
+        if (meshSlot.VisibleHandle)
+          renderer_.DeleteMesh(*meshSlot.VisibleHandle);
+        meshSlot.VisibleHandle = meshSlot.PendingHandle;
+      } else {
+        renderer_.DeleteMesh(*meshSlot.PendingHandle);
+      }
+      meshSlot.PendingHandle = std::nullopt;
+    }
 
     // Only meshes with vertices are uploaded to the GPU.
     if (result.Mesh.HasVertices()) {
-      meshSlot.Handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
+      const auto handle = renderer_.CreateMesh({.Vertices = result.Mesh.Vertices, .Indices = result.Mesh.Indices});
+      meshSlot.PendingHandle = handle;
+    } else {
+      if (meshSlot.VisibleHandle)
+        renderer_.DeleteMesh(*meshSlot.VisibleHandle);
+      if (meshSlot.PendingHandle)
+        renderer_.DeleteMesh(*meshSlot.PendingHandle);
+      meshSlot.VisibleHandle = std::nullopt;
+      meshSlot.PendingHandle = std::nullopt;
     }
   }
 }

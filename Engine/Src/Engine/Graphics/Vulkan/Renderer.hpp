@@ -66,24 +66,23 @@ public:
 
   std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera);
   void EndFrame();
-  void Submit(const PipelineHandle& pipelineHandle,
-              const MeshHandle& handle,
-              const MaterialHandle& material,
-              const ObjectPushConstants& model);
+  void
+  Submit(PipelineHandle pipelineHandle, MeshHandle handle, MaterialHandle material, const ObjectPushConstants& model);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
 
   PipelineHandle CreatePipeline(const PipelineCreateInfo& info);
-  void DeletePipeline(const PipelineHandle& handle);
+  void DeletePipeline(PipelineHandle handle);
 
   MeshHandle CreateMesh(const Mesh& mesh);
-  void DeleteMesh(const MeshHandle& handle);
+  void DeleteMesh(MeshHandle handle);
+  bool IsMeshReady(MeshHandle mesh) noexcept;
 
   TextureHandle CreateTexture(const std::span<const std::byte>& data, int width, int height);
   resources::TextureArrayBuilder BeginTextureArray(const resources::TextureArrayInfo& info);
 
-  MaterialHandle CreateMaterial(const TextureHandle& texture);
+  MaterialHandle CreateMaterial(TextureHandle texture);
 
   glm::mat4 MakeProjection(const ProjectionSettings& settings) const noexcept;
 

@@ -243,9 +243,9 @@ void Renderer::EndFrame() {
   frameContext_.CurrentFrame = (frameContext_.CurrentFrame + 1) % config::MaxFramesInFlight;
 }
 
-void Renderer::Submit(const PipelineHandle& pipelineHandle,
-                      const MeshHandle& handle,
-                      const MaterialHandle& material,
+void Renderer::Submit(const PipelineHandle pipelineHandle,
+                      const MeshHandle handle,
+                      const MaterialHandle material,
                       const ObjectPushConstants& model) {
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
@@ -315,7 +315,7 @@ PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
   return PipelineHandle{*pipeline};
 }
 
-void Renderer::DeletePipeline(const PipelineHandle& handle) {
+void Renderer::DeletePipeline(const PipelineHandle handle) {
   pipelineCache_.DestroyPipeline(handle.PipelineID);
 }
 
@@ -324,12 +324,16 @@ MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
   return MeshHandle{.MeshID = result};
 }
 
-void Renderer::DeleteMesh(const MeshHandle& handle) {
+void Renderer::DeleteMesh(const MeshHandle handle) {
   std::uint32_t retireFrame = frameContext_.CurrentFrame;
   if (!frameContext_.FrameActive) // Retire after last frame is done.
     retireFrame = (frameContext_.CurrentFrame + config::MaxFramesInFlight - 1) % config::MaxFramesInFlight;
 
   meshAllocator_.DeleteDeferred(handle.MeshID, retireFrame);
+}
+
+bool Renderer::IsMeshReady(const MeshHandle mesh) noexcept {
+  return meshAllocator_.Get(mesh.MeshID).State == MeshState::Ready;
 }
 
 TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
@@ -342,7 +346,7 @@ resources::TextureArrayBuilder Renderer::BeginTextureArray(const resources::Text
   return resources::TextureArrayBuilder{textureAllocator_};
 }
 
-MaterialHandle Renderer::CreateMaterial(const TextureHandle& texture) {
+MaterialHandle Renderer::CreateMaterial(const TextureHandle texture) {
   const std::uint32_t descriptorID = descriptorAllocator_.CreateTextureDescriptorSet(texture.TextureID);
   return MaterialHandle{.TextureID = texture.TextureID, .DescriptorSetID = descriptorID};
 }
