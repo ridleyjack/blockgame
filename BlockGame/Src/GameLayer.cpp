@@ -41,12 +41,13 @@ void GameLayer::OnUpdate(const float deltaTime) {
   const int playerZ = static_cast<int>(std::floor(camera_.Position().z / Chunk::ChunkDepth));
   world_.Update({playerX, 1, playerZ});
 
-  auto result = world_.RaycastBlock(camera_.Position(), camera_.Forward(), 10);
+  constexpr float maxDrawDistanceInBlocks = 10;
+  const auto result = world_.RaycastBlock(camera_.Position(), camera_.Forward(), maxDrawDistanceInBlocks);
   if (result) {
-    blockHit_ = true;
     blockHighlighter_.SetPosition(result->Position);
+    hoveredBlock_ = result->Position;
   } else
-    blockHit_ = false;
+    hoveredBlock_ = std::nullopt;
 }
 
 void GameLayer::OnRender() {
@@ -71,7 +72,7 @@ void GameLayer::OnRender() {
       renderer.Submit(renderItem.Pipeline, *meshHandle, renderItem.Material, renderItem.PushConstants);
   }
 
-  if (blockHit_) {
+  if (hoveredBlock_) {
     auto& highlightItem = blockHighlighter_.GetRenderItem();
     renderer.Submit(highlightItem.Pipeline,
                     blockHighlighter_.GetMesh(),
@@ -109,6 +110,12 @@ void GameLayer::OnMouseMoved(const engine::events::MouseMovedEvent& event) {
   camera_.Rotate(deltaX * sensitivity, deltaY * sensitivity);
 }
 
+void GameLayer::OnMouseButtonPressed(const engine::events::MouseButtonPressedEvent& event) {
+  if (event.Button == GLFW_MOUSE_BUTTON_LEFT && hoveredBlock_) {
+    world_.SetBlock(*hoveredBlock_, BlockType::Air);
+  }
+}
+
 void GameLayer::handleKeyInput(const int keycode, const bool state) {
   switch (keycode) {
   case GLFW_KEY_W:
@@ -123,18 +130,6 @@ void GameLayer::handleKeyInput(const int keycode, const bool state) {
   case GLFW_KEY_D:
     input_.Movement.Right = state;
     break;
-  case GLFW_KEY_P: {
-    if (!state)
-      return;
-    auto pos = camera_.Position();
-    auto dir = camera_.Forward();
-    auto result = world_.RaycastBlock(pos, dir, 10);
-    if (result) {
-      auto pos2 = result->Position;
-      world_.SetBlock(pos2, BlockType::Air);
-    }
-    break;
-  }
   case GLFW_KEY_ESCAPE:
     input_.Exit = true;
     break;

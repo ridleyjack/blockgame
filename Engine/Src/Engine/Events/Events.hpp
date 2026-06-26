@@ -22,6 +22,19 @@ struct MouseMovedEvent {
   double Y{};
 };
 
-using Event = std::variant<FramebufferResizedEvent, KeyPressedEvent, KeyReleasedEvent, MouseMovedEvent>;
+struct MouseButtonPressedEvent {
+  int Button{};
+};
+
+struct MouseButtonReleasedEvent {
+  int Button{};
+};
+
+using Event = std::variant<FramebufferResizedEvent,
+                           KeyPressedEvent,
+                           KeyReleasedEvent,
+                           MouseMovedEvent,
+                           MouseButtonPressedEvent,
+                           MouseButtonReleasedEvent>;
 
 } // namespace engine::events

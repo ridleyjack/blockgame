@@ -6,12 +6,14 @@ struct FramebufferResizedEvent;
 struct KeyPressedEvent;
 struct KeyReleasedEvent;
 struct MouseMovedEvent;
+struct MouseButtonPressedEvent;
+struct MouseButtonReleasedEvent;
 
 class IWindowEventHandler {
 public:
   virtual ~IWindowEventHandler() = default;
 
-  virtual void OnFramebufferResized(const FramebufferResizedEvent& event) = 0;
+  virtual void OnFramebufferResized(const FramebufferResizedEvent& event) {};
 };
 
 struct WindowEventDispatch {
@@ -28,8 +30,8 @@ class IKeyEventHandler {
 public:
   virtual ~IKeyEventHandler() = default;
 
-  virtual void OnKeyPressed(const KeyPressedEvent& event) = 0;
-  virtual void OnKeyReleased(const KeyReleasedEvent& event) = 0;
+  virtual void OnKeyPressed(const KeyPressedEvent& event) {};
+  virtual void OnKeyReleased(const KeyReleasedEvent& event) {};
 };
 
 struct KeyEventDispatch {
@@ -49,7 +51,9 @@ class IMouseEventHandler {
 public:
   virtual ~IMouseEventHandler() = default;
 
-  virtual void OnMouseMoved(const MouseMovedEvent& event) = 0;
+  virtual void OnMouseMoved(const MouseMovedEvent& event) {};
+  virtual void OnMouseButtonPressed(const MouseButtonPressedEvent& event) {};
+  virtual void OnMouseButtonReleased(const MouseButtonReleasedEvent& event) {};
 };
 
 struct MouseEventDispatch {
@@ -57,6 +61,12 @@ struct MouseEventDispatch {
 
   void operator()(const MouseMovedEvent& e) const {
     Handler.OnMouseMoved(e);
+  }
+  void operator()(const MouseButtonPressedEvent& e) const {
+    Handler.OnMouseButtonPressed(e);
+  }
+  void operator()(const MouseButtonReleasedEvent& e) const {
+    Handler.OnMouseButtonReleased(e);
   }
 
   template <typename T> void operator()(const T&) const {}

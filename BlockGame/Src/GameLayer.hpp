@@ -3,11 +3,13 @@
 #include "Camera.hpp"
 #include "BlockHighlighter.hpp"
 #include "TextureRegistry.hpp"
-#include "Engine/Application.hpp"
 
+#include "Engine/Application.hpp"
 #include "World/World.hpp"
 #include "Engine/ILayer.hpp"
 #include "Engine/Events/IEventHandler.hpp"
+
+#include <optional>
 
 namespace engine {
 class Application;
@@ -33,6 +35,7 @@ struct Movements {
 
 struct KeyInput {
   Movements Movement{};
+
   bool Exit{};
 };
 
@@ -50,6 +53,7 @@ public:
   void OnKeyPressed(const engine::events::KeyPressedEvent& event) override;
 
   void OnMouseMoved(const engine::events::MouseMovedEvent& event) override;
+  void OnMouseButtonPressed(const engine::events::MouseButtonPressedEvent& event) override;
 
 private:
   engine::Application& application_;
@@ -62,7 +66,7 @@ private:
   World world_;
 
   BlockHighlighter blockHighlighter_;
-  bool blockHit_{};
+  std::optional<math::Vec3Int> hoveredBlock_{};
 
   bool firstMouse_{true};
   float lastX_{}, lastY_{};

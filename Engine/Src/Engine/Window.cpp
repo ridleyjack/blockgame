@@ -64,6 +64,28 @@ void Window::Create() {
     events::MouseMovedEvent event(x, y);
     window.eventRaiser_.RaiseEvent(event);
   });
+
+  glfwSetMouseButtonCallback(handle_, [](GLFWwindow* handle, const int button, const int action, const int mods) {
+    const Window& window = *static_cast<Window*>(glfwGetWindowUserPointer(handle));
+
+    switch (action) {
+    case GLFW_PRESS: {
+      events::MouseButtonPressedEvent event{
+          .Button = button,
+      };
+      window.eventRaiser_.RaiseEvent(event);
+      break;
+    }
+    case GLFW_RELEASE: {
+      events::MouseButtonReleasedEvent event{
+          .Button = button,
+      };
+      window.eventRaiser_.RaiseEvent(event);
+      break;
+    }
+    default:;
+    }
+  });
 }
 
 void Window::Destroy() {

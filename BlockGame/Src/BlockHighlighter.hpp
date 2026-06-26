@@ -17,7 +17,7 @@ public:
 
   const RenderItem& GetRenderItem() const noexcept;
   gfx::MeshHandle GetMesh() const noexcept;
-
+  
   void SetPosition(math::Vec3Int worldBlockPos);
 
 private:
