@@ -2,6 +2,7 @@
 
 #include "Camera.hpp"
 #include "BlockHighlighter.hpp"
+#include "Crosshair.hpp"
 #include "TextureRegistry.hpp"
 
 #include "Engine/Application.hpp"
@@ -66,6 +67,7 @@ private:
   World world_;
 
   BlockHighlighter blockHighlighter_;
+  Crosshair crosshair_;
   std::optional<math::Vec3Int> hoveredBlock_{};
 
   bool firstMouse_{true};

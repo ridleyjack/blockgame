@@ -25,6 +25,8 @@ add_executable(Blockgame
         Src/BlockHighlighter.cpp
         Src/BlockHighlighter.hpp
         Src/RenderItem.hpp
+        Src/Crosshair.cpp
+        Src/Crosshair.hpp
 )
 
 target_include_directories(Blockgame
@@ -54,6 +56,8 @@ set(SHADERS
         terrain.frag
         highlight.vert
         highlight.frag
+        crosshair.vert
+        crosshair.frag
 )
 
 set(SPIRV_OUTPUTS)

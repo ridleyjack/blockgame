@@ -14,8 +14,8 @@ gfx::Mesh CreateBlockHighlightMesh() {
   constexpr float t = 0.035f;
   constexpr float e = 0.002f;
 
-  constexpr float lo = -0.5f - e;
-  constexpr float hi = 0.5f + e;
+  constexpr float lo = -e;
+  constexpr float hi = 1.0f + e;
   constexpr float stripScale = t / (hi - lo);
 
   gfx::Mesh mesh{};

@@ -275,6 +275,12 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
   x *= blockWidth;
 
   constexpr size_t verticesPerFace = 4;
+  const float x0 = x;
+  const float x1 = x + blockWidth;
+  const float y0 = y;
+  const float y1 = y + blockWidth;
+  const float z0 = z;
+  const float z1 = z + blockWidth;
 
   std::vector<gfx::Vertex>& vertices = mesh.Vertices;
   vertices.reserve(vertices.size() + verticesPerFace * faces.NumEnabled());
@@ -285,10 +291,10 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
     // +Z (Front)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y0, z1}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y0, z1}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y1, z1}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y1, z1}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
@@ -297,10 +303,10 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
     // -Z (Back)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y0, z0}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y0, z0}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y1, z0}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y1, z0}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
@@ -309,10 +315,10 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
     // +X (Right)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y0, z1}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y0, z0}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y1, z0}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y1, z1}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
@@ -321,10 +327,10 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
     // -X (Left)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y0, z0}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y0, z1}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y1, z1}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y1, z0}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
@@ -333,10 +339,10 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
     // +Y (Top)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, 0.5f + y, 0.5f + z},  .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, 0.5f + y, 0.5f + z},   .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, 0.5f + y, -0.5f + z},  .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, 0.5f + y, -0.5f + z}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y1, z1}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y1, z1}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y1, z0}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y1, z0}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
@@ -345,10 +351,10 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
     // -Y (Bottom)
     vertices.insert(vertices.end(),
                     {
-                        {.Position = {-0.5f + x, -0.5f + y, -0.5f + z}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, -0.5f + y, -0.5f + z},  .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {0.5f + x, -0.5f + y, 0.5f + z},   .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {-0.5f + x, -0.5f + y, 0.5f + z},  .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y0, z0}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y0, z0}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+                        {.Position = {x1, y0, z1}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+                        {.Position = {x0, y0, z1}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 }

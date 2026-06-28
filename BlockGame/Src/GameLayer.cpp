@@ -20,7 +20,8 @@ GameLayer::GameLayer(engine::Application& application)
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
       world_(application.GetRenderer()),
-      blockHighlighter_(application.GetRenderer()) {
+      blockHighlighter_(application.GetRenderer()),
+      crosshair_(application.GetRenderer()) {
   world_.Update({1, 1, 1});
 }
 
@@ -79,6 +80,9 @@ void GameLayer::OnRender() {
                     highlightItem.Material,
                     highlightItem.PushConstants);
   }
+
+  const auto& crosshairItem = crosshair_.GetRenderItem();
+  renderer.Submit(crosshairItem.Pipeline, crosshair_.GetMesh(), crosshairItem.Material, crosshairItem.PushConstants);
 
   renderer.EndFrame();
 }
