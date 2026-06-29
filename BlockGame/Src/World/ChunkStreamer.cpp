@@ -8,6 +8,9 @@ ChunkStreamer::ChunkStreamer(WorldStore& worldStore, WorldGenerator& generator, 
   const std::size_t size = (2 * LoadRadius + 1) * (2 * LoadRadius + 1) * worldStore_.WorldHeight;
   loadedChunkList_.reserve(size);
   loadedChunks_.reserve(size);
+
+  const std::size_t dataSize = (2 * (LoadRadius + 1) + 1) * (2 * (LoadRadius + 1) + 1) * worldStore_.WorldHeight;
+  loadedDataChunks_.reserve(dataSize);
 }
 
 void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
@@ -21,10 +24,20 @@ void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
   for (auto& chunkCoord : desiredDataChunks) {
     if (const auto result = worldView.GetChunk(chunkCoord); !result) {
       worldView.StoreChunk(chunkCoord, worldGenerator_.GenerateChunk(chunkCoord));
+      loadedDataChunks_.insert(chunkCoord);
     }
   }
 
-  // TODO: Remove unneeded dataChunks.
+  // Remove unneeded data chunks. This data will need to be saved and loaded from disk if persistent worlds are ever
+  // desired.
+  for (auto it = loadedDataChunks_.begin(); it != loadedDataChunks_.end();) {
+    if (!desiredDataChunks.contains(*it)) {
+      worldView.RemoveChunk(*it);
+      it = loadedDataChunks_.erase(it);
+    } else {
+      ++it;
+    }
+  }
 
   // Update Mesh chunks.
   // Remove unneeded mesh chunks

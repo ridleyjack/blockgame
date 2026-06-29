@@ -32,5 +32,7 @@ private:
   ChunkSet loadedChunks_{};
   std::vector<math::Vec3Int> loadedChunkList_{};
 
+  ChunkSet loadedDataChunks_{};
+
   ChunkSet buildChunkSet_(math::Vec3Int centerPosition, std::int32_t radius);
 };
