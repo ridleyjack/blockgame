@@ -14,6 +14,9 @@ ChunkStreamer::ChunkStreamer(WorldStore& worldStore, WorldGenerator& generator, 
 }
 
 void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
+  if (playerChunk == lastPlayerChunk_)
+    return;
+  
   ChunkSet desiredMeshChunks = buildChunkSet_(playerChunk, LoadRadius);
   ChunkSet desiredDataChunks = buildChunkSet_(playerChunk, LoadRadius + 1);
 

@@ -34,5 +34,7 @@ private:
 
   ChunkSet loadedDataChunks_{};
 
+  math::Vec3Int lastPlayerChunk_{-1, -1, -1};
+
   ChunkSet buildChunkSet_(math::Vec3Int centerPosition, std::int32_t radius);
 };
