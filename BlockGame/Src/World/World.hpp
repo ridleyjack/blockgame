@@ -6,6 +6,7 @@
 #include "BlockRegistry.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
+#include "Engine/Math/Frustum.hpp"
 #include "Engine/Math/Vec3Int.hpp"
 
 #include <glm/vec3.hpp>
@@ -42,6 +43,8 @@ public:
 
   std::span<const math::Vec3Int> LoadedChunks() const noexcept;
   std::optional<gfx::MeshHandle> Mesh(const math::Vec3Int& chunkCoord);
+
+  math::AABB ChunkBounds(math::Vec3Int chunkCoord) const noexcept;
 
 private:
   WorldStore worldStore_;

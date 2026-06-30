@@ -137,3 +137,20 @@ std::span<const math::Vec3Int> World::LoadedChunks() const noexcept {
 std::optional<gfx::MeshHandle> World::Mesh(const math::Vec3Int& chunkCoord) {
   return chunkMesher_.RenderableMesh(chunkCoord);
 }
+
+math::AABB World::ChunkBounds(const math::Vec3Int chunkCoord) const noexcept {
+  return {
+      .Min =
+          {
+                static_cast<float>(chunkCoord.X * Chunk::ChunkWidth),
+                static_cast<float>(chunkCoord.Y * Chunk::ChunkHeight),
+                static_cast<float>(chunkCoord.Z * Chunk::ChunkDepth),
+                },
+      .Max =
+          {
+                static_cast<float>((chunkCoord.X + 1) * Chunk::ChunkWidth),
+                static_cast<float>((chunkCoord.Y + 1) * Chunk::ChunkHeight),
+                static_cast<float>((chunkCoord.Z + 1) * Chunk::ChunkDepth),
+                },
+  };
+}

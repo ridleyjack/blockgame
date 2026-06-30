@@ -14,6 +14,7 @@
 namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace assets = engine::assets;
+namespace math = engine::math;
 
 GameLayer::GameLayer(engine::Application& application)
     : application_(application),
@@ -56,18 +57,22 @@ void GameLayer::OnRender() {
   const auto& renderItem = textures_.GetRenderItem();
 
   float drawDistance = static_cast<float>(ChunkStreamer::LoadRadius * (Chunk::ChunkWidth + 1));
-  engine::graphics::CameraMatrices cameraMatrices{.Projection =
-                                                      renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
-                                                          .FarPlane = drawDistance,
-                                                      }),
-                                                  .View = camera_.View()};
+  auto projection = renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
+      .FarPlane = drawDistance,
+  });
+  const auto view = camera_.View();
+  auto frustum = math::Frustum::FromViewProjection(projection * view);
 
+  gfx::CameraMatrices cameraMatrices{.Projection = projection, .View = view};
   if (const auto r = renderer.BeginFrame(cameraMatrices); !r) {
     std::println("Failed to begin rendering frame");
     return;
   }
 
   for (const auto& meshCoords : world_.LoadedChunks()) {
+    if (!frustum.Intersects(world_.ChunkBounds(meshCoords)))
+      continue;
+
     const auto meshHandle = world_.Mesh(meshCoords);
     if (meshHandle)
       renderer.Submit(renderItem.Pipeline, *meshHandle, renderItem.Material, renderItem.PushConstants);

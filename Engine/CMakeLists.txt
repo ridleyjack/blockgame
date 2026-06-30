@@ -22,6 +22,8 @@ add_library(Engine
         Src/Engine/Memory/RingBuffer.cpp
         Src/Engine/Memory/RingBuffer.hpp
         Src/Engine/Fatal.hpp
+        Src/Engine/Math/Frustum.cpp
+        Src/Engine/Math/Frustum.hpp
 )
 target_include_directories(Engine
         PUBLIC
