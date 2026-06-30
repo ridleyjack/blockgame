@@ -10,5 +10,6 @@
   } catch (...) {
     std::fputs("Critical: Fatal error occurred, and logging failed.\n", stderr);
   }
+  std::fflush(stderr);
   std::abort();
 }
