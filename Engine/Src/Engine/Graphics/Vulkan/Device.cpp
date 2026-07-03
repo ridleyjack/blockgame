@@ -10,6 +10,61 @@
 #include <vector>
 #include <print>
 
+namespace {
+
+struct RequiredDeviceFeatures {
+  VkPhysicalDeviceFeatures VK10{
+      .samplerAnisotropy = VK_TRUE,
+  };
+  VkPhysicalDeviceVulkan12Features VK12{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+      .bufferDeviceAddress = VK_TRUE,
+  };
+  VkPhysicalDeviceVulkan13Features VK13{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+      .synchronization2 = VK_TRUE,
+      .dynamicRendering = VK_TRUE,
+  };
+  VkPhysicalDeviceVulkan14Features VK14{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+  };
+
+  RequiredDeviceFeatures() {
+    VK14.pNext = &VK13;
+    VK13.pNext = &VK12;
+  }
+  void* Chain() {
+    return &VK14;
+  }
+};
+
+struct SupportedDeviceFeatures {
+  VkPhysicalDeviceFeatures2 vk10{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+  };
+  VkPhysicalDeviceVulkan12Features vk12{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+  };
+  VkPhysicalDeviceVulkan13Features vk13{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+  };
+  VkPhysicalDeviceVulkan14Features vk14{
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+  };
+
+  SupportedDeviceFeatures() {
+    vk10.pNext = &vk12;
+    vk12.pNext = &vk13;
+    vk13.pNext = &vk14;
+  }
+  bool SupportsRequired() const {
+    return vk10.features.samplerAnisotropy && vk12.bufferDeviceAddress && vk13.synchronization2 &&
+           vk13.dynamicRendering;
+  }
+};
+
+} // namespace
+
 namespace engine::graphics::vulkan {
 
 Device::Device(Context& context) : context_{context} {
@@ -29,28 +84,17 @@ Device::Device(Context& context) : context_{context} {
     queueCreateInfos.push_back(queueCreateInfo);
   }
 
-  VkPhysicalDeviceVulkan13Features enabledVK13Features{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-      .synchronization2 = VK_TRUE,
-      .dynamicRendering = VK_TRUE,
-  };
-  VkPhysicalDeviceVulkan14Features enabledVK14Features{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
-      .pNext = &enabledVK13Features,
-  };
-  VkPhysicalDeviceFeatures enabledVK10Features{
-      .samplerAnisotropy = VK_TRUE,
-  };
+  RequiredDeviceFeatures requiredDeviceFeatures{};
 
   VkDeviceCreateInfo createInfo{
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = &enabledVK14Features,
+      .pNext = requiredDeviceFeatures.Chain(),
       .queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size()),
       .pQueueCreateInfos = queueCreateInfos.data(),
       .enabledLayerCount = 0,
       .enabledExtensionCount = static_cast<uint32_t>(config::DeviceExtensions.size()),
       .ppEnabledExtensionNames = config::DeviceExtensions.data(),
-      .pEnabledFeatures = &enabledVK10Features,
+      .pEnabledFeatures = &requiredDeviceFeatures.VK10,
   };
   if (config::EnableValidationLayers) { // These values are ignored in modern Vulkan.
     createInfo.enabledLayerCount = static_cast<uint32_t>(config::ValidationLayers.size());
@@ -140,53 +184,6 @@ VkSampleCountFlagBits Device::MsaaSamples() const noexcept {
   return msaaSamples_;
 }
 
-AllocatedBuffer Device::CreateBuffer(const VkDeviceSize size,
-                                     const VkBufferUsageFlags usage,
-                                     const VkMemoryPropertyFlags properties) const {
-  VkBuffer buffer;
-  VkDeviceMemory memory;
-
-  // Buffer
-  VkBufferCreateInfo bufferInfo{};
-  bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  bufferInfo.size = size;
-  bufferInfo.usage = usage;
-  bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-  CheckVk(vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer), "vkCreateBuffer");
-
-  // Buffer Memory
-  VkMemoryRequirements memRequirements;
-  vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
-
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex = this->FindMemoryType(memRequirements.memoryTypeBits, properties);
-  CheckVk(vkAllocateMemory(device_, &allocInfo, nullptr, &memory), "vkAllocateMemory");
-  CheckVk(vkBindBufferMemory(device_, buffer, memory, 0), "vkBindBufferMemory");
-
-  return AllocatedBuffer{.Buffer = buffer, .Memory = memory};
-}
-
-void Device::DestroyBuffer(const AllocatedBuffer& buffer) const noexcept {
-  vkDestroyBuffer(device_, buffer.Buffer, nullptr);
-  vkFreeMemory(device_, buffer.Memory, nullptr);
-}
-
-void Device::CopyBuffer(const VkBuffer src, const VkBuffer dst, const VkDeviceSize size) const {
-  const auto& cmd = context_.GetCommand();
-  VkCommandBuffer commandBuffer = cmd.BeginSingleTimeCommands();
-
-  VkBufferCopy copyRegion{};
-  copyRegion.srcOffset = 0; // Optional
-  copyRegion.dstOffset = 0; // Optional
-  copyRegion.size = size;
-  vkCmdCopyBuffer(commandBuffer, src, dst, 1, &copyRegion);
-
-  cmd.EndSingleTimeCommands(commandBuffer);
-}
-
 bool Device::checkDeviceExtensionSupport_(VkPhysicalDevice device) {
   uint32_t extensionCount;
   vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -205,14 +202,8 @@ bool Device::isDeviceSuitable_(VkPhysicalDevice device, VkSurfaceKHR surface) {
   VkPhysicalDeviceProperties deviceProperties;
   vkGetPhysicalDeviceProperties(device, &deviceProperties);
 
-  VkPhysicalDeviceVulkan13Features vk13Features{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-  };
-  VkPhysicalDeviceFeatures2 supportedFeatures{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &vk13Features,
-  };
-  vkGetPhysicalDeviceFeatures2(device, &supportedFeatures);
+  SupportedDeviceFeatures supportedFeatures{};
+  vkGetPhysicalDeviceFeatures2(device, &supportedFeatures.vk10);
 
   QueueFamilyIndices indices = findQueueFamilies_(device, surface);
 
@@ -224,8 +215,7 @@ bool Device::isDeviceSuitable_(VkPhysicalDevice device, VkSurfaceKHR surface) {
     swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
   }
 
-  return indices.IsComplete() && extensionsSupported && swapChainAdequate &&
-         supportedFeatures.features.samplerAnisotropy && vk13Features.synchronization2 && vk13Features.dynamicRendering;
+  return indices.IsComplete() && extensionsSupported && swapChainAdequate && supportedFeatures.SupportsRequired();
 }
 
 QueueFamilyIndices Device::findQueueFamilies_(VkPhysicalDevice device, VkSurfaceKHR surface) {

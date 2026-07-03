@@ -1,25 +1,29 @@
 #pragma once
 #include <cstdint>
+#include <type_traits>
 
 namespace engine::graphics {
 struct PipelineHandle {
-  uint32_t PipelineID{};
+  std::uint32_t PipelineID{};
 };
 
 struct MeshHandle {
-  uint32_t MeshID{};
-};
-
-struct UniformHandle {
-  uint32_t UniformID{};
+  std::uint32_t MeshID{};
 };
 
 struct TextureHandle {
-  uint32_t TextureID{};
+  std::uint32_t TextureID{};
 };
 
 struct MaterialHandle {
-  uint32_t TextureID{};
-  uint32_t DescriptorSetID{};
+  std::uint32_t TextureID{};
+  std::uint32_t DescriptorSetID{};
+};
+
+template <class T>
+concept ShaderDataStruct = std::is_trivially_copyable_v<T> && std::is_standard_layout_v<T>;
+
+template <class T> struct ShaderDataHandle {
+  std::uint32_t ShaderDataID{};
 };
 } // namespace engine::graphics

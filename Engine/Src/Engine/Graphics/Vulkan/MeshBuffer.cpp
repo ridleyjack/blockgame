@@ -3,9 +3,8 @@
 #include "CheckVk.hpp"
 #include "Context.hpp"
 #include "Device.hpp"
-#include "Engine/Graphics/Mesh.hpp"
 
-#include <print>
+#include "Engine/Graphics/Mesh.hpp"
 
 namespace engine::graphics::vulkan {
 

@@ -4,12 +4,13 @@
 #include "DescriptorAllocator.hpp"
 #include "MeshAllocator.hpp"
 #include "MeshBuffer.hpp"
-#include "UniformBuffer.hpp"
 #include "TextureAllocator.hpp"
 #include "PipelineCache.hpp"
+#include "ShaderDataAllocator.hpp"
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
+#include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/ObjectPushConstants.hpp"
 
 #include <expected>
@@ -19,15 +20,12 @@ struct GLFWwindow;
 namespace engine::graphics {
 class CameraMatrices;
 
-struct MeshHandle;
 struct Mesh;
 struct MeshCreateInfo;
 
-struct PipelineHandle;
-struct PipelineCreateInfo;
+struct SubmitInfo;
 
-struct TextureHandle;
-struct MaterialHandle;
+struct PipelineCreateInfo;
 
 namespace resources {
 class TextureArrayBuilder;
@@ -42,11 +40,16 @@ enum class RenderError : uint8_t {
   FrameOutOfDate,
 };
 
+struct CameraShaderData {
+  alignas(16) glm::mat4 View{1.0f};
+  alignas(16) glm::mat4 Projection{1.0f};
+};
+
 struct FrameContext {
   std::uint32_t CurrentFrame{};
   std::uint32_t ImageIndex{};
 
-  UniformBuffer CameraGPU{};
+  CameraShaderData CameraGPU{};
   bool FrameActive{};
 };
 
@@ -66,8 +69,7 @@ public:
 
   std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera);
   void EndFrame();
-  void
-  Submit(PipelineHandle pipelineHandle, MeshHandle handle, MaterialHandle material, const ObjectPushConstants& model);
+  void Submit(const SubmitInfo& info);
 
   bool ShouldClose() const noexcept;
   void WaitUntilIdle() const;
@@ -81,6 +83,21 @@ public:
 
   TextureHandle CreateTexture(const std::span<const std::byte>& data, int width, int height);
   resources::TextureArrayBuilder BeginTextureArray(const resources::TextureArrayInfo& info);
+
+  template <ShaderDataStruct T> ShaderDataHandle<T> CreateShaderData() {
+    const std::uint32_t id = shaderDataAllocator_.AllocateShaderData(sizeof(T));
+    return ShaderDataHandle<T>{.ShaderDataID = id};
+  }
+
+  template <ShaderDataStruct T> void SetShaderData(ShaderDataHandle<T> handle, const T& data) {
+    for (std::uint32_t frame = 0; frame < config::MaxFramesInFlight; ++frame) {
+      shaderDataAllocator_.WriteShaderData(handle.ShaderDataID, frame, std::as_bytes(std::span{&data, 1}));
+    }
+  }
+
+  template <ShaderDataStruct T> void DeleteShaderData(ShaderDataHandle<T> handle) {
+    shaderDataAllocator_.FreeShaderData(handle.ShaderDataID);
+  }
 
   MaterialHandle CreateMaterial(TextureHandle texture);
 
@@ -99,8 +116,11 @@ private:
   MeshBuffer meshBuffer_;
   MeshAllocator meshAllocator_;
   DescriptorAllocator descriptorAllocator_;
+  ShaderDataAllocator shaderDataAllocator_;
 
   FrameContext frameContext_{};
+
+  std::uint32_t cameraShaderDataID_{};
 };
 } // namespace vulkan
 } // namespace engine::graphics

@@ -3,6 +3,7 @@
 #include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
+#include "Engine/Graphics/SubmitInfo.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -70,26 +71,32 @@ gfx::Mesh CreateBlockHighlightMesh() {
 
 } // namespace
 
-BlockHighlighter::BlockHighlighter(vlk::Renderer& renderer) {
-  const gfx::PipelineHandle pipeline =
-      renderer.CreatePipeline(gfx::PipelineCreateInfo{.Kind = gfx::PipelineKind::SolidGeometry,
-                                                      .VertexShaderFile = "Shaders/highlight.vert.spv",
-                                                      .FragmentShaderFile = "Shaders/highlight.frag.spv"});
+BlockHighlighter::BlockHighlighter(vlk::Renderer& renderer) : renderer_{renderer} {
+  auto shaderDataType = gfx::MakeShaderDataType<glm::mat4>();
+  pipeline_ = renderer.CreatePipeline(gfx::PipelineCreateInfo{.Kind = gfx::PipelineKind::SolidGeometry,
+                                                              .VertexShaderFile = "Shaders/highlight.vert.spv",
+                                                              .FragmentShaderFile = "Shaders/highlight.frag.spv",
+                                                              .ShaderDataSlots = {{shaderDataType}}});
 
-  renderItem_.Pipeline = pipeline;
-  const gfx::Mesh meshData = CreateBlockHighlightMesh();
-  mesh_ = renderer.CreateMesh(meshData);
+  mesh_ = renderer.CreateMesh(CreateBlockHighlightMesh());
+  shaderDataHandle_ = renderer.CreateShaderData<glm::mat4>();
+}
+BlockHighlighter::~BlockHighlighter() {
+  renderer_.DeleteMesh(mesh_);
+  renderer_.DeletePipeline(pipeline_);
+  renderer_.DeleteShaderData(shaderDataHandle_);
 }
 
-const RenderItem& BlockHighlighter::GetRenderItem() const noexcept {
-  return renderItem_;
+void BlockHighlighter::Upload() const {
+  auto data = glm::translate(glm::mat4{1.0f}, glm::vec3{worldBlockPos_.X, worldBlockPos_.Y, worldBlockPos_.Z});
+  renderer_.SetShaderData(shaderDataHandle_, data);
 }
 
-gfx::MeshHandle BlockHighlighter::GetMesh() const noexcept {
-  return mesh_;
+void BlockHighlighter::Submit() const {
+  gfx::ShaderDataBinding binding = gfx::BindShaderData(shaderDataHandle_);
+  renderer_.Submit({.Pipeline = pipeline_, .Mesh = mesh_, .ShaderData = {{binding}}});
 }
 
 void BlockHighlighter::SetPosition(const math::Vec3Int worldBlockPos) {
-  renderItem_.PushConstants.Model =
-      glm::translate(glm::mat4{1.0f}, glm::vec3{worldBlockPos.X, worldBlockPos.Y, worldBlockPos.Z});
+  worldBlockPos_ = worldBlockPos;
 }

@@ -18,9 +18,6 @@ public:
 
   VkCommandBuffer PerFrameBuffer(uint32_t index) const noexcept;
 
-  VkCommandBuffer BeginSingleTimeCommands() const noexcept;
-  void EndSingleTimeCommands(VkCommandBuffer commandBuffer) const noexcept;
-
   VkCommandBuffer BeginTransient() const noexcept;
   void FreeTransient(VkCommandBuffer cmd) const noexcept;
 

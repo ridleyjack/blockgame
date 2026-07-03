@@ -5,7 +5,6 @@
 #include "Config.hpp"
 #include "Engine/Graphics/Vulkan/Device.hpp"
 
-
 namespace engine::graphics::vulkan {
 
 Command::Command(Context& context) : context_{context} {
@@ -24,7 +23,7 @@ VkCommandBuffer Command::PerFrameBuffer(const uint32_t index) const noexcept {
   return perFrameBuffers_[index];
 }
 
-VkCommandBuffer Command::BeginSingleTimeCommands() const noexcept {
+VkCommandBuffer Command::BeginTransient() const noexcept {
   const auto vkDevice = context_.GetDevice().Logical();
 
   VkCommandBufferAllocateInfo allocInfo{};
@@ -42,27 +41,6 @@ VkCommandBuffer Command::BeginSingleTimeCommands() const noexcept {
 
   CheckVk(vkBeginCommandBuffer(commandBuffer, &beginInfo), "vkBeginCommandBuffer");
   return commandBuffer;
-}
-
-void Command::EndSingleTimeCommands(VkCommandBuffer commandBuffer) const noexcept {
-  const auto& device = context_.GetDevice();
-
-  CheckVk(vkEndCommandBuffer(commandBuffer), "vkEndCommandBuffer");
-
-  VkSubmitInfo submitInfo{};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &commandBuffer;
-
-  CheckVk(vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, VK_NULL_HANDLE), "vkQueueSubmit");
-  CheckVk(vkQueueWaitIdle(device.GraphicsQueue()), "vkQueueWaitIdle");
-
-  vkFreeCommandBuffers(device.Logical(), transientPool_, 1, &commandBuffer);
-}
-
-VkCommandBuffer Command::BeginTransient() const noexcept {
-  // BeginSingleTimeCommands will likely be removed in the future.
-  return BeginSingleTimeCommands();
 }
 
 void Command::FreeTransient(VkCommandBuffer cmd) const noexcept {
@@ -93,8 +71,7 @@ void Command::createFrameBuffers_() {
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = static_cast<uint32_t>(perFrameBuffers_.size());
 
-  CheckVk(vkAllocateCommandBuffers(device.Logical(), &allocInfo, perFrameBuffers_.data()),
-          "vkAllocateCommandBuffers");
+  CheckVk(vkAllocateCommandBuffers(device.Logical(), &allocInfo, perFrameBuffers_.data()), "vkAllocateCommandBuffers");
 }
 
 void Command::createTransientPool_() {

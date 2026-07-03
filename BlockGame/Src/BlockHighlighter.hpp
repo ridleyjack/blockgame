@@ -8,19 +8,29 @@ namespace engine::graphics::vulkan {
 class Renderer;
 }
 
+namespace gfx = engine::graphics;
 namespace vlk = engine::graphics::vulkan;
 namespace math = engine::math;
 
 class BlockHighlighter {
 public:
-  BlockHighlighter(vlk::Renderer& renderer);
+  explicit BlockHighlighter(vlk::Renderer& renderer);
+  ~BlockHighlighter();
 
-  const RenderItem& GetRenderItem() const noexcept;
-  gfx::MeshHandle GetMesh() const noexcept;
-  
+  BlockHighlighter(const BlockHighlighter&) = delete;
+  BlockHighlighter& operator=(const BlockHighlighter&) = delete;
+
+  void Upload() const;
+  void Submit() const;
+
   void SetPosition(math::Vec3Int worldBlockPos);
 
 private:
-  RenderItem renderItem_{};
+  vlk::Renderer& renderer_;
+
+  gfx::PipelineHandle pipeline_{};
   gfx::MeshHandle mesh_{};
+  math::Vec3Int worldBlockPos_{};
+
+  gfx::ShaderDataHandle<glm::mat4> shaderDataHandle_{};
 };

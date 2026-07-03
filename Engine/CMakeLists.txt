@@ -24,6 +24,7 @@ add_library(Engine
         Src/Engine/Fatal.hpp
         Src/Engine/Math/Frustum.cpp
         Src/Engine/Math/Frustum.hpp
+        Src/Engine/Graphics/SubmitInfo.hpp
 )
 target_include_directories(Engine
         PUBLIC
@@ -64,7 +65,6 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/PipelineCreateInfo.hpp
         Src/Engine/Graphics/Mesh.hpp
         Src/Engine/Graphics/ObjectPushConstants.hpp
-        Src/Engine/Graphics/Vulkan/UniformBuffer.hpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.cpp
         Src/Engine/Graphics/Vulkan/DescriptorAllocator.hpp
         Src/Engine/Graphics/Vulkan/Config.hpp
@@ -88,6 +88,8 @@ add_library(Engine_Graphics
         Src/Engine/Graphics/Resources/TextureLoader.cpp
         Src/Engine/Graphics/Resources/TextureLoader.hpp
         Src/Engine/Graphics/Vulkan/CheckVk.hpp
+        Src/Engine/Graphics/Vulkan/ShaderDataAllocator.cpp
+        Src/Engine/Graphics/Vulkan/ShaderDataAllocator.hpp
 )
 
 target_include_directories(Engine_Graphics

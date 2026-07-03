@@ -15,6 +15,7 @@
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Fatal.hpp"
+#include "Engine/Graphics/SubmitInfo.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -24,6 +25,7 @@
 
 #include <cstring>
 #include <array>
+#include <span>
 
 namespace engine::graphics::vulkan {
 
@@ -35,18 +37,15 @@ Renderer::Renderer(GLFWwindow* window)
       textureAllocator_(context_, uploader_, stagingBuffer_),
       meshBuffer_(MeshBuffer::Create(context_)),
       meshAllocator_(context_, uploader_, meshBuffer_, stagingBuffer_),
-      descriptorAllocator_(context_, textureAllocator_) {
+      descriptorAllocator_(context_, textureAllocator_),
+      shaderDataAllocator_(context_) {
 
   const auto& device = context_.GetDevice();
-  frameContext_.CameraGPU = DescriptorAllocator::CreateUniformBuffer(device);
-  descriptorAllocator_.CreateGlobalDescriptorSets(frameContext_.CameraGPU);
+  cameraShaderDataID_ = shaderDataAllocator_.AllocateShaderData(sizeof(CameraShaderData));
 }
 
 Renderer::~Renderer() {
   context_.WaitUntilIdle();
-  const auto& device = context_.GetDevice();
-  for (const auto buffer : frameContext_.CameraGPU.Buffers)
-    device.DestroyBuffer(buffer);
 }
 
 std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& camera) {
@@ -78,8 +77,10 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
   }
 
   // Camera
-  const GlobalUBO ubo{.View = camera.View, .Projection = camera.Projection};
-  memcpy(frameContext_.CameraGPU.MappedMemory[frameContext_.CurrentFrame], &ubo, sizeof(GlobalUBO));
+  const CameraShaderData ubo{.View = camera.View, .Projection = camera.Projection};
+  shaderDataAllocator_.WriteShaderData(cameraShaderDataID_,
+                                       frameContext_.CurrentFrame,
+                                       std::as_bytes(std::span{&ubo, 1}));
 
   // Command Buffer
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
@@ -222,15 +223,16 @@ void Renderer::EndFrame() {
   CheckVk(vkQueueSubmit(device.GraphicsQueue(), 1, &submitInfo, sync.InFlightFence(frameContext_.CurrentFrame)),
           "vkQueueSubmit");
 
-  VkPresentInfoKHR presentInfo{};
-  presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = signalSemaphores.data();
   const std::array<VkSwapchainKHR, 1> swapChains = {swapchain.Handle()};
-  presentInfo.swapchainCount = 1;
-  presentInfo.pSwapchains = swapChains.data();
-  presentInfo.pImageIndices = &frameContext_.ImageIndex;
-  presentInfo.pResults = nullptr; // Optional
+  VkPresentInfoKHR presentInfo{
+      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = signalSemaphores.data(),
+      .swapchainCount = 1,
+      .pSwapchains = swapChains.data(),
+      .pImageIndices = &frameContext_.ImageIndex,
+      .pResults = nullptr,
+  };
 
   const VkResult result = vkQueuePresentKHR(device.PresentQueue(), &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || context_.GetFramebufferHasResized()) {
@@ -243,25 +245,21 @@ void Renderer::EndFrame() {
   frameContext_.CurrentFrame = (frameContext_.CurrentFrame + 1) % config::MaxFramesInFlight;
 }
 
-void Renderer::Submit(const PipelineHandle pipelineHandle,
-                      const MeshHandle handle,
-                      const MaterialHandle material,
-                      const ObjectPushConstants& model) {
+void Renderer::Submit(const SubmitInfo& info) {
   const auto& cmd = context_.GetCommand();
   const auto commandBuffer = cmd.PerFrameBuffer(frameContext_.CurrentFrame);
 
-  const auto& pipeline = pipelineCache_.GetPipeline(pipelineHandle.PipelineID);
+  const auto& pipeline = pipelineCache_.GetPipeline(info.Pipeline.PipelineID);
 
-  const MeshAllocator::MeshGPU& meshGPU = meshAllocator_.Get(handle.MeshID);
+  const MeshAllocator::MeshGPU& meshGPU = meshAllocator_.Get(info.Mesh.MeshID);
   if (meshGPU.State != MeshState::Ready)
     return;
 
-  const auto globalDescriptor = descriptorAllocator_.GlobalDescriptorSet(frameContext_.CurrentFrame);
-  std::array<VkDescriptorSet, 2> descriptors{globalDescriptor, VK_NULL_HANDLE};
-  std::uint32_t numDescriptorSets = 1;
+  std::array<VkDescriptorSet, 1> descriptors{VK_NULL_HANDLE};
+  std::uint32_t numDescriptorSets = 0;
 
   if (pipeline.Kind() == PipelineKind::SolidTexture) {
-    const auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(material.DescriptorSetID);
+    const auto texDescriptor = descriptorAllocator_.TextureDescriptorSet(info.Material.DescriptorSetID);
     if (texDescriptor == VK_NULL_HANDLE)
       return;
     descriptors[numDescriptorSets++] = texDescriptor;
@@ -274,24 +272,40 @@ void Renderer::Submit(const PipelineHandle pipelineHandle,
   vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
   vkCmdBindIndexBuffer(commandBuffer, meshBuffer_.Handle(), meshGPU.IndexOffset, VK_INDEX_TYPE_UINT32);
 
-  vkCmdBindDescriptorSets(commandBuffer,
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          pipeline.PipelineLayout(),
-                          0,
-                          numDescriptorSets,
-                          descriptors.data(),
-                          0,
-                          nullptr);
+  if (numDescriptorSets > 0)
+    vkCmdBindDescriptorSets(commandBuffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipeline.PipelineLayout(),
+                            0,
+                            numDescriptorSets,
+                            descriptors.data(),
+                            0,
+                            nullptr);
+
+  ObjectPushConstants pushConstants = {
+      .CameraAddress = shaderDataAllocator_.GetShaderDataAddress(cameraShaderDataID_, frameContext_.CurrentFrame),
+  };
+
+  if (info.ShaderData.size() > static_cast<size_t>(ObjectPushConstants::MaxShaderDataSlots))
+    Fatal("Renderer Submit called with shaderDataSlots exceeding MaxShaderDataSlots");
+  if (!pipeline.ValidShaderData(info.ShaderData))
+    Fatal("Renderer Submit called with shaderData that is not compatible with bound pipeline");
+
+  for (std::size_t i = 0; i < info.ShaderData.size(); i++) {
+    VkDeviceAddress addr =
+        shaderDataAllocator_.GetShaderDataAddress(info.ShaderData[i].ShaderDataID, frameContext_.CurrentFrame);
+    pushConstants.ShaderData[i] = addr;
+  }
 
   vkCmdPushConstants(commandBuffer,
                      pipeline.PipelineLayout(),
                      VK_SHADER_STAGE_VERTEX_BIT,
                      0,
                      sizeof(ObjectPushConstants),
-                     &model);
+                     &pushConstants);
 
   vkCmdDrawIndexed(commandBuffer, meshGPU.IndexCount, 1, 0, 0, 0);
-}
+} // namespace engine::graphics::vulkan
 
 bool Renderer::ShouldClose() const noexcept {
   return context_.WindowShouldClose();
@@ -302,9 +316,10 @@ void Renderer::WaitUntilIdle() const {
 }
 
 PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
-  std::span<const VkDescriptorSetLayout> layouts = descriptorAllocator_.DescriptorSetLayouts();
-  if (info.Kind == PipelineKind::SolidGeometry)
-    layouts = descriptorAllocator_.GlobalSetLayouts();
+  std::span<const VkDescriptorSetLayout> layouts{};
+  if (info.Kind == PipelineKind::SolidTexture) {
+    layouts = descriptorAllocator_.TextureSetLayout();
+  }
 
   auto pipeline = pipelineCache_.CreatePipeline(info, layouts);
   if (!pipeline) {

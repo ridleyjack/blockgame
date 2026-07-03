@@ -1,9 +1,14 @@
 #version 450
+#extension GL_EXT_buffer_reference: require
 
-layout (set = 0, binding = 0) uniform UniformBufferObject {
+layout (buffer_reference, std430) readonly buffer CameraBuffer {
     mat4 view;
     mat4 projection;
-} ubo;
+};
+
+layout (push_constant) uniform Push {
+    CameraBuffer camera;
+} pushData;
 
 layout (location = 0) in vec3 inPosition;
 layout (location = 1) in vec3 inColor;
@@ -15,7 +20,7 @@ layout (location = 1) out vec2 fragTexCoord;
 layout (location = 2) out flat uint fragTexIdx;
 
 void main() {
-    gl_Position = ubo.projection * ubo.view * vec4(inPosition, 1.0);
+    gl_Position = pushData.camera.projection * pushData.camera.view * vec4(inPosition, 1.0);
     fragColor = inColor;
     fragTexCoord = inTexCoord;
     fragTexIdx = inTexIdx;

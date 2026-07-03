@@ -5,6 +5,7 @@
 #include "Engine/Events/Events.hpp"
 #include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Graphics/CameraMatrices.hpp"
+#include "Engine/Graphics/SubmitInfo.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -75,19 +76,18 @@ void GameLayer::OnRender() {
 
     const auto meshHandle = world_.Mesh(meshCoords);
     if (meshHandle)
-      renderer.Submit(renderItem.Pipeline, *meshHandle, renderItem.Material, renderItem.PushConstants);
+      renderer.Submit(
+          gfx::SubmitInfo{.Pipeline = renderItem.Pipeline, .Mesh = *meshHandle, .Material = renderItem.Material});
   }
 
   if (hoveredBlock_) {
-    auto& highlightItem = blockHighlighter_.GetRenderItem();
-    renderer.Submit(highlightItem.Pipeline,
-                    blockHighlighter_.GetMesh(),
-                    highlightItem.Material,
-                    highlightItem.PushConstants);
+    blockHighlighter_.Upload();
+    blockHighlighter_.Submit();
   }
 
   const auto& crosshairItem = crosshair_.GetRenderItem();
-  renderer.Submit(crosshairItem.Pipeline, crosshair_.GetMesh(), crosshairItem.Material, crosshairItem.PushConstants);
+  renderer.Submit(
+      {.Pipeline = crosshairItem.Pipeline, .Mesh = crosshair_.GetMesh(), .Material = crosshairItem.Material});
 
   renderer.EndFrame();
 }

@@ -1,12 +1,18 @@
 #version 450
+#extension GL_EXT_buffer_reference: require
 
-layout (set = 0, binding = 0) uniform Camera {
+layout (buffer_reference, std430) readonly buffer CameraBuffer {
     mat4 view;
     mat4 projection;
-} camera;
+};
+
+layout (buffer_reference, std430) readonly buffer ModelBuffer {
+    mat4 model;
+};
 
 layout (push_constant) uniform Push {
-    mat4 model;
+    CameraBuffer camera;
+    ModelBuffer shaderData;
 } pushData;
 
 layout (location = 0) in vec3 inPosition;
@@ -18,6 +24,6 @@ layout (location = 0) out vec3 fragColor;
 
 void main()
 {
-    gl_Position = camera.projection * camera.view * pushData.model * vec4(inPosition, 1.0);
+    gl_Position = pushData.camera.projection * pushData.camera.view * pushData.shaderData.model * vec4(inPosition, 1.0);
     fragColor = inColor;
 }

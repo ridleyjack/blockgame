@@ -8,6 +8,7 @@
 #include "Engine/Assets/File.hpp"
 #include "Engine/Graphics/ObjectPushConstants.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
+#include "Engine/Graphics/SubmitInfo.hpp"
 
 #include <array>
 
@@ -16,6 +17,10 @@ namespace engine::graphics::vulkan {
 std::expected<Pipeline, PipelineError> Pipeline::Create(Context& context,
                                                         const PipelineCreateInfo& info,
                                                         std::span<const VkDescriptorSetLayout> descriptorSetLayouts) {
+
+  if (info.ShaderDataSlots.size() > ObjectPushConstants::MaxShaderDataSlots)
+    return std::unexpected(PipelineError::ExceededMaxShaderDataSlots);
+
   auto vkDevice = context.GetDevice().Logical();
   VkPipelineLayout pipelineLayout{VK_NULL_HANDLE};
   VkPipeline pipeline{VK_NULL_HANDLE};
@@ -40,7 +45,13 @@ Pipeline::Pipeline(Context& context,
                    const PipelineCreateInfo& info,
                    VkPipelineLayout pipelineLayout,
                    VkPipeline pipeline)
-    : context_{context}, pipelineLayout_{pipelineLayout}, pipeline_{pipeline}, kind_{info.Kind} {}
+    : context_{context}, pipelineLayout_{pipelineLayout}, pipeline_{pipeline}, kind_{info.Kind} {
+
+  numShaderDataSlots_ = info.ShaderDataSlots.size();
+  for (size_t i = 0; i < info.ShaderDataSlots.size(); i++) {
+    shaderDataSlots_[i] = info.ShaderDataSlots[i];
+  }
+}
 
 Pipeline::~Pipeline() {
   const auto vkDevice = context_.GetDevice().Logical();
@@ -50,7 +61,12 @@ Pipeline::~Pipeline() {
 }
 
 Pipeline::Pipeline(Pipeline&& other) noexcept
-    : context_{other.context_}, pipelineLayout_{other.pipelineLayout_}, pipeline_{other.pipeline_}, kind_{other.kind_} {
+    : context_{other.context_},
+      pipelineLayout_{other.pipelineLayout_},
+      pipeline_{other.pipeline_},
+      kind_{other.kind_},
+      numShaderDataSlots_{other.numShaderDataSlots_},
+      shaderDataSlots_{other.shaderDataSlots_} {
   other.pipelineLayout_ = VK_NULL_HANDLE;
   other.pipeline_ = VK_NULL_HANDLE;
 }
@@ -65,6 +81,17 @@ VkPipeline Pipeline::Handle() const noexcept {
 
 PipelineKind Pipeline::Kind() const noexcept {
   return kind_;
+}
+
+bool Pipeline::ValidShaderData(std::span<const ShaderDataBinding> shaderData) const noexcept {
+  if (shaderData.size() != numShaderDataSlots_)
+    return false;
+
+  for (size_t i = 0; i < shaderData.size(); i++) {
+    if (shaderData[i].Type != shaderDataSlots_[i].Type || shaderData[i].Size != shaderDataSlots_[i].Size)
+      return false;
+  }
+  return true;
 }
 
 std::expected<VkPipelineLayout, PipelineError>

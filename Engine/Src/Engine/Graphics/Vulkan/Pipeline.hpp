@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Engine/Graphics/ObjectPushConstants.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
 
 #include <vulkan/vulkan.h>
@@ -13,7 +14,7 @@
 namespace gfx = engine::graphics;
 
 namespace engine::graphics {
-struct PipelineCreateInfo;
+struct ShaderDataBinding;
 struct PipelineHandle;
 } // namespace engine::graphics
 
@@ -26,6 +27,7 @@ enum class PipelineError : uint8_t {
   PipelineLayoutCreation,
   ShaderCompile,
   ShaderFileRead,
+  ExceededMaxShaderDataSlots,
 };
 
 constexpr std::string_view ToString(const PipelineError e) noexcept {
@@ -40,6 +42,8 @@ constexpr std::string_view ToString(const PipelineError e) noexcept {
     return "FailedShaderCompile";
   case ShaderFileRead:
     return "FailedShaderFileRead";
+  case ExceededMaxShaderDataSlots:
+    return "ExceededMaxShaderDataSlots";
   }
   return "UnknownPipelineError";
 }
@@ -62,6 +66,8 @@ public:
 
   PipelineKind Kind() const noexcept;
 
+  bool ValidShaderData(std::span<const ShaderDataBinding> shaderData) const noexcept;
+
 private:
   static std::expected<VkPipelineLayout, PipelineError>
   createPipelineLayout_(const Context& context, std::span<const VkDescriptorSetLayout> layouts) noexcept;
@@ -77,7 +83,9 @@ private:
   VkPipelineLayout pipelineLayout_{VK_NULL_HANDLE};
   VkPipeline pipeline_{VK_NULL_HANDLE};
 
-  gfx::PipelineKind kind_;
+  PipelineKind kind_;
+  std::uint32_t numShaderDataSlots_{};
+  std::array<ShaderDataType, ObjectPushConstants::MaxShaderDataSlots> shaderDataSlots_{};
 };
 
 } // namespace engine::graphics::vulkan
