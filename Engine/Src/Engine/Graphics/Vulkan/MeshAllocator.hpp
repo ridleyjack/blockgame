@@ -70,7 +70,7 @@ private:
                                    VkDeviceSize alignment,
                                    VkCommandBuffer cmd,
                                    std::uint64_t batchID) const;
-  void deleteMesh(std::uint32_t meshID);
+  void deleteMesh_(std::uint32_t meshID);
 };
 
 } // namespace engine::graphics::vulkan

@@ -60,6 +60,8 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
 
   vkWaitForFences(device.Logical(), 1, &sync.InFlightFence(frameContext_.CurrentFrame), VK_TRUE, UINT64_MAX);
   meshAllocator_.ProcessDeferredDeletions(frameContext_.CurrentFrame);
+  pipelineCache_.ProcessDeferredDeletions(frameContext_.CurrentFrame);
+  shaderDataAllocator_.ProcessDeferredDeletions(frameContext_.CurrentFrame);
 
   const VkResult result = vkAcquireNextImageKHR(device.Logical(),
                                                 swapchain.Handle(),
@@ -331,7 +333,7 @@ PipelineHandle Renderer::CreatePipeline(const PipelineCreateInfo& info) {
 }
 
 void Renderer::DeletePipeline(const PipelineHandle handle) {
-  pipelineCache_.DestroyPipeline(handle.PipelineID);
+  pipelineCache_.DestroyPipelineDeferred(handle.PipelineID, retireFrameForDeletion_());
 }
 
 MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
@@ -340,11 +342,7 @@ MeshHandle Renderer::CreateMesh(const Mesh& mesh) {
 }
 
 void Renderer::DeleteMesh(const MeshHandle handle) {
-  std::uint32_t retireFrame = frameContext_.CurrentFrame;
-  if (!frameContext_.FrameActive) // Retire after last frame is done.
-    retireFrame = (frameContext_.CurrentFrame + config::MaxFramesInFlight - 1) % config::MaxFramesInFlight;
-
-  meshAllocator_.DeleteDeferred(handle.MeshID, retireFrame);
+  meshAllocator_.DeleteDeferred(handle.MeshID, retireFrameForDeletion_());
 }
 
 bool Renderer::IsMeshReady(const MeshHandle mesh) noexcept {
@@ -376,5 +374,13 @@ glm::mat4 Renderer::MakeProjection(const ProjectionSettings& settings) const noe
 
 void Renderer::SetFramebufferResized(const bool hasResized) noexcept {
   context_.SetFramebufferHasResized(hasResized);
+}
+
+std::uint32_t Renderer::retireFrameForDeletion_() const noexcept {
+  if (frameContext_.FrameActive)
+    return frameContext_.CurrentFrame;
+
+  // Retire after the last submitted frame has completed.
+  return (frameContext_.CurrentFrame + config::MaxFramesInFlight - 1) % config::MaxFramesInFlight;
 }
 } // namespace engine::graphics::vulkan

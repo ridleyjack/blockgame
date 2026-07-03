@@ -5,6 +5,7 @@
 #include "Engine/Memory/SparseBuffer.hpp"
 
 #include <span>
+#include <vector>
 #include <vulkan/vulkan.h>
 
 namespace engine::graphics::vulkan {
@@ -18,7 +19,8 @@ public:
   ~ShaderDataAllocator();
 
   std::uint32_t AllocateShaderData(std::size_t size);
-  void FreeShaderData(std::uint32_t id);
+  void FreeShaderDataDeferred(std::uint32_t id, std::uint32_t retireFrame);
+  void ProcessDeferredDeletions(std::uint32_t currentFrame);
   void WriteShaderData(std::uint32_t id, std::uint32_t frame, std::span<const std::byte> data);
   VkDeviceSize GetShaderDataAddress(std::uint32_t id, std::uint32_t frame) const noexcept;
 
@@ -26,6 +28,11 @@ private:
   struct ShaderData {
     std::array<VkDeviceSize, config::MaxFramesInFlight> Offsets;
     VkDeviceSize Size;
+  };
+
+  struct PendingDelete {
+    std::uint32_t ShaderDataID{};
+    std::uint32_t RetireFrame{};
   };
 
   Context& context_;
@@ -39,6 +46,9 @@ private:
   memory::SparseBuffer sparseBuffer_{DefaultBufferMemorySize};
 
   containers::HandlePool<ShaderData> shaderDataPool_{};
+  std::vector<PendingDelete> pendingDeletes_{};
+
+  void freeShaderData_(std::uint32_t id);
 };
 
 } // namespace engine::graphics::vulkan

@@ -90,13 +90,13 @@ public:
   }
 
   template <ShaderDataStruct T> void SetShaderData(ShaderDataHandle<T> handle, const T& data) {
-    for (std::uint32_t frame = 0; frame < config::MaxFramesInFlight; ++frame) {
-      shaderDataAllocator_.WriteShaderData(handle.ShaderDataID, frame, std::as_bytes(std::span{&data, 1}));
-    }
+    shaderDataAllocator_.WriteShaderData(handle.ShaderDataID,
+                                         frameContext_.CurrentFrame,
+                                         std::as_bytes(std::span{&data, 1}));
   }
 
   template <ShaderDataStruct T> void DeleteShaderData(ShaderDataHandle<T> handle) {
-    shaderDataAllocator_.FreeShaderData(handle.ShaderDataID);
+    shaderDataAllocator_.FreeShaderDataDeferred(handle.ShaderDataID, retireFrameForDeletion_());
   }
 
   MaterialHandle CreateMaterial(TextureHandle texture);
@@ -121,6 +121,8 @@ private:
   FrameContext frameContext_{};
 
   std::uint32_t cameraShaderDataID_{};
+
+  std::uint32_t retireFrameForDeletion_() const noexcept;
 };
 } // namespace vulkan
 } // namespace engine::graphics

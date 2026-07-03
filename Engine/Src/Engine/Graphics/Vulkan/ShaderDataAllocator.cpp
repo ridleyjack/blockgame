@@ -4,6 +4,7 @@
 #include "Context.hpp"
 #include "Device.hpp"
 
+#include <algorithm>
 #include <cstring>
 
 namespace engine::graphics::vulkan {
@@ -81,14 +82,27 @@ std::uint32_t ShaderDataAllocator::AllocateShaderData(const std::size_t size) {
   return shaderDataPool_.Create(shaderData);
 }
 
-void ShaderDataAllocator::FreeShaderData(const std::uint32_t id) {
+void ShaderDataAllocator::FreeShaderDataDeferred(const std::uint32_t id, const std::uint32_t retireFrame) {
   if (!shaderDataPool_.Contains(id))
     return;
 
-  for (auto& shaderData = shaderDataPool_.Get(id); VkDeviceSize offset : shaderData.Offsets) {
-    sparseBuffer_.Free(offset);
-  }
-  shaderDataPool_.Delete(id);
+  const auto alreadyPending = std::ranges::any_of(pendingDeletes_, [id](const PendingDelete& pending) {
+    return pending.ShaderDataID == id;
+  });
+  if (alreadyPending)
+    return;
+
+  pendingDeletes_.push_back({.ShaderDataID = id, .RetireFrame = retireFrame});
+}
+
+void ShaderDataAllocator::ProcessDeferredDeletions(const std::uint32_t currentFrame) {
+  std::erase_if(pendingDeletes_, [&](const PendingDelete& pending) {
+    if (pending.RetireFrame != currentFrame)
+      return false;
+
+    freeShaderData_(pending.ShaderDataID);
+    return true;
+  });
 }
 
 void ShaderDataAllocator::WriteShaderData(const std::uint32_t id,
@@ -106,6 +120,16 @@ VkDeviceAddress ShaderDataAllocator::GetShaderDataAddress(const std::uint32_t id
                                                           const std::uint32_t frame) const noexcept {
   assert(shaderDataPool_.Contains(id));
   return deviceAddress_ + shaderDataPool_.Get(id).Offsets[frame];
+}
+
+void ShaderDataAllocator::freeShaderData_(const std::uint32_t id) {
+  if (!shaderDataPool_.Contains(id))
+    return;
+
+  for (auto& shaderData = shaderDataPool_.Get(id); VkDeviceSize offset : shaderData.Offsets) {
+    sparseBuffer_.Free(offset);
+  }
+  shaderDataPool_.Delete(id);
 }
 
 } // namespace engine::graphics::vulkan

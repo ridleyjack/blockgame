@@ -7,7 +7,6 @@
 #include "Engine/Fatal.hpp"
 #include "Engine/Graphics/Mesh.hpp"
 
-
 namespace engine::graphics::vulkan {
 
 MeshAllocator::MeshAllocator(Context& context, Uploader& uploader, MeshBuffer& meshBuffer, StagingBuffer& stagingBuffer)
@@ -16,7 +15,7 @@ MeshAllocator::MeshAllocator(Context& context, Uploader& uploader, MeshBuffer& m
 MeshAllocator::~MeshAllocator() {
   for (size_t i = 0; i < meshes_.Size(); i++) {
     if (meshes_.Contains(i))
-      deleteMesh(i);
+      deleteMesh_(i);
   }
 }
 
@@ -37,7 +36,7 @@ std::uint32_t MeshAllocator::Create(const Mesh& mesh) {
   Uploader::UploadRequest request{.OnComplete = [this, meshID]() noexcept {
     auto& gpuMesh = meshes_.Get(meshID);
     if (gpuMesh.State == MeshState::Deleting)
-      deleteMesh(meshID);
+      deleteMesh_(meshID);
     else
       gpuMesh.State = MeshState::Ready;
   }};
@@ -64,7 +63,7 @@ void MeshAllocator::ProcessDeferredDeletions(const std::uint32_t currentframe) {
     if (pending.RetireFrame != currentframe)
       return false;
 
-    deleteMesh(pending.MeshID);
+    deleteMesh_(pending.MeshID);
     return true;
   });
 }
@@ -96,7 +95,7 @@ VkDeviceSize MeshAllocator::uploadToMeshBuffer_(std::span<const std::byte> data,
   return *meshOffset;
 }
 
-void MeshAllocator::deleteMesh(const std::uint32_t meshID) {
+void MeshAllocator::deleteMesh_(const std::uint32_t meshID) {
   const auto& mesh = meshes_.Get(meshID);
   meshBuffer_.Free(mesh.VertexOffset);
   meshBuffer_.Free(mesh.IndexOffset);
