@@ -179,7 +179,7 @@ void Context::createInstance_() {
       .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
       .pEngineName = "BlockEngine",
       .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-      .apiVersion = VK_API_VERSION_1_4,
+      .apiVersion = VK_API_VERSION_1_3,
   };
 
   VkInstanceCreateInfo createInfo{};

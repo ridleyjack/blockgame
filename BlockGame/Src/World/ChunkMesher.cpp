@@ -311,7 +311,7 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
   }
 
   if (faces.Right) {
-    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Back]);
+    const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Right]);
     // +X (Right)
     vertices.insert(vertices.end(),
                     {

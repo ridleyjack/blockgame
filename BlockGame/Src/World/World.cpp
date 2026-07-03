@@ -1,6 +1,7 @@
 #include "World.hpp"
 
 #include <array>
+#include <limits>
 
 World::World(vlk::Renderer& renderer)
     : chunkMesher_(renderer, worldStore_, blockRegistry_), chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {}
@@ -67,37 +68,53 @@ void World::SetBlock(const math::Vec3Int worldBlockPos, const BlockType blockTyp
 std::optional<World::BlockHit> World::RaycastBlock(glm::vec3 origin, glm::vec3 direction, float maxDistance) {
   glm::ivec3 blockPos = glm::floor(origin);
 
-  const glm::vec3 deltaDist = glm::abs(glm::vec3{1.0f / direction.x, 1.0f / direction.y, 1.0f / direction.z});
+  constexpr float infinity = std::numeric_limits<float>::infinity();
+  auto axisDelta = [](float component) { return component == 0.0f ? infinity : std::abs(1.0f / component); };
 
-  glm::ivec3 step{};
-  glm::vec3 sideDist{};
+  const glm::vec3 deltaDist{
+      axisDelta(direction.x),
+      axisDelta(direction.y),
+      axisDelta(direction.z),
+  };
 
-  // X
-  if (direction.x < 0.0f) {
-    step.x = -1;
-    sideDist.x = (origin.x - static_cast<float>(blockPos.x)) * deltaDist.x;
-  } else {
-    step.x = 1;
-    sideDist.x = (static_cast<float>(blockPos.x + 1) - origin.x) * deltaDist.x;
-  }
+  auto setupAxis = [](float originCoord, int blockCoord, float directionCoord, float delta) {
+    struct Axis {
+      int Step{};
+      float SideDist{};
+    };
 
-  // Y
-  if (direction.y < 0.0f) {
-    step.y = -1;
-    sideDist.y = (origin.y - static_cast<float>(blockPos.y)) * deltaDist.y;
-  } else {
-    step.y = 1;
-    sideDist.y = (static_cast<float>(blockPos.y + 1) - origin.y) * deltaDist.y;
-  }
+    if (directionCoord > 0.0f) {
+      return Axis{
+          .Step = 1,
+          .SideDist = (static_cast<float>(blockCoord + 1) - originCoord) * delta,
+      };
+    }
+    if (directionCoord < 0.0f) {
+      return Axis{
+          .Step = -1,
+          .SideDist = (originCoord - static_cast<float>(blockCoord)) * delta,
+      };
+    }
+    return Axis{
+        .Step = 0,
+        .SideDist = infinity,
+    };
+  };
 
-  // Z
-  if (direction.z < 0.0f) {
-    step.z = -1;
-    sideDist.z = (origin.z - static_cast<float>(blockPos.z)) * deltaDist.z;
-  } else {
-    step.z = 1;
-    sideDist.z = (static_cast<float>(blockPos.z + 1) - origin.z) * deltaDist.z;
-  }
+  const auto x = setupAxis(origin.x, blockPos.x, direction.x, deltaDist.x);
+  const auto y = setupAxis(origin.y, blockPos.y, direction.y, deltaDist.y);
+  const auto z = setupAxis(origin.z, blockPos.z, direction.z, deltaDist.z);
+
+  glm::ivec3 step{
+      step.x = x.Step,
+      step.y = y.Step,
+      step.z = z.Step,
+  };
+  glm::vec3 sideDist{
+      sideDist.x = x.SideDist,
+      sideDist.y = y.SideDist,
+      sideDist.z = z.SideDist,
+  };
 
   const auto worldView = worldStore_.AcquireReadView();
 

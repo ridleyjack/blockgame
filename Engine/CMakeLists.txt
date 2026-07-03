@@ -1,6 +1,6 @@
 # Engine/CMakeLists.txt
 
-find_package(Vulkan REQUIRED)
+find_package(Vulkan 1.3 REQUIRED)
 
 add_library(Engine
         vendor/stb/stb_image.cpp

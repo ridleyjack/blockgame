@@ -25,16 +25,12 @@ struct RequiredDeviceFeatures {
       .synchronization2 = VK_TRUE,
       .dynamicRendering = VK_TRUE,
   };
-  VkPhysicalDeviceVulkan14Features VK14{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
-  };
 
   RequiredDeviceFeatures() {
-    VK14.pNext = &VK13;
     VK13.pNext = &VK12;
   }
   void* Chain() {
-    return &VK14;
+    return &VK13;
   }
 };
 
@@ -48,14 +44,9 @@ struct SupportedDeviceFeatures {
   VkPhysicalDeviceVulkan13Features vk13{
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
   };
-  VkPhysicalDeviceVulkan14Features vk14{
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
-  };
-
   SupportedDeviceFeatures() {
     vk10.pNext = &vk12;
     vk12.pNext = &vk13;
-    vk13.pNext = &vk14;
   }
   bool SupportsRequired() const {
     return vk10.features.samplerAnisotropy && vk12.bufferDeviceAddress && vk13.synchronization2 &&

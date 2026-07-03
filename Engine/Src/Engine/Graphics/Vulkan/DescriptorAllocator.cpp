@@ -96,23 +96,24 @@ void DescriptorAllocator::writeTexture(DescriptorEntry& entry, const TextureGPU&
   auto vkDevice = context_.GetDevice().Logical();
 
   // Update Descriptor Sets.
-  for (std::size_t i = 0; i < config::MaxFramesInFlight; i++) {
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = texture.ImageView;
-    imageInfo.sampler = texture.Sampler;
 
-    std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
-    descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptorWrites[0].dstSet = entry.DescriptorSet;
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pImageInfo = &imageInfo;
+  VkDescriptorImageInfo imageInfo{
+      .sampler = texture.Sampler,
+      .imageView = texture.ImageView,
+      .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+  };
 
-    vkUpdateDescriptorSets(vkDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
-  }
+  std::array<VkWriteDescriptorSet, 1> descriptorWrites{};
+  descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  descriptorWrites[0].dstSet = entry.DescriptorSet;
+  descriptorWrites[0].dstBinding = 0;
+  descriptorWrites[0].dstArrayElement = 0;
+  descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  descriptorWrites[0].descriptorCount = 1;
+  descriptorWrites[0].pImageInfo = &imageInfo;
+
+  vkUpdateDescriptorSets(vkDevice, descriptorWrites.size(), descriptorWrites.data(), 0, nullptr);
+
   entry.TextureReady = true;
 }
 
