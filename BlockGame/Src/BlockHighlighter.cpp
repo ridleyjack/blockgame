@@ -7,6 +7,7 @@
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <span>
 
 namespace {
 constexpr glm::vec3 HighlightColor{1.0f, 0.9f, 0.2f};
@@ -73,10 +74,12 @@ gfx::Mesh CreateBlockHighlightMesh() {
 
 BlockHighlighter::BlockHighlighter(vlk::Renderer& renderer) : renderer_{renderer} {
   auto shaderDataType = gfx::MakeShaderDataType<glm::mat4>();
-  pipeline_ = renderer.CreatePipeline(gfx::PipelineCreateInfo{.Kind = gfx::PipelineKind::SolidGeometry,
-                                                              .VertexShaderFile = "Shaders/highlight.vert.spv",
-                                                              .FragmentShaderFile = "Shaders/highlight.frag.spv",
-                                                              .ShaderDataSlots = {{shaderDataType}}});
+  pipeline_ = renderer.CreatePipeline(gfx::PipelineCreateInfo{
+      .Kind = gfx::PipelineKind::SolidGeometry,
+      .VertexShaderFile = "Shaders/highlight.vert.spv",
+      .FragmentShaderFile = "Shaders/highlight.frag.spv",
+      .ShaderDataSlots = {shaderDataType},
+  });
 
   mesh_ = renderer.CreateMesh(CreateBlockHighlightMesh());
   shaderDataHandle_ = renderer.CreateShaderData<glm::mat4>();
@@ -92,9 +95,13 @@ void BlockHighlighter::Upload() const {
   renderer_.SetShaderData(shaderDataHandle_, data);
 }
 
-void BlockHighlighter::Submit() const {
+void BlockHighlighter::Draw() const {
   gfx::ShaderDataBinding binding = gfx::BindShaderData(shaderDataHandle_);
-  renderer_.Submit({.Pipeline = pipeline_, .Mesh = mesh_, .ShaderData = {{binding}}});
+  renderer_.Submit({
+      .Pipeline = pipeline_,
+      .Mesh = mesh_,
+      .ShaderData = std::span{&binding, 1},
+  });
 }
 
 void BlockHighlighter::SetPosition(const math::Vec3Int worldBlockPos) {

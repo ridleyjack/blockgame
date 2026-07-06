@@ -1,14 +1,66 @@
 #include "World.hpp"
 
+#include "Engine/Graphics/SubmitInfo.hpp"
+#include "Engine/Graphics/PipelineCreateInfo.hpp"
+
 #include <array>
 #include <limits>
 
-World::World(vlk::Renderer& renderer)
-    : chunkMesher_(renderer, worldStore_, blockRegistry_), chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {}
+World::World(vlk::Renderer& renderer, gfx::MaterialHandle material, gfx::Color fogColor)
+    : renderer_(renderer),
+      blockMaterial_(material),
+      fogColor_(fogColor),
+      chunkMesher_(renderer, worldStore_, blockRegistry_),
+      chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {
+
+  auto shaderDataType = gfx::MakeShaderDataType<FogShaderData>();
+  pipeline_ = renderer.CreatePipeline(gfx::PipelineCreateInfo{
+      .Kind = gfx::PipelineKind::SolidTexture,
+      .VertexShaderFile = "Shaders/terrain.vert.spv",
+      .FragmentShaderFile = "Shaders/terrain.frag.spv",
+      .ShaderDataSlots = {shaderDataType},
+  });
+
+  fogShaderData_ = renderer_.CreateShaderData<FogShaderData>();
+}
+
+World::~World() {
+  renderer_.DeleteShaderData(fogShaderData_);
+  renderer_.DeletePipeline(pipeline_);
+}
 
 void World::Update(const math::Vec3Int playerPosition) {
   chunkStreamer_.Update(playerPosition);
   chunkMesher_.Update();
+}
+
+void World::Upload(const glm::vec3 cameraWorldPosition) const {
+  FogShaderData fog{
+      .CameraWorldPos = cameraWorldPosition,
+      .FogDensity = 0.008f,
+      .FogColor = glm::vec3{fogColor_.R, fogColor_.G, fogColor_.B},
+      .FogStart = 16 * 4,
+  };
+  renderer_.SetShaderData(fogShaderData_, fog);
+}
+
+void World::Draw(math::Frustum frustum) {
+  auto fogBinding = gfx::BindShaderData(fogShaderData_);
+
+  for (const auto& meshCoords : LoadedChunks()) {
+    if (!frustum.Intersects(ChunkBounds(meshCoords)))
+      continue;
+
+    const auto meshHandle = Mesh(meshCoords);
+    if (meshHandle) {
+      renderer_.Submit(gfx::SubmitInfo{
+          .Pipeline = pipeline_,
+          .Mesh = *meshHandle,
+          .Material = blockMaterial_,
+          .ShaderData = std::span{&fogBinding, 1},
+      });
+    }
+  }
 }
 
 BlockType World::GetBlock(const math::Vec3Int worldBlockPos) {

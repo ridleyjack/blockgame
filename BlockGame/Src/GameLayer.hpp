@@ -57,6 +57,8 @@ public:
   void OnMouseButtonPressed(const engine::events::MouseButtonPressedEvent& event) override;
 
 private:
+  static constexpr gfx::Color SkyColor{0.55f, 0.72f, 0.90f};
+
   engine::Application& application_;
 
   TextureRegistry textures_;

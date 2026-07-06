@@ -2,6 +2,7 @@
 
 #include "Engine/Graphics/Mesh.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
+#include "Engine/Graphics/SubmitInfo.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 namespace {
@@ -22,7 +23,7 @@ gfx::Mesh CreateCrosshairMesh() {
                              {b, CrosshairColor},
                              {c, CrosshairColor},
                              {d, CrosshairColor},
-                         });
+    });
 
     mesh.Indices.insert(mesh.Indices.end(),
                         {
@@ -62,19 +63,18 @@ gfx::Mesh CreateCrosshairMesh() {
 }
 } // namespace
 
-Crosshair::Crosshair(vlk::Renderer& renderer) {
-  renderItem_.Pipeline =
-      renderer.CreatePipeline(gfx::PipelineCreateInfo{.Kind = gfx::PipelineKind::SolidGeometry,
-                                                      .VertexShaderFile = "Shaders/crosshair.vert.spv",
-                                                      .FragmentShaderFile = "Shaders/crosshair.frag.spv"});
-
+Crosshair::Crosshair(vlk::Renderer& renderer) : renderer_(renderer) {
+  pipeline_ = renderer.CreatePipeline(gfx::PipelineCreateInfo{.Kind = gfx::PipelineKind::SolidGeometry,
+                                                              .VertexShaderFile = "Shaders/crosshair.vert.spv",
+                                                              .FragmentShaderFile = "Shaders/crosshair.frag.spv"});
   mesh_ = renderer.CreateMesh(CreateCrosshairMesh());
 }
 
-const RenderItem& Crosshair::GetRenderItem() const noexcept {
-  return renderItem_;
+Crosshair::~Crosshair() {
+  renderer_.DeleteMesh(mesh_);
+  renderer_.DeletePipeline(pipeline_);
 }
 
-gfx::MeshHandle Crosshair::GetMesh() const noexcept {
-  return mesh_;
+void Crosshair::Draw() const {
+  renderer_.Submit(gfx::SubmitInfo{.Pipeline = pipeline_, .Mesh = mesh_});
 }

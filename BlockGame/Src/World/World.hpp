@@ -21,6 +21,14 @@ namespace math = engine::math;
 
 struct ChunkMesh;
 
+struct FogShaderData {
+  alignas(16) glm::vec3 CameraWorldPos{};
+  float FogDensity{};
+
+  alignas(16) glm::vec3 FogColor{};
+  float FogStart{};
+};
+
 class World {
 public:
   struct BlockHit {
@@ -32,9 +40,13 @@ public:
   static constexpr std::uint32_t WorldHeight{3};
   static constexpr std::uint32_t WorldDepth{100};
 
-  explicit World(vlk::Renderer& renderer);
+  World(vlk::Renderer& renderer, gfx::MaterialHandle material, gfx::Color fogColor);
+  ~World();
 
   void Update(math::Vec3Int playerPosition);
+
+  void Upload(glm::vec3 cameraWorldPosition) const;
+  void Draw(math::Frustum frustum);
 
   BlockType GetBlock(math::Vec3Int worldBlockPos);
   void SetBlock(math::Vec3Int worldBlockPos, BlockType blockType);
@@ -47,6 +59,12 @@ public:
   math::AABB ChunkBounds(math::Vec3Int chunkCoord) const noexcept;
 
 private:
+  vlk::Renderer& renderer_;
+  gfx::PipelineHandle pipeline_;
+  gfx::ShaderDataHandle<FogShaderData> fogShaderData_;
+  gfx::MaterialHandle blockMaterial_;
+  gfx::Color fogColor_;
+
   WorldStore worldStore_;
   WorldGenerator worldGenerator_;
   BlockRegistry blockRegistry_;

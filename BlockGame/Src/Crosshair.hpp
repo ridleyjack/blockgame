@@ -11,11 +11,16 @@ namespace vlk = engine::graphics::vulkan;
 class Crosshair {
 public:
   explicit Crosshair(vlk::Renderer& renderer);
+  ~Crosshair();
 
-  const RenderItem& GetRenderItem() const noexcept;
-  gfx::MeshHandle GetMesh() const noexcept;
+  Crosshair(const Crosshair&) = delete;
+  Crosshair& operator=(const Crosshair&) = delete;
+
+  void Draw() const;
 
 private:
-  RenderItem renderItem_{};
+  vlk::Renderer& renderer_;
+  gfx::PipelineHandle pipeline_;
+
   gfx::MeshHandle mesh_{};
 };

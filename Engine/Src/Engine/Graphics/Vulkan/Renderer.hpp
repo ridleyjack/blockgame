@@ -10,8 +10,8 @@
 #include "StagingBuffer.hpp"
 #include "Uploader.hpp"
 
+#include "Engine/Graphics/Color.hpp"
 #include "Engine/Graphics/Handles.hpp"
-#include "Engine/Graphics/ObjectPushConstants.hpp"
 
 #include <expected>
 
@@ -67,7 +67,7 @@ public:
   Renderer(const Renderer&) = delete;
   Renderer& operator=(const Renderer&) = delete;
 
-  std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera);
+  std::expected<void, RenderError> BeginFrame(const CameraMatrices& camera, Color clearColor);
   void EndFrame();
   void Submit(const SubmitInfo& info);
 

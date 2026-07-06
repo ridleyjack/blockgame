@@ -40,7 +40,6 @@ Renderer::Renderer(GLFWwindow* window)
       descriptorAllocator_(context_, textureAllocator_),
       shaderDataAllocator_(context_) {
 
-  const auto& device = context_.GetDevice();
   cameraShaderDataID_ = shaderDataAllocator_.AllocateShaderData(sizeof(CameraShaderData));
 }
 
@@ -48,7 +47,7 @@ Renderer::~Renderer() {
   context_.WaitUntilIdle();
 }
 
-std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& camera) {
+std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& camera, const Color clearColor) {
   const auto& device = context_.GetDevice();
   auto& sync = context_.GetSync();
   auto& swapchain = context_.GetSwapchain();
@@ -132,15 +131,16 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
                                          .pImageMemoryBarriers = outputBarriers.data()};
   vkCmdPipelineBarrier2(commandBuffer, &barrierDependencyInfo);
 
-  VkRenderingAttachmentInfo colorAttachment{.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
-                                            .imageView = swapchain.ColorImageView(),
-                                            .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
-                                            .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
-                                            .resolveImageView = swapchain.ImageViews()[frameContext_.ImageIndex],
-                                            .resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
-                                            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                            .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-                                            .clearValue = {.color = {0.0f, 0.0f, 0.0f, 1.0f}}};
+  VkRenderingAttachmentInfo colorAttachment{
+      .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+      .imageView = swapchain.ColorImageView(),
+      .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+      .resolveMode = VK_RESOLVE_MODE_AVERAGE_BIT,
+      .resolveImageView = swapchain.ImageViews()[frameContext_.ImageIndex],
+      .resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+      .clearValue = {.color = {clearColor.R, clearColor.G, clearColor.B, clearColor.A}}};
   VkRenderingAttachmentInfo depthAttachment{.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
                                             .imageView = swapchain.DepthImageView(),
                                             .imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL,

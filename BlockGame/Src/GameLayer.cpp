@@ -3,9 +3,7 @@
 #include "Engine/Application.hpp"
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Events/Events.hpp"
-#include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Graphics/CameraMatrices.hpp"
-#include "Engine/Graphics/SubmitInfo.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -14,14 +12,13 @@
 
 namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
-namespace assets = engine::assets;
 namespace math = engine::math;
 
 GameLayer::GameLayer(engine::Application& application)
     : application_(application),
       textures_(application.GetRenderer()),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
-      world_(application.GetRenderer()),
+      world_(application.GetRenderer(), textures_.GetBlockMaterial(), SkyColor),
       blockHighlighter_(application.GetRenderer()),
       crosshair_(application.GetRenderer()) {
   world_.Update({1, 1, 1});
@@ -44,8 +41,8 @@ void GameLayer::OnUpdate(const float deltaTime) {
   const int playerZ = static_cast<int>(std::floor(camera_.Position().z / Chunk::ChunkDepth));
   world_.Update({playerX, 1, playerZ});
 
-  constexpr float maxDrawDistanceInBlocks = 10;
-  const auto result = world_.RaycastBlock(camera_.Position(), camera_.Forward(), maxDrawDistanceInBlocks);
+  constexpr float maxHighlightDistanceInBlocks = 10;
+  const auto result = world_.RaycastBlock(camera_.Position(), camera_.Forward(), maxHighlightDistanceInBlocks);
   if (result) {
     blockHighlighter_.SetPosition(result->Position);
     hoveredBlock_ = result->Position;
@@ -55,39 +52,28 @@ void GameLayer::OnUpdate(const float deltaTime) {
 
 void GameLayer::OnRender() {
   auto& renderer = application_.GetRenderer();
-  const auto& renderItem = textures_.GetRenderItem();
 
   float drawDistance = static_cast<float>(ChunkStreamer::LoadRadius * (Chunk::ChunkWidth + 1));
   auto projection = renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
       .FarPlane = drawDistance,
   });
-  const auto view = camera_.View();
-  auto frustum = math::Frustum::FromViewProjection(projection * view);
 
+  const auto view = camera_.View();
   gfx::CameraMatrices cameraMatrices{.Projection = projection, .View = view};
-  if (const auto r = renderer.BeginFrame(cameraMatrices); !r) {
+  if (const auto r = renderer.BeginFrame(cameraMatrices, SkyColor); !r) {
     std::println("Failed to begin rendering frame");
     return;
   }
 
-  for (const auto& meshCoords : world_.LoadedChunks()) {
-    if (!frustum.Intersects(world_.ChunkBounds(meshCoords)))
-      continue;
-
-    const auto meshHandle = world_.Mesh(meshCoords);
-    if (meshHandle)
-      renderer.Submit(
-          gfx::SubmitInfo{.Pipeline = renderItem.Pipeline, .Mesh = *meshHandle, .Material = renderItem.Material});
-  }
+  auto frustum = math::Frustum::FromViewProjection(projection * view);
+  world_.Upload(camera_.Position());
+  world_.Draw(frustum);
 
   if (hoveredBlock_) {
     blockHighlighter_.Upload();
-    blockHighlighter_.Submit();
+    blockHighlighter_.Draw();
   }
-
-  const auto& crosshairItem = crosshair_.GetRenderItem();
-  renderer.Submit(
-      {.Pipeline = crosshairItem.Pipeline, .Mesh = crosshair_.GetMesh(), .Material = crosshairItem.Material});
+  crosshair_.Draw();
 
   renderer.EndFrame();
 }

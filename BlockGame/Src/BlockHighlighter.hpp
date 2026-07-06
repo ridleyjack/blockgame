@@ -21,7 +21,7 @@ public:
   BlockHighlighter& operator=(const BlockHighlighter&) = delete;
 
   void Upload() const;
-  void Submit() const;
+  void Draw() const;
 
   void SetPosition(math::Vec3Int worldBlockPos);
 

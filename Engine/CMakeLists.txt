@@ -15,6 +15,7 @@ add_library(Engine
         Src/Engine/Events/IEventHandler.hpp
         Src/Engine/Events/IEventRaiser.hpp
         Src/Engine/Events/Events.hpp
+        Src/Engine/Graphics/Color.hpp
         Src/Engine/Math/Vec3Int.hpp
         Src/Engine/Memory/SparseBuffer.hpp
         Src/Engine/Memory/SparseBuffer.cpp

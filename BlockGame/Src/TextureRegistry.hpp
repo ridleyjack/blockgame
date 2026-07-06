@@ -19,7 +19,7 @@ class TextureRegistry {
 public:
   explicit TextureRegistry(vlk::Renderer& renderer);
 
-  const RenderItem& GetRenderItem() const noexcept;
+  const gfx::MaterialHandle GetBlockMaterial() const noexcept;
 
 private:
   struct BlockTextureResource {
@@ -44,5 +44,5 @@ private:
        }
   };
 
-  RenderItem renderItem_;
+  gfx::MaterialHandle materialHandle_{};
 };
