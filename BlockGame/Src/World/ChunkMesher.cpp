@@ -24,7 +24,7 @@ ChunkMesher::~ChunkMesher() {
   stopWorkers_();
 }
 
-std::optional<gfx::MeshHandle> ChunkMesher::RenderableMesh(const math::Vec3Int& mapCoord) {
+std::optional<gfx::MeshHandle> ChunkMesher::RenderableMesh(const math::Vec3Int mapCoord) {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
 
   auto& mesh = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
@@ -38,18 +38,18 @@ std::optional<gfx::MeshHandle> ChunkMesher::RenderableMesh(const math::Vec3Int& 
   return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].VisibleHandle;
 }
 
-void ChunkMesher::RequestLoad(const math::Vec3Int& mapCoord) {
+void ChunkMesher::RequestLoad(const math::Vec3Int mapCoord) {
   ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
   if (meshSlot.Status == ChunkMeshStatus::Building || meshSlot.Status == ChunkMeshStatus::Uploaded)
     return; // Must request deletion of mesh before building it again.
   enqueueBuild_(mapCoord);
 }
 
-void ChunkMesher::RequestRebuild(const math::Vec3Int& mapCoord) {
+void ChunkMesher::RequestRebuild(const math::Vec3Int mapCoord) {
   enqueueBuild_(mapCoord);
 }
 
-void ChunkMesher::RequestUnload(const math::Vec3Int& mapCoord) {
+void ChunkMesher::RequestUnload(const math::Vec3Int mapCoord) {
   auto& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
 
   if (meshSlot.VisibleHandle)
@@ -63,7 +63,7 @@ void ChunkMesher::RequestUnload(const math::Vec3Int& mapCoord) {
   meshSlot.Status = ChunkMeshStatus::Unloaded;
 }
 
-ChunkMeshStatus ChunkMesher::ChunkStatus(const math::Vec3Int& mapCoord) {
+ChunkMeshStatus ChunkMesher::ChunkStatus(const math::Vec3Int mapCoord) {
   return meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X].Status;
 }
 
@@ -134,15 +134,18 @@ void ChunkMesher::workerLoop_() {
     if (!job) {
       return; // Stop requested.
     }
-    auto meshResult = buildChunk_(job->Coord);
 
     ChunkBuildResult buildResult{.Coord = job->Coord, .Generation = job->Generation};
-    if (!meshResult) {
+    const auto worldView = worldStore_.AcquireReadView();
+
+    if (!buildDependenciesReady_(worldView, job->Coord)) {
       buildResult.Status = ChunkMeshStatus::MissingDependencies;
     } else {
+      auto meshResult = buildChunk_(worldView, job->Coord);
       buildResult.Status = ChunkMeshStatus::Building; // Building includes uploading.
-      buildResult.Mesh = std::move(*meshResult);
+      buildResult.Mesh = std::move(meshResult);
     }
+
     resultQueue_.Push(buildResult);
   }
 }
@@ -156,42 +159,41 @@ void ChunkMesher::enqueueBuild_(const math::Vec3Int mapCoord) {
   buildQueue_.Push({.Coord = mapCoord, .Generation = meshSlot.Generation});
 }
 
-std::optional<ChunkMesh> ChunkMesher::buildChunk_(const math::Vec3Int chunkCoord) {
-  const auto worldView = worldStore_.AcquireReadView();
+std::array<math::Vec3Int, 27> ChunkMesher::GetRequiredChunks(const math::Vec3Int chunkCoord) const {
+  std::array<math::Vec3Int, 27> chunks{};
+  std::size_t index = 0;
 
-  const auto chunk = worldView.GetChunk(chunkCoord);
-  if (chunk == nullptr)
-    return std::nullopt; // Current chunk has not been generated.
+  for (std::int32_t z = -1; z <= 1; z++) {
+    for (std::int32_t y = -1; y <= 1; y++) {
+      for (std::int32_t x = -1; x <= 1; x++) {
+        chunks[index++] = {
+            .X = chunkCoord.X + x,
+            .Y = chunkCoord.Y + y,
+            .Z = chunkCoord.Z + z,
+        };
+      }
+    }
+  }
 
-  // Verify required neighboring chunks have been generated.
-  constexpr std::array<math::Vec3Int, 6> offsets{
-      {
-       {.X = -1, .Y = 0, .Z = 0},
-       {.X = 1, .Y = 0, .Z = 0},
-       {.X = 0, .Y = -1, .Z = 0},
-       {.X = 0, .Y = 1, .Z = 0},
-       {.X = 0, .Y = 0, .Z = -1},
-       {.X = 0, .Y = 0, .Z = 1},
-       }
-  };
+  return chunks;
+}
 
-  for (const auto offset : offsets) {
-    const math::Vec3Int neighbor{
-        .X = chunkCoord.X + offset.X,
-        .Y = chunkCoord.Y + offset.Y,
-        .Z = chunkCoord.Z + offset.Z,
-    };
-
-    if (neighbor.X < 0 || neighbor.X >= WorldStore::WorldWidth || neighbor.Y < 0 ||
-        neighbor.Y >= WorldStore::WorldHeight || neighbor.Z < 0 || neighbor.Z >= WorldStore::WorldDepth) {
+bool ChunkMesher::buildDependenciesReady_(const WorldStore::ReadView& worldView, const math::Vec3Int chunkCoord) const {
+  for (const math::Vec3Int chunk : GetRequiredChunks(chunkCoord)) {
+    if (chunk.X < 0 || chunk.X >= WorldStore::WorldWidth || chunk.Y < 0 || chunk.Y >= WorldStore::WorldHeight ||
+        chunk.Z < 0 || chunk.Z >= WorldStore::WorldDepth) {
       continue;
     }
 
-    if (worldView.GetChunk(neighbor) == nullptr)
-      return std::nullopt;
+    if (worldView.GetChunk(chunk) == nullptr)
+      return false;
   }
 
-  // Create the mesh.
+  return true;
+}
+
+ChunkMesh ChunkMesher::buildChunk_(const WorldStore::ReadView& worldView, const math::Vec3Int chunkCoord) {
+  const auto chunk = worldView.GetChunk(chunkCoord);
   auto& blocks = chunk->Blocks;
   ChunkMesh mesh{};
   for (std::int32_t z = 0; z < blocks.Depth(); z++) {
@@ -233,7 +235,6 @@ std::optional<ChunkMesh> ChunkMesher::buildChunk_(const math::Vec3Int chunkCoord
         };
 
         BlockFaces faces{};
-
         if (getBlock(-1, 0, 0) == 0)
           faces.Back = true;
         if (getBlock(+1, 0, 0) == 0)
@@ -249,12 +250,73 @@ std::optional<ChunkMesh> ChunkMesher::buildChunk_(const math::Vec3Int chunkCoord
         if (getBlock(0, 0, 1) == 0)
           faces.Right = true;
 
+        if (faces.NumEnabled() == 0)
+          continue;
+
+        auto calculateAO = [&](const math::Vec3Int normal, const math::Vec3Int sideA, const math::Vec3Int sideB) {
+          const auto isSolid = [&](const math::Vec3Int offset) { return getBlock(offset.Z, offset.Y, offset.X) != 0; };
+
+          const bool a = isSolid({.X = normal.X + sideA.X, .Y = normal.Y + sideA.Y, .Z = normal.Z + sideA.Z});
+          const bool b = isSolid({.X = normal.X + sideB.X, .Y = normal.Y + sideB.Y, .Z = normal.Z + sideB.Z});
+          const bool corner = isSolid({.X = normal.X + sideA.X + sideB.X,
+                                       .Y = normal.Y + sideA.Y + sideB.Y,
+                                       .Z = normal.Z + sideA.Z + sideB.Z});
+
+          const int occlusion = a && b ? 3 : static_cast<int>(a) + static_cast<int>(b) + static_cast<int>(corner);
+          constexpr float minLight = 0.45f;
+          return minLight + (1.0f - minLight) * (3.0f - static_cast<float>(occlusion)) / 3.0f;
+        };
+
+        FaceAmbientOcclusion ambientOcclusion{};
+        if (faces.Front)
+          ambientOcclusion[Front] = {
+              calculateAO({.X = 0, .Y = 0, .Z = 1}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = 0, .Y = 0, .Z = 1}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = 0, .Y = 0, .Z = 1}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 1, .Z = 0}),
+              calculateAO({.X = 0, .Y = 0, .Z = 1}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 1, .Z = 0}),
+          };
+        if (faces.Back)
+          ambientOcclusion[Back] = {
+              calculateAO({.X = 0, .Y = 0, .Z = -1}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = 0, .Y = 0, .Z = -1}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = 0, .Y = 0, .Z = -1}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 1, .Z = 0}),
+              calculateAO({.X = 0, .Y = 0, .Z = -1}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 1, .Z = 0}),
+          };
+        if (faces.Right)
+          ambientOcclusion[Right] = {
+              calculateAO({.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}, {.X = 0, .Y = 1, .Z = 0}),
+              calculateAO({.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}, {.X = 0, .Y = 1, .Z = 0}),
+          };
+        if (faces.Left)
+          ambientOcclusion[Left] = {
+              calculateAO({.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}, {.X = 0, .Y = -1, .Z = 0}),
+              calculateAO({.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}, {.X = 0, .Y = 1, .Z = 0}),
+              calculateAO({.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}, {.X = 0, .Y = 1, .Z = 0}),
+          };
+        if (faces.Top)
+          ambientOcclusion[Top] = {
+              calculateAO({.X = 0, .Y = 1, .Z = 0}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}),
+              calculateAO({.X = 0, .Y = 1, .Z = 0}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}),
+              calculateAO({.X = 0, .Y = 1, .Z = 0}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}),
+              calculateAO({.X = 0, .Y = 1, .Z = 0}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}),
+          };
+        if (faces.Bottom)
+          ambientOcclusion[Bottom] = {
+              calculateAO({.X = 0, .Y = -1, .Z = 0}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}),
+              calculateAO({.X = 0, .Y = -1, .Z = 0}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = -1}),
+              calculateAO({.X = 0, .Y = -1, .Z = 0}, {.X = 1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}),
+              calculateAO({.X = 0, .Y = -1, .Z = 0}, {.X = -1, .Y = 0, .Z = 0}, {.X = 0, .Y = 0, .Z = 1}),
+          };
+
         const auto worldZ = static_cast<float>(blocks.Depth() * chunkCoord.Z + z);
         const auto worldY = static_cast<float>(blocks.Height() * chunkCoord.Y + y);
         const auto worldX = static_cast<float>(blocks.Width() * chunkCoord.X + x);
 
         const std::uint32_t baseVertex = mesh.Vertices.size();
-        buildVertices_(mesh, faces, blocks[z, y, x], worldZ, worldY, worldX);
+        buildVertices_(mesh, faces, ambientOcclusion, blocks[z, y, x], worldZ, worldY, worldX);
         buildIndices_(mesh, baseVertex, faces.NumEnabled());
       }
     }
@@ -265,6 +327,7 @@ std::optional<ChunkMesh> ChunkMesher::buildChunk_(const math::Vec3Int chunkCoord
 
 void ChunkMesher::buildVertices_(ChunkMesh& mesh,
                                  const BlockFaces& faces,
+                                 const FaceAmbientOcclusion& ambientOcclusion,
                                  const std::uint32_t blockType,
                                  float z,
                                  float y,
@@ -286,75 +349,89 @@ void ChunkMesher::buildVertices_(ChunkMesh& mesh,
   vertices.reserve(vertices.size() + verticesPerFace * faces.NumEnabled());
 
   const auto& textures = blockRegistry_.GetBlockDef(static_cast<BlockType>(blockType)).FaceTextures;
+  const auto color = [](const float ao) { return glm::vec3{ao, ao, ao}; };
+
   if (faces.Front) {
     const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Front]);
+    const auto& ao = ambientOcclusion[Front];
     // +Z (Front)
-    vertices.insert(vertices.end(),
-                    {
-                        {.Position = {x0, y0, z1}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y0, z1}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y1, z1}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y1, z1}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+    vertices.insert(
+        vertices.end(),
+        {
+            {.Position = {x0, y0, z1}, .Color = color(ao[0]), .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y0, z1}, .Color = color(ao[1]), .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y1, z1}, .Color = color(ao[2]), .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+            {.Position = {x0, y1, z1}, .Color = color(ao[3]), .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Back) {
     const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Back]);
+    const auto& ao = ambientOcclusion[Back];
     // -Z (Back)
-    vertices.insert(vertices.end(),
-                    {
-                        {.Position = {x1, y0, z0}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y0, z0}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y1, z0}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y1, z0}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+    vertices.insert(
+        vertices.end(),
+        {
+            {.Position = {x1, y0, z0}, .Color = color(ao[0]), .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+            {.Position = {x0, y0, z0}, .Color = color(ao[1]), .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+            {.Position = {x0, y1, z0}, .Color = color(ao[2]), .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+            {.Position = {x1, y1, z0}, .Color = color(ao[3]), .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Right) {
     const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Right]);
+    const auto& ao = ambientOcclusion[Right];
     // +X (Right)
-    vertices.insert(vertices.end(),
-                    {
-                        {.Position = {x1, y0, z1}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y0, z0}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y1, z0}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y1, z1}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+    vertices.insert(
+        vertices.end(),
+        {
+            {.Position = {x1, y0, z1}, .Color = color(ao[0]), .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y0, z0}, .Color = color(ao[1]), .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y1, z0}, .Color = color(ao[2]), .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+            {.Position = {x1, y1, z1}, .Color = color(ao[3]), .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Left) {
     const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Left]);
+    const auto& ao = ambientOcclusion[Left];
     // -X (Left)
-    vertices.insert(vertices.end(),
-                    {
-                        {.Position = {x0, y0, z0}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y0, z1}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y1, z1}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y1, z0}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+    vertices.insert(
+        vertices.end(),
+        {
+            {.Position = {x0, y0, z0}, .Color = color(ao[0]), .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+            {.Position = {x0, y0, z1}, .Color = color(ao[1]), .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+            {.Position = {x0, y1, z1}, .Color = color(ao[2]), .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+            {.Position = {x0, y1, z0}, .Color = color(ao[3]), .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Top) {
     const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Top]);
+    const auto& ao = ambientOcclusion[Top];
     // +Y (Top)
-    vertices.insert(vertices.end(),
-                    {
-                        {.Position = {x0, y1, z1}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y1, z1}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y1, z0}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y1, z0}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+    vertices.insert(
+        vertices.end(),
+        {
+            {.Position = {x0, y1, z1}, .Color = color(ao[0]), .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y1, z1}, .Color = color(ao[1]), .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y1, z0}, .Color = color(ao[2]), .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+            {.Position = {x0, y1, z0}, .Color = color(ao[3]), .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 
   if (faces.Bottom) {
     const std::uint32_t faceIndex = static_cast<std::uint32_t>(textures[Bottom]);
+    const auto& ao = ambientOcclusion[Bottom];
     // -Y (Bottom)
-    vertices.insert(vertices.end(),
-                    {
-                        {.Position = {x0, y0, z0}, .TexCoord = {0, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y0, z0}, .TexCoord = {1, 0}, .TextureIndex = faceIndex},
-                        {.Position = {x1, y0, z1}, .TexCoord = {1, 1}, .TextureIndex = faceIndex},
-                        {.Position = {x0, y0, z1}, .TexCoord = {0, 1}, .TextureIndex = faceIndex},
+    vertices.insert(
+        vertices.end(),
+        {
+            {.Position = {x0, y0, z0}, .Color = color(ao[0]), .TexCoord = {0, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y0, z0}, .Color = color(ao[1]), .TexCoord = {1, 0}, .TextureIndex = faceIndex},
+            {.Position = {x1, y0, z1}, .Color = color(ao[2]), .TexCoord = {1, 1}, .TextureIndex = faceIndex},
+            {.Position = {x0, y0, z1}, .Color = color(ao[3]), .TexCoord = {0, 1}, .TextureIndex = faceIndex},
     });
   }
 }

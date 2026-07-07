@@ -82,35 +82,43 @@ void World::SetBlock(const math::Vec3Int worldBlockPos, const BlockType blockTyp
     chunk->SetBlock(localCoord, blockType);
   }
 
-  std::array<math::Vec3Int, 7> chunksToRebuild{chunkCoord};
-  std::size_t chunkCount = 1;
+  constexpr std::int32_t worldWidth = WorldStore::WorldWidth * Chunk::ChunkWidth;
+  constexpr std::int32_t worldHeight = WorldStore::WorldHeight * Chunk::ChunkHeight;
+  constexpr std::int32_t worldDepth = WorldStore::WorldDepth * Chunk::ChunkDepth;
+
+  std::array<math::Vec3Int, 8> chunksToRebuild{}; // Max adjacent chunks is 8, includes horizontal.
+  std::size_t chunkCount = 0;
 
   auto addChunk = [&](const math::Vec3Int coord) {
-    if (coord.X < 0 || coord.X >= WorldStore::WorldWidth || coord.Y < 0 || coord.Y >= WorldStore::WorldHeight ||
-        coord.Z < 0 || coord.Z >= WorldStore::WorldDepth) {
-      return;
+    for (std::size_t i = 0; i < chunkCount; i++) {
+      if (chunksToRebuild[i] == coord)
+        return;
     }
-
+    assert(chunkCount < chunksToRebuild.size());
     chunksToRebuild[chunkCount++] = coord;
   };
 
-  if (localCoord.X == 0)
-    addChunk({.X = chunkCoord.X - 1, .Y = chunkCoord.Y, .Z = chunkCoord.Z});
-  if (localCoord.X == static_cast<std::int32_t>(Chunk::ChunkWidth) - 1)
-    addChunk({.X = chunkCoord.X + 1, .Y = chunkCoord.Y, .Z = chunkCoord.Z});
+  for (std::int32_t z = -1; z <= 1; z++) {
+    for (std::int32_t y = -1; y <= 1; y++) {
+      for (std::int32_t x = -1; x <= 1; x++) {
+        const math::Vec3Int blockCoord{
+            .X = worldBlockPos.X + x,
+            .Y = worldBlockPos.Y + y,
+            .Z = worldBlockPos.Z + z,
+        };
 
-  if (localCoord.Y == 0)
-    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y - 1, .Z = chunkCoord.Z});
-  if (localCoord.Y == static_cast<std::int32_t>(Chunk::ChunkHeight) - 1)
-    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y + 1, .Z = chunkCoord.Z});
+        if (blockCoord.X < 0 || blockCoord.X >= worldWidth || blockCoord.Y < 0 || blockCoord.Y >= worldHeight ||
+            blockCoord.Z < 0 || blockCoord.Z >= worldDepth) {
+          continue;
+        }
 
-  if (localCoord.Z == 0)
-    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y, .Z = chunkCoord.Z - 1});
-  if (localCoord.Z == static_cast<std::int32_t>(Chunk::ChunkDepth) - 1)
-    addChunk({.X = chunkCoord.X, .Y = chunkCoord.Y, .Z = chunkCoord.Z + 1});
+        addChunk(worldStore_.WorldToChunkPosition(blockCoord));
+      }
+    }
+  }
 
   for (std::size_t i = 0; i < chunkCount; i++) {
-    auto chunk = chunksToRebuild[i];
+    const math::Vec3Int chunk = chunksToRebuild[i];
     if (chunkMesher_.ChunkStatus(chunk) == ChunkMeshStatus::Unloaded)
       continue; // No need to rebuild unloaded meshes.
     chunkMesher_.RequestRebuild(chunk);
