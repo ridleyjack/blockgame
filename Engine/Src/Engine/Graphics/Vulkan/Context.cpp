@@ -152,14 +152,6 @@ Sync& Context::GetSync() const noexcept {
   return *sync_;
 }
 
-bool Context::GetFramebufferHasResized() const noexcept {
-  return framebufferHasResized_;
-}
-
-void Context::SetFramebufferHasResized(bool value) noexcept {
-  framebufferHasResized_ = value;
-}
-
 bool Context::WindowShouldClose() const noexcept {
   return glfwWindowShouldClose(window_);
 }

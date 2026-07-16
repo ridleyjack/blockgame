@@ -21,12 +21,9 @@ Application::Application(const ApplicationConfig& config) : config_(config) {
 
   window_ = std::make_unique<Window>(config.Window, *this);
   window_->Create();
-
-  renderer_ = std::make_unique<graphics::vulkan::Renderer>(window_->GetHandle());
 }
 
 Application::~Application() {
-  renderer_.reset();
   window_.reset();
   glfwTerminate();
 }
@@ -78,13 +75,8 @@ Window& Application::GetWindow() const {
   return *window_;
 }
 
-graphics::vulkan::Renderer& Application::GetRenderer() const {
-  return *renderer_;
-}
-
 void Application::RaiseEvent(const events::Event& event) {
-  std::visit(events::WindowEventDispatch{.Handler = *this}, event);
-
+  
   for (const auto& layer : std::views::reverse(layerStack_)) {
     if (auto* handler = dynamic_cast<events::IWindowEventHandler*>(layer)) {
       std::visit(events::WindowEventDispatch{.Handler = *handler}, event);
@@ -97,10 +89,4 @@ void Application::RaiseEvent(const events::Event& event) {
     }
   }
 }
-
-void Application::OnFramebufferResized(const events::FramebufferResizedEvent& event) {
-  (void)event;
-  renderer_->SetFramebufferResized(true);
-}
-
 } // namespace engine

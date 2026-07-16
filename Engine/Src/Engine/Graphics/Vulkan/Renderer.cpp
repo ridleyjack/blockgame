@@ -71,6 +71,7 @@ std::expected<void, RenderError> Renderer::BeginFrame(const CameraMatrices& came
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR) {
     swapchain.Recreate();
+    rebuildFrameBuffer_ = false;
     return std::unexpected(RenderError::FrameOutOfDate);
   }
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -237,9 +238,9 @@ void Renderer::EndFrame() {
   };
 
   const VkResult result = vkQueuePresentKHR(device.PresentQueue(), &presentInfo);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || context_.GetFramebufferHasResized()) {
+  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || rebuildFrameBuffer_) {
     swapchain.Recreate();
-    context_.SetFramebufferHasResized(false);
+    rebuildFrameBuffer_ = false;
   } else if (result != VK_SUCCESS) {
     CheckVk(result, "vkQueuePresentKHR");
   }
@@ -372,8 +373,8 @@ glm::mat4 Renderer::MakeProjection(const ProjectionSettings& settings) const noe
   return proj;
 }
 
-void Renderer::SetFramebufferResized(const bool hasResized) noexcept {
-  context_.SetFramebufferHasResized(hasResized);
+void Renderer::RebuildFrameBuffer() noexcept {
+  rebuildFrameBuffer_ = true;
 }
 
 std::uint32_t Renderer::retireFrameForDeletion_() const noexcept {

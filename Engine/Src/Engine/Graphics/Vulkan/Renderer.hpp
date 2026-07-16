@@ -103,7 +103,7 @@ public:
 
   glm::mat4 MakeProjection(const ProjectionSettings& settings) const noexcept;
 
-  void SetFramebufferResized(bool hasResized) noexcept;
+  void RebuildFrameBuffer() noexcept;
 
 private:
   Context context_;
@@ -123,6 +123,8 @@ private:
   std::uint32_t cameraShaderDataID_{};
 
   std::uint32_t retireFrameForDeletion_() const noexcept;
+
+  bool rebuildFrameBuffer_ = false;
 };
 } // namespace vulkan
 } // namespace engine::graphics

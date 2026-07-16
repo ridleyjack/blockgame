@@ -14,13 +14,14 @@ namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace math = engine::math;
 
-GameLayer::GameLayer(engine::Application& application)
+GameLayer::GameLayer(engine::Application& application, vlk::Renderer& renderer)
     : application_(application),
-      textures_(application.GetRenderer()),
+      renderer_(renderer),
+      textures_(renderer_),
       camera_({16 * 1.5f, 16 * 3.0f, 16 * 1.5f}),
-      world_(application.GetRenderer(), textures_.GetBlockMaterial(), SkyColor),
-      blockHighlighter_(application.GetRenderer()),
-      crosshair_(application.GetRenderer()) {
+      world_(renderer_, textures_.GetBlockMaterial(), SkyColor),
+      blockHighlighter_(renderer_),
+      crosshair_(renderer_) {
   world_.Update({1, 1, 1});
 }
 
@@ -51,7 +52,7 @@ void GameLayer::OnUpdate(const float deltaTime) {
 }
 
 void GameLayer::OnRender() {
-  auto& renderer = application_.GetRenderer();
+  auto& renderer = renderer_;
 
   float drawDistance = static_cast<float>(ChunkStreamer::LoadRadius * (Chunk::ChunkWidth + 1));
   auto projection = renderer.MakeProjection(vlk::Renderer::ProjectionSettings{
@@ -109,6 +110,9 @@ void GameLayer::OnMouseButtonPressed(const engine::events::MouseButtonPressedEve
   if (event.Button == GLFW_MOUSE_BUTTON_LEFT && hoveredBlock_) {
     world_.SetBlock(*hoveredBlock_, BlockType::Air);
   }
+}
+void GameLayer::OnFramebufferResized(const engine::events::FramebufferResizedEvent& event) {
+  renderer_.RebuildFrameBuffer();
 }
 
 void GameLayer::handleKeyInput(const int keycode, const bool state) {

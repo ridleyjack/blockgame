@@ -17,7 +17,11 @@ class Application;
 
 namespace graphics {
 struct Vertex;
+
+namespace vulkan {
+class Renderer;
 }
+} // namespace graphics
 
 namespace events {
 struct KeyPressedEvent;
@@ -26,6 +30,9 @@ struct KeyReleasedEvent;
 } // namespace engine
 
 namespace gfx = engine::graphics;
+namespace vlk = gfx::vulkan;
+
+namespace evt = engine::events;
 
 struct Movements {
   bool Forward{};
@@ -41,10 +48,11 @@ struct KeyInput {
 };
 
 class GameLayer : public engine::ILayer,
-                  public engine::events::IKeyEventHandler,
-                  public engine::events::IMouseEventHandler {
+                  public evt::IKeyEventHandler,
+                  public evt::IMouseEventHandler,
+                  public evt::IWindowEventHandler {
 public:
-  explicit GameLayer(engine::Application& application);
+  explicit GameLayer(engine::Application& application, vlk::Renderer& renderer);
 
   void OnUpdate(float deltaTime) override;
 
@@ -56,10 +64,13 @@ public:
   void OnMouseMoved(const engine::events::MouseMovedEvent& event) override;
   void OnMouseButtonPressed(const engine::events::MouseButtonPressedEvent& event) override;
 
+  void OnFramebufferResized(const engine::events::FramebufferResizedEvent& event) override;
+
 private:
   static constexpr gfx::Color SkyColor{0.55f, 0.72f, 0.90f};
 
   engine::Application& application_;
+  vlk::Renderer& renderer_;
 
   TextureRegistry textures_;
 

@@ -2,17 +2,12 @@
 
 #include "Window.hpp"
 #include "Events/Events.hpp"
-#include "Events/IEventHandler.hpp"
 #include "Events/IEventRaiser.hpp"
 
 #include <memory>
 #include <vector>
 
 namespace engine {
-
-namespace graphics::vulkan {
-class Renderer;
-} // namespace graphics::vulkan
 
 class ILayer;
 class Window;
@@ -22,7 +17,7 @@ struct ApplicationConfig {
   WindowConfig Window{};
 };
 
-class Application : public events::IEventRaiser, public events::IWindowEventHandler {
+class Application : public events::IEventRaiser {
 public:
   explicit Application(const ApplicationConfig& config);
   ~Application() override;
@@ -36,15 +31,11 @@ public:
   static float GetTime();
 
   Window& GetWindow() const;
-  graphics::vulkan::Renderer& GetRenderer() const;
 
   void RaiseEvent(const events::Event& event) override;
 
-  void OnFramebufferResized(const events::FramebufferResizedEvent& event) override;
-
 private:
   ApplicationConfig config_{};
-  std::unique_ptr<graphics::vulkan::Renderer> renderer_{};
   std::unique_ptr<Window> window_{};
   std::vector<ILayer*> layerStack_{};
 

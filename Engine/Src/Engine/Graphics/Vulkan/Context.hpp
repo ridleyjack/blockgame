@@ -31,9 +31,6 @@ public:
   Command& GetCommand() const noexcept;
   Sync& GetSync() const noexcept;
 
-  bool GetFramebufferHasResized() const noexcept;
-  void SetFramebufferHasResized(bool value) noexcept;
-
   bool WindowShouldClose() const noexcept;
   void WaitUntilIdle() const noexcept;
 
@@ -48,8 +45,6 @@ private:
   std::unique_ptr<SwapChain> swapchain_;
   std::unique_ptr<Command> command_;
   std::unique_ptr<Sync> sync_;
-
-  bool framebufferHasResized_{false};
 
   void createInstance_();
   void setupDebugMessenger_();
