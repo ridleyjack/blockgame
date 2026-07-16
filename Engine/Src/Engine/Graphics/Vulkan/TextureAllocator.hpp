@@ -65,15 +65,14 @@ public:
   TextureAllocator(Context& context, Uploader& uploader, StagingBuffer& staging);
   ~TextureAllocator();
 
-  std::uint32_t Create(const std::span<const std::byte>& imageData, std::uint32_t width, std::uint32_t height);
-
   const TextureGPU& Get(std::uint32_t textureID) const noexcept;
 
-  // BeginArray creates a Texture with multiple layers. A texture can be uploaded to each layer. FinishArray must be
-  // called before another array can be started.
-  void BeginArray(const resources::TextureArrayInfo& info);
+  // BeginTexture starts the process of creating a texture. FinishTexture must be called before a
+  // new texture can begin.
+  // Process: BeginTexture, UploadLayer NumberOfLayers times, FinishTexture.
+  void BeginTexture(const resources::TextureArrayInfo& info);
   void UploadLayer(const std::span<const std::byte>& imageData);
-  std::uint32_t FinishArray();
+  std::uint32_t FinishTexture();
 
 private:
   Context& context_;
@@ -82,14 +81,14 @@ private:
 
   std::vector<TextureGPU> textures_;
 
-  struct ArrayBuildState {
+  struct TextureBuildState {
     TextureGPU Texture{};
 
     VkDeviceSize LayerSizeBytes{};
     std::uint32_t NumLayers{};
     std::uint32_t NextLayer{};
   };
-  std::optional<ArrayBuildState> arrayState_{};
+  std::optional<TextureBuildState> arrayState_{};
 
   std::expected<TextureGPU, TextureError>
   createImage_(VkCommandBuffer cmd, std::uint32_t width, std::uint32_t height, std::uint32_t numLayers) const;

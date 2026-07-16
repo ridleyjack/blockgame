@@ -40,47 +40,14 @@ TextureAllocator::~TextureAllocator() {
   }
 }
 
-std::uint32_t TextureAllocator::Create(const std::span<const std::byte>& imageData,
-                                       const std::uint32_t width,
-                                       const std::uint32_t height) {
-  constexpr std::uint32_t numLayers = 1;
-  auto [cmd, batchID] = uploader_.GetCurrent();
-
-  auto textureResult = createImage_(cmd, width, height, numLayers);
-  if (!textureResult)
-    Fatal("Failed to create texture image");
-
-  TextureGPU texture = *textureResult;
-
-  if (auto result = uploadLayer_(texture, cmd, batchID, 0, imageData); !result) {
-    cleanupGPUTexture_(texture);
-    Fatal("Failed to uploade texture to image");
-  }
-
-  auto textureIDResult = finishTexture_(cmd, texture, numLayers);
-  if (!textureIDResult) {
-    cleanupGPUTexture_(texture);
-    Fatal("Failed to create texture image");
-  }
-  const std::uint32_t textureID = *textureIDResult;
-
-  Uploader::UploadRequest request{.OnComplete = [this, textureID]() noexcept {
-    TextureGPU& texture = textures_[textureID];
-    texture.State = TextureState::Ready;
-  }};
-  uploader_.Queue(std::move(request));
-
-  return textureID;
-}
-
 const TextureGPU& TextureAllocator::Get(const std::uint32_t textureID) const noexcept {
   assert(textureID < textures_.size());
   return textures_[textureID];
 }
 
-void TextureAllocator::BeginArray(const resources::TextureArrayInfo& info) {
+void TextureAllocator::BeginTexture(const resources::TextureArrayInfo& info) {
   assert(!arrayState_.has_value());
-  arrayState_.emplace(ArrayBuildState{.LayerSizeBytes = info.LayerSizeBytes, .NumLayers = info.NumLayers});
+  arrayState_.emplace(TextureBuildState{.LayerSizeBytes = info.LayerSizeBytes, .NumLayers = info.NumLayers});
 
   auto [cmd, batchID] = uploader_.GetCurrent();
   TextureGPU& texture = arrayState_->Texture;
@@ -113,7 +80,7 @@ void TextureAllocator::UploadLayer(const std::span<const std::byte>& imageData) 
   arrayState_->NextLayer++;
 }
 
-std::uint32_t TextureAllocator::FinishArray() {
+std::uint32_t TextureAllocator::FinishTexture() {
   assert(arrayState_.has_value());
   assert(arrayState_->NextLayer == arrayState_->NumLayers);
 
@@ -122,7 +89,7 @@ std::uint32_t TextureAllocator::FinishArray() {
   if (!textureIDResult) {
     cleanupGPUTexture_(arrayState_->Texture);
     arrayState_.reset();
-    Fatal("Failed to finish texture array");
+    Fatal("Failed to finish texture");
   }
   const std::uint32_t textureID = *textureIDResult;
 

@@ -71,10 +71,10 @@ VkExtent2D SwapChain::Extent() const noexcept {
   return extent_;
 }
 
-std::vector<VkImage> SwapChain::Images() const noexcept {
+std::span<const VkImage> SwapChain::Images() const noexcept {
   return images_;
 }
-std::vector<VkImageView> SwapChain::ImageViews() const noexcept {
+std::span<const VkImageView> SwapChain::ImageViews() const noexcept {
   return imageViews_;
 }
 VkImage SwapChain::DepthImage() const noexcept {

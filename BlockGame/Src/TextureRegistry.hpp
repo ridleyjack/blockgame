@@ -2,7 +2,7 @@
 
 #include "BlockTypes.hpp"
 
-#include "RenderItem.hpp"
+#include "Engine/Graphics/Handles.hpp"
 
 #include <array>
 #include <string_view>

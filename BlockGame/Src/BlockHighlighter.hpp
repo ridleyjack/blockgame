@@ -1,8 +1,9 @@
 #pragma once
 
-#include "RenderItem.hpp"
-
+#include "Engine/Graphics/Handles.hpp"
 #include "Engine/Math/Vec3Int.hpp"
+
+#include "glm/fwd.hpp"
 
 namespace engine::graphics::vulkan {
 class Renderer;

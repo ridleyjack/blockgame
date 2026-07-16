@@ -24,7 +24,6 @@ add_executable(Blockgame
         Src/World/WorldStore.hpp
         Src/BlockHighlighter.cpp
         Src/BlockHighlighter.hpp
-        Src/RenderItem.hpp
         Src/Crosshair.cpp
         Src/Crosshair.hpp
 )

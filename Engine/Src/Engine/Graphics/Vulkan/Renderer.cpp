@@ -13,9 +13,9 @@
 #include "Engine/Graphics/Handles.hpp"
 #include "Engine/Graphics/Resources/TextureArrayBuilder.hpp"
 #include "Engine/Graphics/PipelineCreateInfo.hpp"
-#include "Engine/Assets/ImageLoader.hpp"
 #include "Engine/Fatal.hpp"
 #include "Engine/Graphics/SubmitInfo.hpp"
+#include "Engine/Graphics/Resources/TextureArrayInfo.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -308,7 +308,7 @@ void Renderer::Submit(const SubmitInfo& info) {
                      &pushConstants);
 
   vkCmdDrawIndexed(commandBuffer, meshGPU.IndexCount, 1, 0, 0, 0);
-} // namespace engine::graphics::vulkan
+}
 
 bool Renderer::ShouldClose() const noexcept {
   return context_.WindowShouldClose();
@@ -351,12 +351,21 @@ bool Renderer::IsMeshReady(const MeshHandle mesh) noexcept {
 }
 
 TextureHandle Renderer::CreateTexture(const std::span<const std::byte>& data, const int width, const int height) {
-  const auto result = textureAllocator_.Create(data, width, height);
-  return TextureHandle{.TextureID = result};
+  resources::TextureArrayInfo info{
+      .Height = static_cast<std::uint32_t>(height),
+      .Width = static_cast<std::uint32_t>(width),
+      .NumLayers = 1,
+      .LayerSizeBytes = data.size(),
+  };
+
+  textureAllocator_.BeginTexture(info);
+  textureAllocator_.UploadLayer(data);
+  const std::uint32_t textureID = textureAllocator_.FinishTexture();
+  return TextureHandle{.TextureID = textureID};
 }
 
 resources::TextureArrayBuilder Renderer::BeginTextureArray(const resources::TextureArrayInfo& info) {
-  textureAllocator_.BeginArray(info);
+  textureAllocator_.BeginTexture(info);
   return resources::TextureArrayBuilder{textureAllocator_};
 }
 

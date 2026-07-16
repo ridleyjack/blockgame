@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <span>
 
 namespace engine::graphics::vulkan {
 
@@ -23,8 +24,8 @@ public:
   VkFormat ImageFormat() const noexcept;
   VkExtent2D Extent() const noexcept;
 
-  std::vector<VkImage> Images() const noexcept;
-  std::vector<VkImageView> ImageViews() const noexcept;
+  std::span<const VkImage> Images() const noexcept;
+  std::span<const VkImageView> ImageViews() const noexcept;
 
   VkImage DepthImage() const noexcept;
   VkImageView DepthImageView() const noexcept;

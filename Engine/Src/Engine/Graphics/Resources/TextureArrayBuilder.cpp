@@ -11,7 +11,7 @@ void TextureArrayBuilder::Upload(const std::span<const std::byte> pixels) const 
 }
 
 TextureHandle TextureArrayBuilder::Finalize() const {
-  const std::uint32_t result = allocator_.FinishArray();
+  const std::uint32_t result = allocator_.FinishTexture();
   return TextureHandle{.TextureID = result};
 }
 } // namespace engine::graphics::resources

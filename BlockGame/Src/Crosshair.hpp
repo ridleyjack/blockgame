@@ -1,12 +1,13 @@
 #pragma once
 
-#include "RenderItem.hpp"
+#include "Engine/Graphics/Handles.hpp"
 
 namespace engine::graphics::vulkan {
 class Renderer;
 }
 
-namespace vlk = engine::graphics::vulkan;
+namespace gfx = engine::graphics;
+namespace vlk = gfx::vulkan;
 
 class Crosshair {
 public:

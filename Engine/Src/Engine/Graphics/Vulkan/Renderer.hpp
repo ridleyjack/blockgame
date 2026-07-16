@@ -36,7 +36,6 @@ namespace vulkan {
 class PipelineCache;
 
 enum class RenderError : uint8_t {
-  FrameAcquireFailed,
   FrameOutOfDate,
 };
 
@@ -49,7 +48,6 @@ struct FrameContext {
   std::uint32_t CurrentFrame{};
   std::uint32_t ImageIndex{};
 
-  CameraShaderData CameraGPU{};
   bool FrameActive{};
 };
 
