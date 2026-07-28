@@ -10,6 +10,7 @@
 
 #include <array>
 
+class WorkerPool;
 namespace gfx = engine::graphics;
 namespace vlk = gfx::vulkan;
 namespace math = engine::math;
@@ -36,11 +37,6 @@ struct ChunkMesh {
   }
 };
 
-struct ChunkBuildJob {
-  math::Vec3Int Coord{};
-  std::uint64_t Generation{};
-};
-
 struct ChunkBuildResult {
   math::Vec3Int Coord{};
   ChunkMesh Mesh{};
@@ -50,8 +46,7 @@ struct ChunkBuildResult {
 
 class ChunkMesher {
 public:
-  ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry);
-  ~ChunkMesher();
+  ChunkMesher(vlk::Renderer& renderer, WorkerPool& workerPool, WorldStore& worldStore, BlockRegistry& blockRegistry);
 
   std::optional<gfx::MeshHandle> RenderableMesh(math::Vec3Int mapCoord);
 
@@ -91,24 +86,18 @@ private:
   };
 
   vlk::Renderer& renderer_;
+  WorkerPool& workerPool_;
+
   WorldStore& worldStore_;
   Grid3D<ChunkMeshSlot> meshes_{0, 0, 0, {}};
 
-  std::vector<std::thread> workers_{};
-  std::atomic<bool> stop_{};
-
-  ThreadSafeQueue<ChunkBuildJob> buildQueue_{};
   ThreadSafeQueue<ChunkBuildResult> resultQueue_{};
 
   BlockRegistry& blockRegistry_;
 
-  void startWorkers_(std::uint32_t count);
-  void stopWorkers_();
-  void workerLoop_();
-
   void enqueueBuild_(math::Vec3Int mapCoord);
-
   bool buildDependenciesReady_(const WorldStore::ReadView& worldView, math::Vec3Int chunkCoord) const;
+
   ChunkMesh buildChunk_(const WorldStore::ReadView& worldView, math::Vec3Int chunkCoord);
   void buildVertices_(ChunkMesh& mesh,
                       const BlockFaces& faces,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Device.hpp"
+
 #include "Engine/Memory/RingBuffer.hpp"
 
 #include <vulkan/vulkan.h>

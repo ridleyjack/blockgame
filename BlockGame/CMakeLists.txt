@@ -26,6 +26,8 @@ add_executable(Blockgame
         Src/BlockHighlighter.hpp
         Src/Crosshair.cpp
         Src/Crosshair.hpp
+        Src/Containers/WorkerPool.cpp
+        Src/Containers/WorkerPool.hpp
 )
 
 target_include_directories(Blockgame

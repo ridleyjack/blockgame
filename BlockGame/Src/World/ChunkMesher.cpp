@@ -3,26 +3,21 @@
 #include "BlockRegistry.hpp"
 #include "WorldStore.hpp"
 #include "Containers/Grid3D.hpp"
+#include "Containers/WorkerPool.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 
 #include <cstddef>
-#include <thread>
 
-ChunkMesher::ChunkMesher(vlk::Renderer& renderer, WorldStore& worldStore, BlockRegistry& blockRegistry)
+ChunkMesher::ChunkMesher(vlk::Renderer& renderer,
+                         WorkerPool& workerPool,
+                         WorldStore& worldStore,
+                         BlockRegistry& blockRegistry)
     : renderer_(renderer),
+      workerPool_(workerPool),
       worldStore_(worldStore),
       meshes_(WorldStore::WorldDepth, WorldStore::WorldHeight, WorldStore::WorldWidth, {}),
-      blockRegistry_(blockRegistry) {
-
-  std::uint32_t threadNum = std::thread::hardware_concurrency();
-  threadNum = threadNum < 2 ? 1 : threadNum - 1;
-  startWorkers_(threadNum);
-}
-
-ChunkMesher::~ChunkMesher() {
-  stopWorkers_();
-}
+      blockRegistry_(blockRegistry) {}
 
 std::optional<gfx::MeshHandle> ChunkMesher::RenderableMesh(const math::Vec3Int mapCoord) {
   assert(mapCoord.Z < meshes_.Depth() && mapCoord.Y < meshes_.Height() && mapCoord.X < meshes_.Width());
@@ -109,56 +104,6 @@ void ChunkMesher::Update() {
   }
 }
 
-void ChunkMesher::startWorkers_(const std::uint32_t count) {
-  stop_ = false;
-  for (std::uint32_t i = 0; i < count; i++) {
-    workers_.emplace_back(&ChunkMesher::workerLoop_, this);
-  }
-}
-
-void ChunkMesher::stopWorkers_() {
-  stop_.store(true);
-  buildQueue_.NotifyAll();
-
-  for (auto& t : workers_) {
-    if (t.joinable()) {
-      t.join();
-    }
-  }
-  workers_.clear();
-}
-
-void ChunkMesher::workerLoop_() {
-  while (true) {
-    auto job = buildQueue_.WaitPop(stop_);
-    if (!job) {
-      return; // Stop requested.
-    }
-
-    ChunkBuildResult buildResult{.Coord = job->Coord, .Generation = job->Generation};
-    const auto worldView = worldStore_.AcquireReadView();
-
-    if (!buildDependenciesReady_(worldView, job->Coord)) {
-      buildResult.Status = ChunkMeshStatus::MissingDependencies;
-    } else {
-      auto meshResult = buildChunk_(worldView, job->Coord);
-      buildResult.Status = ChunkMeshStatus::Building; // Building includes uploading.
-      buildResult.Mesh = std::move(meshResult);
-    }
-
-    resultQueue_.Push(buildResult);
-  }
-}
-
-void ChunkMesher::enqueueBuild_(const math::Vec3Int mapCoord) {
-  ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
-
-  meshSlot.Wanted = true;
-  meshSlot.Generation++;
-  meshSlot.Status = ChunkMeshStatus::Building;
-  buildQueue_.Push({.Coord = mapCoord, .Generation = meshSlot.Generation});
-}
-
 std::array<math::Vec3Int, 27> ChunkMesher::GetRequiredChunks(const math::Vec3Int chunkCoord) const {
   std::array<math::Vec3Int, 27> chunks{};
   std::size_t index = 0;
@@ -176,6 +121,39 @@ std::array<math::Vec3Int, 27> ChunkMesher::GetRequiredChunks(const math::Vec3Int
   }
 
   return chunks;
+}
+
+void ChunkMesher::enqueueBuild_(const math::Vec3Int mapCoord) {
+  ChunkMeshSlot& meshSlot = meshes_[mapCoord.Z, mapCoord.Y, mapCoord.X];
+
+  meshSlot.Wanted = true;
+  meshSlot.Generation++;
+  meshSlot.Status = ChunkMeshStatus::Building;
+
+  const std::uint64_t generation = meshSlot.Generation;
+
+  auto buildJob = [this, mapCoord, generation] {
+    ChunkBuildResult result{
+        .Coord = mapCoord,
+        .Generation = generation,
+    };
+
+    const auto worldView = worldStore_.AcquireReadView();
+
+    if (!buildDependenciesReady_(worldView, mapCoord)) {
+      result.Status = ChunkMeshStatus::MissingDependencies;
+    } else {
+      result.Mesh = buildChunk_(worldView, mapCoord);
+      result.Status = ChunkMeshStatus::Building;
+    }
+
+    resultQueue_.Push(std::move(result));
+  };
+
+  if (!workerPool_.Enqueue(buildJob)) {
+    meshSlot.Status =
+        meshSlot.VisibleHandle || meshSlot.PendingHandle ? ChunkMeshStatus::Uploaded : ChunkMeshStatus::Unloaded;
+  }
 }
 
 bool ChunkMesher::buildDependenciesReady_(const WorldStore::ReadView& worldView, const math::Vec3Int chunkCoord) const {

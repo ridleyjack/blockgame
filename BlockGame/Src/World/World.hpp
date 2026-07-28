@@ -4,6 +4,7 @@
 #include "ChunkMesher.hpp"
 #include "WorldGenerator.hpp"
 #include "BlockRegistry.hpp"
+#include "Containers/WorkerPool.hpp"
 
 #include "Engine/Graphics/Vulkan/Renderer.hpp"
 #include "Engine/Math/Frustum.hpp"
@@ -11,7 +12,6 @@
 
 #include <glm/vec3.hpp>
 
-#include <cstdint>
 #include <optional>
 #include <span>
 
@@ -64,6 +64,8 @@ private:
   gfx::ShaderDataHandle<FogShaderData> fogShaderData_;
   gfx::MaterialHandle blockMaterial_;
   gfx::Color fogColor_;
+
+  WorkerPool workerPool_;
 
   WorldStore worldStore_;
   WorldGenerator worldGenerator_;

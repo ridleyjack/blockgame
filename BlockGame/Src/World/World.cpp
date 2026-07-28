@@ -10,7 +10,7 @@ World::World(vlk::Renderer& renderer, gfx::MaterialHandle material, gfx::Color f
     : renderer_(renderer),
       blockMaterial_(material),
       fogColor_(fogColor),
-      chunkMesher_(renderer, worldStore_, blockRegistry_),
+      chunkMesher_(renderer, workerPool_, worldStore_, blockRegistry_),
       chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {
 
   auto shaderDataType = gfx::MakeShaderDataType<FogShaderData>();
@@ -25,6 +25,7 @@ World::World(vlk::Renderer& renderer, gfx::MaterialHandle material, gfx::Color f
 }
 
 World::~World() {
+  workerPool_.Cancel();
   renderer_.DeleteShaderData(fogShaderData_);
   renderer_.DeletePipeline(pipeline_);
 }
