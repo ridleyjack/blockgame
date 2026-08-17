@@ -2,34 +2,58 @@
 
 #include "ChunkMesher.hpp"
 #include "WorldGenerator.hpp"
+#include "Containers/WorkerPool.hpp"
 
-ChunkStreamer::ChunkStreamer(WorldStore& worldStore, WorldGenerator& generator, ChunkMesher& mesher)
-    : worldStore_(worldStore), worldGenerator_(generator), mesher_(mesher) {
+ChunkStreamer::ChunkStreamer(WorkerPool& workerPool,
+                             WorldStore& worldStore,
+                             WorldGenerator& generator,
+                             ChunkMesher& mesher)
+    : workerPool_(workerPool), worldStore_(worldStore), worldGenerator_(generator), mesher_(mesher) {
+
   const std::size_t size = (2 * LoadRadius + 1) * (2 * LoadRadius + 1) * worldStore_.WorldHeight;
   loadedChunkList_.reserve(size);
   loadedChunks_.reserve(size);
 
   const std::size_t dataSize = (2 * (LoadRadius + 1) + 1) * (2 * (LoadRadius + 1) + 1) * worldStore_.WorldHeight;
   loadedDataChunks_.reserve(dataSize);
+  loadingDataChunks_.reserve(dataSize);
 }
 
 void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
-  if (playerChunk == lastPlayerChunk_)
+
+  auto chunkResult = dataChunkResultQueue_.TryPop();
+
+  if (playerChunk == lastPlayerChunk_ && !chunkResult) {
+    retryMissingMeshes_();
     return;
+  }
   lastPlayerChunk_ = playerChunk;
 
-  ChunkSet desiredMeshChunks = buildChunkSet_(playerChunk, LoadRadius);
-  ChunkSet desiredDataChunks = buildChunkSet_(playerChunk, LoadRadius + 1);
+  const ChunkSet desiredMeshChunks = buildChunkSet_(playerChunk, LoadRadius);
+  const ChunkSet desiredDataChunks = buildChunkSet_(playerChunk, LoadRadius + 1);
 
   auto worldView = worldStore_.AcquireWriteView();
+  while (chunkResult) {
+    auto& result = *chunkResult;
+    loadingDataChunks_.erase(result.Coord);
+
+    if (desiredDataChunks.contains(result.Coord)) {
+      loadedDataChunks_.insert(result.Coord);
+      worldView.StoreChunk(result.Coord, std::move(result.Chunk));
+    }
+
+    chunkResult = dataChunkResultQueue_.TryPop();
+  }
 
   // Update chunk block data.
   // Chunk mesh generation depends on the block data for the desired chunk to mesh and its neighbors.
   for (auto& chunkCoord : desiredDataChunks) {
-    if (const auto result = worldView.GetChunk(chunkCoord); !result) {
-      worldView.StoreChunk(chunkCoord, worldGenerator_.GenerateChunk(chunkCoord));
-      loadedDataChunks_.insert(chunkCoord);
-    }
+    if (const auto result = worldView.GetChunk(chunkCoord); result)
+      continue;
+    if (loadedDataChunks_.contains(chunkCoord) || loadingDataChunks_.contains(chunkCoord))
+      continue;
+    if (enqueueDataChunkBuild_(chunkCoord))
+      loadingDataChunks_.insert(chunkCoord);
   }
 
   // Remove unneeded data chunks. This data will need to be saved and loaded from disk if persistent worlds are ever
@@ -61,17 +85,17 @@ void ChunkStreamer::Update(const math::Vec3Int playerChunk) {
       mesher_.RequestLoad(chunk);
       loadedChunks_.insert(chunk);
     }
-    if (mesher_.ChunkStatus(chunk) == ChunkMeshStatus::MissingDependencies)
-      mesher_.RequestLoad(chunk);
     loadedChunkList_.push_back(chunk);
   }
+  retryMissingMeshes_();
 }
 
 std::span<const math::Vec3Int> ChunkStreamer::LoadedChunks() const noexcept {
   return loadedChunkList_;
 }
 
-ChunkStreamer::ChunkSet ChunkStreamer::buildChunkSet_(const math::Vec3Int centerPosition, const std::int32_t radius) {
+ChunkStreamer::ChunkSet ChunkStreamer::buildChunkSet_(const math::Vec3Int centerPosition,
+                                                      const std::int32_t radius) const {
   const std::uint32_t size = (2 * radius + 1) * (2 * radius + 1) * worldStore_.WorldHeight;
   ChunkSet result{};
   result.reserve(size);
@@ -91,4 +115,19 @@ ChunkStreamer::ChunkSet ChunkStreamer::buildChunkSet_(const math::Vec3Int center
     }
 
   return result;
+}
+
+bool ChunkStreamer::enqueueDataChunkBuild_(math::Vec3Int chunkCoord) {
+  auto buildJob = [this, chunkCoord]() {
+    Chunk chunk = worldGenerator_.GenerateChunk(chunkCoord);
+    dataChunkResultQueue_.Push({chunkCoord, std::move(chunk)});
+  };
+  return workerPool_.Enqueue(buildJob);
+}
+
+void ChunkStreamer::retryMissingMeshes_() const {
+  for (const auto& chunk : loadedChunks_) {
+    if (mesher_.ChunkStatus(chunk) == ChunkMeshStatus::MissingDependencies)
+      mesher_.RequestLoad(chunk);
+  }
 }

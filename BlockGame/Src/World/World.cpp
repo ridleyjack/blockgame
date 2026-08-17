@@ -11,7 +11,7 @@ World::World(vlk::Renderer& renderer, gfx::MaterialHandle material, gfx::Color f
       blockMaterial_(material),
       fogColor_(fogColor),
       chunkMesher_(renderer, workerPool_, worldStore_, blockRegistry_),
-      chunkStreamer_(worldStore_, worldGenerator_, chunkMesher_) {
+      chunkStreamer_(workerPool_, worldStore_, worldGenerator_, chunkMesher_) {
 
   auto shaderDataType = gfx::MakeShaderDataType<FogShaderData>();
   pipeline_ = renderer.CreatePipeline(gfx::PipelineCreateInfo{
