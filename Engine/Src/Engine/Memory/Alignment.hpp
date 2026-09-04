@@ -5,6 +5,13 @@
 #include <optional>
 #include <bit>
 
+namespace {
+bool AddOverflow(const std::uint64_t a, const std::uint64_t b, std::uint64_t& result) {
+  result = a + b;
+  return result < a;
+}
+}
+
 namespace engine::memory {
 
 // Align returns the smallest value >= value that is a multiple of alignment.
@@ -15,7 +22,7 @@ constexpr std::optional<std::uint64_t> Align(const std::uint64_t value, const st
   const std::uint64_t mask = alignment - 1;
 
   std::uint64_t sum{};
-  if (__builtin_add_overflow(value, mask, &sum))
+  if (AddOverflow(value, mask, sum))
     return std::nullopt;
   return sum & ~mask;
 }

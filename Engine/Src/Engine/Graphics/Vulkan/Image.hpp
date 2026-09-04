@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <expected>
 #include <string_view>
+#include <bit>
+
 #include <vulkan/vulkan.h>
 
 namespace engine::graphics::vulkan {

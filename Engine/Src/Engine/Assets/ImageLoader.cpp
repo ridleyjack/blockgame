@@ -13,7 +13,9 @@ std::expected<ImageData, std::string> LoadImage(const std::filesystem::path& pat
   int channels{};
 
   stbi_set_flip_vertically_on_load(true);
-  stbi_uc* data = stbi_load(path.c_str(), &result.Width, &result.Height, &channels, outputChannels);
+
+  const std::string pathString = path.string();
+  stbi_uc* data = stbi_load(pathString.c_str(), &result.Width, &result.Height, &channels, outputChannels);
   if (!data) {
     return std::unexpected{"Failed to load image: " + path.string() + ": " + stbi_failure_reason()};
   }

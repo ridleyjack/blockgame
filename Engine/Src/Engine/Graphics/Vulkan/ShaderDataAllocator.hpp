@@ -6,6 +6,7 @@
 
 #include <span>
 #include <vector>
+#include <array>
 #include <vulkan/vulkan.h>
 
 namespace engine::graphics::vulkan {

@@ -13,6 +13,7 @@
 #include <cassert>
 #include <limits>
 #include <print>
+#include <array>
 
 namespace engine::graphics::vulkan {
 

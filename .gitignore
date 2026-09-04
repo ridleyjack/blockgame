@@ -1,11 +1,15 @@
 # Build directories
 cmake-build-debug/
 
-# CLion / JetBrains IDE settings
+# CLion / JetBrains IDE Settings
 .idea/
 build/
 build-clang/
 build-make/
+
+# Visual Studio IDE Settings
+.vs/*
+BlockGame/.vs/*
 
 # Compiled Shaders
 *.spv
