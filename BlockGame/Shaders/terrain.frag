@@ -16,6 +16,9 @@ layout (location = 0) out vec4 outColor;
 
 void main() {
     vec4 texColor = texture(texSampler, vec3(fragTexCoord, fragTexIdx));
+    if (texColor.a == 0.0)
+    discard;
+
     vec3 baseColor = texColor.rgb * fragColor;
 
     float d = length(fragWorldPos - fragCameraWorldPos);
@@ -27,5 +30,6 @@ void main() {
     fogAmount = clamp(fogAmount, 0.0, 1.0);
 
     vec3 color = mix(baseColor, fragFogColor, fogAmount);
+
     outColor = vec4(color, texColor.a);
 }

@@ -99,12 +99,21 @@ private:
   bool buildDependenciesReady_(const WorldStore::ReadView& worldView, math::Vec3Int chunkCoord) const;
 
   ChunkMesh buildChunk_(const WorldStore::ReadView& worldView, math::Vec3Int chunkCoord);
-  void buildVertices_(ChunkMesh& mesh,
-                      const BlockFaces& faces,
-                      const FaceAmbientOcclusion& ambientOcclusion,
-                      std::uint32_t blockType,
-                      float z,
-                      float y,
-                      float x);
+
+  void buildSolidBlock_(const WorldStore::ReadView& worldView,
+                        ChunkMesh& mesh,
+                        math::Vec3Int chunkCoord,
+                        math::Vec3Int blockCoord);
+
+  void buildCrossBillboardBlock_(ChunkMesh& mesh, math::Vec3Int chunkCoord, math::Vec3Int blockCoord, BlockType type);
+
+  void buildSolidBlockVertices_(ChunkMesh& mesh,
+                                const BlockFaces& faces,
+                                const FaceAmbientOcclusion& ambientOcclusion,
+                                std::uint32_t blockType,
+                                float z,
+                                float y,
+                                float x);
+
   void buildIndices_(ChunkMesh& mesh, std::uint32_t baseVertex, std::uint32_t numFaces);
 };

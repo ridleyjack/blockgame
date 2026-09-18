@@ -41,6 +41,8 @@ private:
        {BlockTexture::StoneDirt, "Textures/Tiles/stone_dirt.png"},
        {BlockTexture::StoneGrass, "Textures/Tiles/stone_grass.png"},
        {BlockTexture::StoneSnow, "Textures/Tiles/stone_snow.png"},
+       {BlockTexture::Bush1, "Textures/Tiles/grass1.png"},
+       {BlockTexture::Rock, "Textures/Tiles/rock.png"},
        }
   };
 

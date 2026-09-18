@@ -14,10 +14,18 @@ enum BlockFace : std::uint8_t {
   Right,
 };
 
+enum class BlockShape : std::uint8_t {
+  Cube,
+  CrossBillboard,
+};
+
 class BlockRegistry {
 public:
   struct BlockDef {
     std::array<BlockTexture, 6> FaceTextures{};
+
+    BlockShape Shape{BlockShape::Cube};
+    bool Opaque{true};
   };
 
   BlockRegistry();

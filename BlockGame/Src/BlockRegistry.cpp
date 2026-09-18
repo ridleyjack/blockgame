@@ -3,6 +3,9 @@
 BlockRegistry::BlockRegistry() {
   constexpr auto toIndex = [](BlockType value) noexcept -> std::size_t { return static_cast<std::size_t>(value); };
 
+  // Air.
+  blockDefs_[toIndex(BlockType::Air)].Opaque = false;
+
   // Dirt.
   blockDefs_[toIndex(BlockType::Dirt)].FaceTextures.fill(BlockTexture::Dirt);
 
@@ -23,6 +26,18 @@ BlockRegistry::BlockRegistry() {
 
   // Stone.
   blockDefs_[toIndex(BlockType::Stone)].FaceTextures.fill(BlockTexture::Stone);
+
+  // Bush.
+  auto& bushDef = blockDefs_[toIndex(BlockType::Bush)];
+  bushDef.FaceTextures.fill(BlockTexture::Bush1);
+  bushDef.Opaque = false;
+  bushDef.Shape = BlockShape::CrossBillboard;
+
+  // Rock.
+  auto& rockDef = blockDefs_[toIndex(BlockType::Rock)];
+  rockDef.FaceTextures.fill(BlockTexture::Rock);
+  rockDef.Opaque = false;
+  rockDef.Shape = BlockShape::CrossBillboard;
 }
 
 const BlockRegistry::BlockDef& BlockRegistry::GetBlockDef(BlockType blockType) const {

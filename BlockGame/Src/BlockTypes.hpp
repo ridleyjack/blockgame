@@ -16,6 +16,8 @@ enum class BlockTexture : std::uint8_t {
   StoneDirt,
   StoneGrass,
   StoneSnow,
+  Bush1,
+  Rock,
   Count,
 };
 
@@ -28,6 +30,8 @@ enum class BlockType : std::uint8_t {
   Snow,
   Ice,
   Stone,
+  Bush,
+  Rock,
   Count,
 };
 constexpr std::size_t BlockTypeCount = static_cast<std::size_t>(BlockType::Count);

@@ -65,6 +65,15 @@ constexpr int GenerateHeight(const std::uint64_t seed, int worldX, int worldZ) {
 BlockType WorldGenerator::BlockAt(math::Vec3Int worldCoord) {
   const int height = GenerateHeight(seed, worldCoord.X, worldCoord.Z);
 
+  if (worldCoord.Y == height + 1) {
+    const double decoration = Random01(seed ^ 0x7d4f8a2b93c15e6aULL, worldCoord.X, worldCoord.Z);
+    if (decoration < 0.015)
+      return BlockType::Rock;
+    if (decoration < 0.075)
+      return BlockType::Bush;
+    return BlockType::Air;
+  }
+
   if (worldCoord.Y > height)
     return BlockType::Air;
 
